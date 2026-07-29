@@ -114,7 +114,7 @@ a finished diff — not as a routine step.
 
 ## Where things stand
 
-**Recently completed and verified (through Batch 012):**
+**Recently completed and verified (through Batch 013):**
 
 - Weekly planning grid: rows size to their tallest cell (88pt floor), nearby start times
   cluster into one row via the tested `WeeklyGridLayout` type. Visually confirmed.
@@ -160,7 +160,7 @@ a finished diff — not as a routine step.
   Snapshot restore deliberately skips readable-document auto-sync so reloading is exact.
   Verification: 103 tests passed and Xcode build succeeded.
 - **"Sunrise Planner" visual redesign, Batch C (Planning Preview) — implemented, verified,
-  and captured; awaiting owner visual approval.** Planning Preview now uses the warm lesson
+  and captured; owner visual approval granted.** Planning Preview now uses the warm lesson
   sidebar, status tags, editor heading, warning banner, collapsible editor cards, styled text
   fields, source provenance rows, export readiness, and output action buttons. Existing
   behavior is preserved: lesson selection, New lesson, status changes, fill-empty-fields, add
@@ -168,24 +168,34 @@ a finished diff — not as a routine step.
   Verification: Swift build with temp caches passed, 103 tests passed, and real Xcode build
   succeeded. Screenshot:
   `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`.
+- **"Sunrise Planner" visual redesign, Batch D part 1 (Document Intake) — implemented,
+  verified, and captured; awaiting owner visual approval.** Document Intake now has the warm
+  import panel, automatic sorting summary, guarded Clear and start over action, custom
+  imported-document rows, an "All set for this week" ready panel, and styled source detail /
+  readiness / text-review / optional draft areas. Existing behavior is preserved: multi-file
+  and folder import, DOCX/PDF support, source role overrides, source text edits, manual draft
+  creation, and optional Codex CLI draft workflow. Verification: Swift build with temp caches
+  passed, 103 tests passed, and real Xcode build succeeded. Screenshot:
+  `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`.
 
-**This is a deliberate pause point, not a finished feature.** Planning Preview, Document
-now has the Sunrise look, but Document Intake and most of Workspace still use the *original*
-stock-SwiftUI look. Do not move to them until Planning Preview has owner visual approval.
+**This is a deliberate pause point, not a finished feature.** Planning Preview and Document
+Intake now have the Sunrise look, but most of Workspace still uses the *original*
+stock-SwiftUI look. Do not move to Workspace until Document Intake has owner visual approval.
 
 ## Start here
 
-1. **Ask me to visually approve the latest Planning Preview screenshot and the new Workspace
+1. **Ask me to visually approve the latest Document Intake screenshot and the new Workspace
    Progress safety section** before making more UI redesign changes:
 
-   `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`
+   `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`
 
-   Mention that Planning Preview now has the Sunrise lesson sidebar, collapsible editor cards,
-   status tags, and styled output/readiness controls. Also mention that the new Progress
-   safety controls are functionally verified but have not yet had owner visual QA.
+   Mention that Document Intake now has the Sunrise import panel, automatic sorting summary,
+   ready-state panel, source detail cards, and guarded clear/start-over action. Also mention
+   that the new Progress safety controls are functionally verified but have not yet had owner
+   visual QA.
 
-2. **If I approve or give feedback that doesn't change the approach**: continue with Batch D
-   of the redesign — Document Intake + Workspace — following
+2. **If I approve or give feedback that doesn't change the approach**: continue with the
+   Workspace redesign following
    `/Users/nils/.claude/plans/snuggly-brewing-elephant.md`'s described rollout (foundation is
    already built; each remaining batch re-skins one/two screens onto it). Declare compute
    level and model shape first, as always.

@@ -588,10 +588,9 @@ System Events/Accessibility is not needed and has historically been unavailable.
 
 Likely next development sequence, in the owner's stated priority order as of 2026-07-29:
 
-1. Visually confirm the Batch C Planning Preview redesign:
-   `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`.
-   If approved, continue the "Sunrise Planner" redesign with Batch D
-   (Document Intake + Workspace), following
+1. Visually confirm the Batch D part 1 Document Intake redesign:
+   `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`.
+   If approved, continue the "Sunrise Planner" redesign with Workspace, following
    /Users/nils/.claude/plans/snuggly-brewing-elephant.md.
 2. Layout-preserving PowerPoint export: use `PowerPointTemplateInspector.resolvePlaceholders(url:)`
    (Batch 005/006) to actually place approved-lesson content into a customer-owned template's
@@ -635,7 +634,7 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 012), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 013), the app has a working local-first prototype path:
 
 document/folder import -> automatic role sorting and pacing scaffold -> weekly planner
 population -> interactive weekly lesson cells -> lesson plan/deck/differentiation guide
@@ -647,12 +646,14 @@ foundation and Today screen are done, committed, and visually confirmed. This We
 reskinned and polished with compact P/D/G output chips. Planning Preview has now been
 reskinned in Batch 012 with a warm lesson sidebar, status tags, collapsible editor cards,
 styled warning/readiness/output controls, and preserved lesson/output behavior. Document
-Intake and Workspace are the remaining stock-looking screens, except for the already-added
-Workspace Progress safety section.
+Intake has been reskinned in Batch 013 with a warm import panel, automatic sorting summary,
+ready-state panel, styled source detail/review cards, and guarded clear/start-over behavior.
+Workspace is the remaining stock-looking screen, except for the already-added Progress safety
+section.
 
-Local verification for Batch 012: Swift build with temp caches passed; full Swift test suite
+Local verification for Batch 013: Swift build with temp caches passed; full Swift test suite
 passed 103 tests with 0 failures; real Xcode build succeeded. Screenshot:
-`Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`.
+`Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`.
 
 GitHub status: local branch is `main`; remote is
 `https://github.com/niljuanzo89/Teachers-Assistant.git`; the repo is public and visible to
@@ -665,8 +666,8 @@ Immediate next session should:
 1. Read CONTINUITY_LOG.md's Batch 008 entry and this document's sections 4/11/13 for full
    context — do not re-derive the font/icon/staging decisions, they're already made.
 2. Ask the owner for visual approval of
-   `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`.
-3. If green-lit, propose Batch D (Document Intake + Workspace) — compute/model-shape
+   `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`.
+3. If green-lit, propose the Workspace redesign — compute/model-shape
    declaration first, following the same DesignSystem.swift foundation already built.
 4. Keep the GitHub push blocker visible but do not spend more local development time on it
    unless the owner asks or a 50-step sync checkpoint is reached.

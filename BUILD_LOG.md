@@ -803,3 +803,22 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   with 0 failures; real Xcode build succeeded before and after lower-output-area polish.
 - Visual QA screenshot saved at
   `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`.
+
+### 2026-07-29 — "Sunrise Planner" redesign, Batch D part 1: Document Intake
+
+- Re-skinned Document Intake around the intended low-friction flow: add documents/folders,
+  show automatic sorting and pacing readiness, and present a large "All set for this week"
+  ready state when imports are available.
+- Preserved the existing multi-file/folder picker, DOCX/PDF support, role inference, source
+  role override picker, local text review/editing, optional manual draft creation, and
+  optional Codex CLI draft workflow.
+- Added custom intake UI helpers in `WorkspaceView.swift`: `ImportedSourceRow` and
+  `IntakeStatePanel`; updated `ImportedSourceRoleSummaryView` and `SourceReadinessView` to
+  use the Sunrise design system.
+- Added a guarded "Clear and start over" action from the intake summary, reusing the existing
+  current-profile clear behavior and destructive confirmation.
+- Verification: Swift build with temp caches passed; full Swift test suite passed 103 tests
+  with 0 failures; real Xcode build succeeded. A first screenshot revealed sidebar summary
+  truncation, fixed before the final capture.
+- Visual QA screenshot saved at
+  `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`.

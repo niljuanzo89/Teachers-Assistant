@@ -303,9 +303,14 @@ struct SourceImportView: View {
     @State private var actionMessage: String?
     @State private var proposalJSON = ""
     @State private var isGeneratingCodexDraft = false
+    @State private var isShowingClearConfirmation = false
 
     private var selectedSource: ImportedSource? {
         store.importedSources.first { $0.id == selectedSourceID }
+    }
+
+    private var intakeReport: ImportedSourceIntakeReport {
+        ImportedSourceIntakeReport.analyze(store.importedSources)
     }
 
     fileprivate init(selectedTab: Binding<WorkspaceTab>) {
@@ -314,121 +319,214 @@ struct SourceImportView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 20) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Document intake").font(.largeTitle.bold())
-                    Spacer()
-                    Button("Add documents…") { chooseDocumentItems() }
-                }
-                Text("Choose PDF or Word documents together, or select a folder. Readable files are sorted and used to update pacing and this week's plan automatically.")
-                    .foregroundStyle(.secondary)
-                Text("In the picker, use Command-click for separate files, or choose a folder to bring in everything supported inside it.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                ImportedSourceRoleSummaryView(sources: store.importedSources)
-                List {
-                    ForEach(store.importedSources, id: \.id) { source in
-                        Button {
-                            selectedSourceID = source.id
-                            loadSelection(source.id)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(source.reference.displayName).lineLimit(1)
-                                HStack {
-                                    Text(source.effectiveSetupRole.displayName)
-                                    Text("•")
-                                    Text(source.extractionMethod.displayName)
+            DSCard(radius: DS.radiusLG, padding: 0) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .top) {
+                        Text("Document\nintake")
+                            .font(DS.font(30, weight: .semibold))
+                            .foregroundStyle(DS.text)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        Button("Add\ndocuments…") { chooseDocumentItems() }
+                            .buttonStyle(.dsPrimary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding([.horizontal, .top], 18)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Choose PDF or Word documents together, or select a folder.")
+                            .font(DS.font(14))
+                            .foregroundStyle(DS.text)
+                        Text("Readable files are sorted automatically and used to update pacing and this week's plan.")
+                            .font(DS.font(13))
+                            .foregroundStyle(DS.neutral700)
+                    }
+                    .padding(.horizontal, 18)
+
+                    ImportedSourceRoleSummaryView(sources: store.importedSources) {
+                        isShowingClearConfirmation = true
+                    }
+                    .padding(.horizontal, 18)
+
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 10) {
+                            ForEach(store.importedSources, id: \.id) { source in
+                                ImportedSourceRow(
+                                    source: source,
+                                    isSelected: selectedSourceID == source.id
+                                ) {
+                                    selectedSourceID = source.id
+                                    loadSelection(source.id)
                                 }
-                                .font(.caption)
-                                .foregroundStyle(source.extractionMethod == .ocrRequired ? Color.orange : Color.secondary)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .buttonStyle(.plain)
-                        .listRowBackground(selectedSourceID == source.id ? Color.accentColor.opacity(0.15) : Color.clear)
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 18)
                     }
                 }
             }
-            .frame(width: 300)
+            .frame(width: 340)
 
             if let source = selectedSource {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(source.reference.displayName).font(.title2.bold())
-                    Picker("Document role", selection: Binding(
-                        get: { source.effectiveSetupRole },
-                        set: { store.updateImportedSourceRole(id: source.id, role: $0) }
-                    )) {
-                        ForEach(ImportedSourceRole.allCases) { role in
-                            Text(role.displayName).tag(role)
-                        }
-                    }
-                    Text(source.effectiveSetupRole.supportsCoursePacing ? "This document can help build course pacing." : "This document will stay available for lesson planning, but will not drive course pacing.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    SourceReadinessView(report: SourceReadinessReport.analyze(source))
-                    if source.extractionMethod == .ocrRequired {
-                        ContentUnavailableView("OCR required", systemImage: "text.viewfinder", description: Text("This PDF contains no selectable text. Local OCR is the next Phase 2 slice; no lesson will be created from an empty extraction."))
-                    } else {
-                        if let confidence = source.confidence {
-                            Text("OCR confidence: \(confidence, format: .percent.precision(.fractionLength(0))). Unreadable details may be omitted; edit the text only where needed.")
-                                .foregroundStyle(.orange)
-                        } else {
-                            Text("Readable text is used automatically. Edit this text only if something important is missing or incorrect.").foregroundStyle(.secondary)
-                        }
-                        TextEditor(text: $reviewedText)
-                            .font(.body.monospaced())
-                            .border(.quaternary)
-                        HStack {
-                            Button("Save text edits") {
-                                store.saveSourceReview(id: source.id, text: reviewedText)
-                                actionMessage = "Text edits saved."
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(source.reference.displayName)
+                                    .font(DS.font(28, weight: .semibold))
+                                    .foregroundStyle(DS.text)
+                                Text(source.effectiveSetupRole.supportsCoursePacing ? "This document can help build course pacing." : "This document stays available for planning but will not drive course pacing.")
+                                    .font(DS.font(13))
+                                    .foregroundStyle(DS.neutral700)
                             }
-                            Text(source.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No readable text" : "Ready to use")
-                                .foregroundStyle(.secondary)
-                        }
-                        Divider()
-                        TextField("Lesson title", text: $lessonTitle)
-                        TextField("Learning objective (optional)", text: $lessonObjective)
-                        Button("Create draft lesson from source") {
-                            store.createDraftLesson(from: source, title: lessonTitle, objective: lessonObjective)
-                            actionMessage = "Draft created. Opening Planning Preview…"
-                            selectedTab = .planning
-                        }
-                        .disabled(source.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        DisclosureGroup("Optional AI-assisted draft") {
-                            Text("Personal workflow: this button sends the readable source text to your signed-in Codex CLI account, then creates an editable draft. Nothing is approved automatically.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                            HStack {
-                                Button("Generate AI draft with Codex CLI") { generateCodexDraft(source) }
-                                    .disabled(source.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGeneratingCodexDraft)
-                                if isGeneratingCodexDraft { ProgressView().controlSize(.small) }
-                            }
-                            HStack {
-                                Button("Copy JSON extraction prompt") {
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString(store.lessonDraftPrompt(for: source), forType: .string)
-                                    actionMessage = "Extraction prompt copied locally."
+                            Spacer()
+                            Picker("Document role", selection: Binding(
+                                get: { source.effectiveSetupRole },
+                                set: { store.updateImportedSourceRole(id: source.id, role: $0) }
+                            )) {
+                                ForEach(ImportedSourceRole.allCases) { role in
+                                    Text(role.displayName).tag(role)
                                 }
-                                .disabled(source.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                                Button("Create draft from JSON") { createDraftFromProposal(source) }
-                                    .disabled(proposalJSON.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || source.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }
-                            TextEditor(text: $proposalJSON)
-                                .font(.body.monospaced())
-                                .frame(minHeight: 150)
-                                .border(.quaternary)
+                            .frame(width: 230)
                         }
-                        if let actionMessage {
-                            Label(actionMessage, systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
+
+                        SourceReadinessView(report: SourceReadinessReport.analyze(source))
+                        if source.extractionMethod == .ocrRequired {
+                            DSCard {
+                                ContentUnavailableView("OCR required", systemImage: "text.viewfinder", description: Text("This PDF contains no selectable text. Local OCR is a later slice; no lesson will be created from an empty extraction."))
+                                    .foregroundStyle(DS.neutral700)
+                                    .frame(maxWidth: .infinity, minHeight: 280)
+                            }
+                        } else {
+                            DSCard {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Label("Readable text", systemImage: "text.alignleft")
+                                            .font(DS.font(17, weight: .semibold))
+                                            .foregroundStyle(DS.text)
+                                        Spacer()
+                                        Text(source.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No readable text" : "Ready to use")
+                                            .font(DS.font(12.5, weight: .semibold))
+                                            .foregroundStyle(source.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? DS.accent2_700 : DS.accent700)
+                                    }
+                                    if let confidence = source.confidence {
+                                        Text("OCR confidence: \(confidence, format: .percent.precision(.fractionLength(0))). Unreadable details may be omitted; edit only where needed.")
+                                            .font(DS.font(13))
+                                            .foregroundStyle(DS.accent2_700)
+                                    } else {
+                                        Text("The app uses readable text automatically. Edit only if something important is missing or incorrect.")
+                                            .font(DS.font(13))
+                                            .foregroundStyle(DS.neutral700)
+                                    }
+                                    TextEditor(text: $reviewedText)
+                                        .font(.system(size: 12, design: .monospaced))
+                                        .frame(minHeight: 260)
+                                        .scrollContentBackground(.hidden)
+                                        .padding(8)
+                                        .background(DS.neutral100)
+                                        .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: DS.radiusMD).stroke(DS.divider, lineWidth: 1)
+                                        }
+                                    Button("Save text edits") {
+                                        store.saveSourceReview(id: source.id, text: reviewedText)
+                                        actionMessage = "Text edits saved."
+                                    }
+                                    .buttonStyle(.dsSecondary)
+                                }
+                            }
+
+                            DSCard {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("Optional lesson draft")
+                                        .font(DS.font(17, weight: .semibold))
+                                        .foregroundStyle(DS.text)
+                                    TextField("Lesson title", text: $lessonTitle)
+                                        .textFieldStyle(.ds)
+                                    TextField("Learning objective (optional)", text: $lessonObjective)
+                                        .textFieldStyle(.ds)
+                                    Button("Create draft lesson from source") {
+                                        store.createDraftLesson(from: source, title: lessonTitle, objective: lessonObjective)
+                                        actionMessage = "Draft created. Opening Planning Preview…"
+                                        selectedTab = .planning
+                                    }
+                                    .disabled(source.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                    .buttonStyle(.dsPrimary)
+                                }
+                            }
+
+                            DSCard {
+                                DisclosureGroup("Optional AI-assisted draft") {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        Text("Personal workflow: this sends readable source text to your signed-in Codex CLI account, then creates an editable draft. Nothing is approved automatically.")
+                                            .font(DS.font(13))
+                                            .foregroundStyle(DS.neutral700)
+                                        HStack {
+                                            Button("Generate AI draft with Codex CLI") { generateCodexDraft(source) }
+                                                .disabled(source.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGeneratingCodexDraft)
+                                                .buttonStyle(.dsSecondary)
+                                            if isGeneratingCodexDraft { ProgressView().controlSize(.small) }
+                                        }
+                                        HStack {
+                                            Button("Copy JSON extraction prompt") {
+                                                NSPasteboard.general.clearContents()
+                                                NSPasteboard.general.setString(store.lessonDraftPrompt(for: source), forType: .string)
+                                                actionMessage = "Extraction prompt copied locally."
+                                            }
+                                            .disabled(source.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                            .buttonStyle(.dsSecondary)
+                                            Button("Create draft from JSON") { createDraftFromProposal(source) }
+                                                .disabled(proposalJSON.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || source.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                                .buttonStyle(.dsSecondary)
+                                        }
+                                        TextEditor(text: $proposalJSON)
+                                            .font(.system(size: 12, design: .monospaced))
+                                            .frame(minHeight: 150)
+                                            .scrollContentBackground(.hidden)
+                                            .padding(8)
+                                            .background(DS.neutral100)
+                                            .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
+                                            .overlay {
+                                                RoundedRectangle(cornerRadius: DS.radiusMD).stroke(DS.divider, lineWidth: 1)
+                                            }
+                                    }
+                                }
+                            }
+
+                            if let actionMessage {
+                                Label(actionMessage, systemImage: "checkmark.circle.fill")
+                                    .font(DS.font(13, weight: .semibold))
+                                    .foregroundStyle(DS.accent700)
+                            }
                         }
                     }
                 }
+                .padding(.trailing, 4)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
-                ContentUnavailableView("Choose setup documents", systemImage: "doc.badge.plus", description: Text("Add pacing guides, curriculum maps, calendars, assessment schedules, and lesson materials from files or a folder."))
-                    .frame(maxWidth: .infinity)
+                IntakeStatePanel(hasImports: !store.importedSources.isEmpty, report: intakeReport) {
+                    chooseDocumentItems()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+        .padding(28)
+        .background(DS.bg)
+        .confirmationDialog(
+            "Clear imported documents and planners?",
+            isPresented: $isShowingClearConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear documents, lessons, and planners", role: .destructive) {
+                store.clearCurrentDocumentsAndEntries()
+                selectedSourceID = nil
+                reviewedText = ""
+                actionMessage = "Documents and planner entries cleared."
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This wipes imported documents, lessons, generated-output history, daily plan, weekly planner, registered source folders, and pacing for the current profile.")
         }
     }
 
@@ -493,22 +591,32 @@ struct SourceImportView: View {
 
 private struct ImportedSourceRoleSummaryView: View {
     var sources: [ImportedSource]
+    var clear: () -> Void
 
     private var report: ImportedSourceIntakeReport { ImportedSourceIntakeReport.analyze(sources) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(report.title, systemImage: report.canBuildCoursePacing ? "checkmark.circle" : "tray.and.arrow.down")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(report.canBuildCoursePacing ? Color.green : Color.primary)
+        VStack(alignment: .leading, spacing: 8) {
+            Label(report.title, systemImage: report.canBuildCoursePacing ? "checkmark.circle.fill" : "tray.and.arrow.down")
+                .font(DS.font(14, weight: .semibold))
+                .foregroundStyle(report.canBuildCoursePacing ? DS.accent700 : DS.text)
             Text(report.pacingStatus)
-                .font(.footnote)
-                .foregroundStyle(report.canBuildCoursePacing ? Color.secondary : Color.orange)
+                .font(DS.font(12.5))
+                .foregroundStyle(report.canBuildCoursePacing ? DS.neutral700 : DS.accent2_700)
+                .fixedSize(horizontal: false, vertical: true)
             FlowRoleCounts(report: report)
+            if !sources.isEmpty {
+                Button("Clear and start over") { clear() }
+                    .buttonStyle(.plain)
+                    .font(DS.font(12.5, weight: .semibold))
+                    .foregroundStyle(DS.accent2_700)
+                    .padding(.top, 4)
+            }
         }
-        .padding(10)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DS.accent100.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
     }
 }
 
@@ -521,9 +629,85 @@ private struct FlowRoleCounts: View {
                 let count = report.roleCounts[role, default: 0]
                 if count > 0 {
                     Text("\(role.displayName): \(count)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.neutral700)
                 }
+            }
+        }
+    }
+}
+
+private struct ImportedSourceRow: View {
+    var source: ImportedSource
+    var isSelected: Bool
+    var select: () -> Void
+
+    var body: some View {
+        Button(action: select) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(source.reference.displayName)
+                    .font(DS.font(14.5, weight: .semibold))
+                    .foregroundStyle(DS.text)
+                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    DSTag(text: source.effectiveSetupRole.displayName, variant: source.effectiveSetupRole.supportsCoursePacing ? .accent : .neutral)
+                    Text(source.extractionMethod.displayName)
+                        .font(DS.font(12))
+                        .foregroundStyle(source.extractionMethod == .ocrRequired ? DS.accent2_700 : DS.neutral700)
+                        .lineLimit(1)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? DS.accent100 : DS.neutral100.opacity(0.58))
+            .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
+            .overlay {
+                RoundedRectangle(cornerRadius: DS.radiusMD)
+                    .stroke(isSelected ? DS.accent300 : DS.divider, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct IntakeStatePanel: View {
+    var hasImports: Bool
+    var report: ImportedSourceIntakeReport
+    var chooseDocuments: () -> Void
+
+    var body: some View {
+        DSCard {
+            VStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(hasImports ? DS.accent100 : DS.neutral100)
+                        .frame(width: 86, height: 86)
+                    Image(systemName: hasImports ? "checkmark.circle.fill" : "doc.badge.plus")
+                        .symbolRenderingMode(.hierarchical)
+                        .font(.system(size: 42, weight: .semibold))
+                        .foregroundStyle(hasImports ? DS.accent700 : DS.accent600)
+                }
+                Text(hasImports ? "All set for this week" : "Choose setup documents")
+                    .font(DS.font(28, weight: .semibold))
+                    .foregroundStyle(DS.text)
+                Text(hasImports ? report.pacingStatus : "Add pacing guides, curriculum maps, calendars, assessment schedules, and lesson materials from files or a folder.")
+                    .font(DS.font(14))
+                    .foregroundStyle(DS.neutral700)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+                Button(hasImports ? "Add more documents…" : "Add documents…") {
+                    chooseDocuments()
+                }
+                .buttonStyle(.dsPrimary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(40)
+        }
+        .overlay {
+            if !hasImports {
+                RoundedRectangle(cornerRadius: DS.radiusLG)
+                    .stroke(DS.accent300, style: StrokeStyle(lineWidth: 1.5, dash: [8, 8]))
+                    .padding(10)
             }
         }
     }
@@ -534,36 +718,43 @@ private struct SourceReadinessView: View {
 
     private var tint: Color {
         switch report.level {
-        case .readyForReview: .green
-        case .carefulReviewRequired: .orange
-        case .visualReviewRequired, .blocked: .red
+        case .readyForReview: DS.accent700
+        case .carefulReviewRequired: DS.accent2_700
+        case .visualReviewRequired, .blocked: DS.accent2_800
         }
     }
 
     var body: some View {
-        GroupBox("Source readiness") {
+        DSCard(radius: DS.radiusMD, padding: 14) {
             VStack(alignment: .leading, spacing: 6) {
                 Label(report.level.title, systemImage: report.level == .readyForReview ? "checkmark.circle" : "exclamationmark.triangle")
+                    .font(DS.font(15, weight: .semibold))
                     .foregroundStyle(tint)
-                Text(report.summary).font(.footnote)
+                Text(report.summary)
+                    .font(DS.font(13))
+                    .foregroundStyle(DS.neutral700)
                 if !report.risks.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Review focus")
-                            .font(.footnote.weight(.semibold))
+                            .font(DS.font(13, weight: .semibold))
+                            .foregroundStyle(DS.text)
                         ForEach(report.risks) { risk in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(risk.title)
-                                    .font(.footnote.weight(.semibold))
+                                    .font(DS.font(13, weight: .semibold))
+                                    .foregroundStyle(DS.text)
                                 Text(risk.reviewInstruction)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                                    .font(DS.font(12.5))
+                                    .foregroundStyle(DS.neutral700)
                             }
                         }
                     }
                     .padding(.vertical, 2)
                 }
                 ForEach(report.checks, id: \.self) { check in
-                    Text("• \(check)").font(.footnote).foregroundStyle(.secondary)
+                    Text("• \(check)")
+                        .font(DS.font(12.5))
+                        .foregroundStyle(DS.neutral700)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

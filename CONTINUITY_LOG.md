@@ -773,3 +773,61 @@ generate-output paths remain unchanged.
 1. Owner visual approval of the Planning Preview redesign.
 2. Continue the Sunrise redesign with Document Intake and Workspace after visual approval.
 3. GitHub push remains blocked by command-line authentication; keep working locally.
+
+---
+
+### Batch 013 — 2026-07-29 — Document Intake Sunrise redesign
+
+**Compute:** medium. **Model shape:** single sufficient — contained View-layer reskin with
+existing import, role inference, source review, and optional draft behavior preserved.
+
+**Goal.** Continue the staged "Sunrise Planner" redesign by re-skinning Document Intake as
+a single obvious place to add setup documents, see automatic sorting, and optionally inspect
+source details.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Received owner visual approval for Planning Preview | Cleared the Batch 012 visual checkpoint |
+| 2 | Started a 30-step local pass | Declared medium compute and single-model shape |
+| 3 | Read `SourceImportView` and nearby helper views | Found stock `List`, plain text, and stock readiness `GroupBox` |
+| 4 | Re-read design reference for Document Intake and Workspace | Confirmed intake target: left import panel + right empty/ready state |
+| 5 | Inspected the Document Intake reference screenshot | Confirmed the imported-state summary and large ready panel layout |
+| 6 | Inspected the Workspace reference screenshot | Confirmed Workspace should be treated as a separate visual area |
+| 7 | Decided to complete Intake before Workspace | Keeps the staged visual checkpoint rule intact |
+| 8 | Added `isShowingClearConfirmation` to `SourceImportView` | Enables guarded clear/start-over from intake |
+| 9 | Added `intakeReport` computed property | Reuses existing imported-source analysis for summary/ready state |
+| 10 | Replaced the intake left column with a `DSCard` panel | Warm heading, short helper copy, and primary Add documents button |
+| 11 | Preserved the existing picker behavior | Multi-file DOCX/PDF and folder import remain wired to `chooseDocumentItems()` |
+| 12 | Replaced the stock imported-source list | Uses custom scroll rows instead of a native `List` |
+| 13 | Added `ImportedSourceRow` | Rows show document name, inferred role tag, and extraction method |
+| 14 | Updated the import summary component | Uses warm summary card styling and role counts |
+| 15 | Added "Clear and start over" to intake summary | Calls a confirmation dialog before clearing current profile planning data |
+| 16 | Added `IntakeStatePanel` | Right panel now shows empty-state upload prompt or "All set for this week" state |
+| 17 | Reworked selected-source detail header | Uses DS typography and preserves document-role picker |
+| 18 | Re-skinned source readiness | `SourceReadinessView` now uses DS card, fonts, and warm warning colors |
+| 19 | Re-skinned readable-text editor | Preserves local text editing and save behavior |
+| 20 | Re-skinned optional manual draft card | Preserves Create draft lesson from source behavior |
+| 21 | Re-skinned optional AI draft area | Preserves Codex CLI draft, prompt copy, JSON paste, and draft creation |
+| 22 | Added destructive intake clear confirmation | Warns that imported docs, lessons, outputs, daily plan, weekly plan, folders, and pacing are wiped |
+| 23 | Ran Swift build with temp caches | Passed |
+| 24 | Ran full Swift test suite | 103 tests passed, 0 failures |
+| 25 | Ran real Xcode build | BUILD SUCCEEDED |
+| 26 | Captured first intake screenshot | Saved `13-document-intake-sunrise-redesign.png` |
+| 27 | Visually inspected screenshot | Layout matched reference, but summary text truncated in the narrow sidebar |
+| 28 | Fixed summary wrapping | Added vertical fixed sizing for pacing-status text |
+| 29 | Rebuilt and recaptured | Swift build and Xcode build passed; screenshot overwritten with corrected capture |
+| 30 | Stopped before Workspace | Workspace is the next separate visual area and needs owner visual approval of Intake first |
+
+**Outcome.** Document Intake now presents a cleaner A-to-B flow: add PDFs/DOCX/folders,
+show automatic document sorting and pacing readiness, display a ready-state panel when imports
+are available, and keep source inspection/editing available without making it feel mandatory.
+
+**Screenshot.**
+
+`Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`
+
+**Still open.**
+
+1. Owner visual approval of the Document Intake redesign.
+2. Continue the Sunrise redesign with Workspace after Intake approval.
+3. GitHub push remains blocked by command-line authentication; continue local work.
