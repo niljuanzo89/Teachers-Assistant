@@ -786,3 +786,20 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
 - Added 2 tests for snapshot save/restore and clear behavior. First run exposed an exactness
   issue in restore caused by startup auto-sync; fixed with `reload(syncReadableDocuments:)`.
   Final verification: 103 tests passed, 0 failures; real Xcode build succeeded.
+
+### 2026-07-29 — "Sunrise Planner" redesign, Batch C: Planning Preview
+
+- Re-skinned the Planning Preview lesson editor using the established Sunrise design system:
+  warm lesson sidebar, status tags, editor heading, warning banner, collapsible section cards,
+  styled text fields, source provenance rows, export readiness, and output action buttons.
+- Preserved existing behavior: lesson selection, New lesson, status changes, fill-empty-fields,
+  add instructional step, save lesson, approve lesson, and Plan/Guide/Deck generation still
+  call the same store methods.
+- Added small helper views in `WorkspaceView.swift`: `LessonSidebarRow`, `LessonStatusTag`,
+  `LessonWarningBanner`, `LessonEditorSection`, and `LessonEditorSectionCard`.
+- First compile caught a non-exhaustive lesson-status switch; fixed by adding `.generated`
+  status handling as an outline tag.
+- Verification: Swift build with temp caches passed; full Swift test suite passed 103 tests
+  with 0 failures; real Xcode build succeeded before and after lower-output-area polish.
+- Visual QA screenshot saved at
+  `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`.

@@ -704,17 +704,72 @@ GitHub sync/checkpoint, commit appropriate local work and attempt to sync to Git
 
 Current GitHub state:
 
-- Local repo is clean on `master` as of commit `e1c9b86` (`Batch 008-011: redesign This Week
-  and add progress safety`).
+- Local repo is on `main`; the GitHub seed commit was merged locally at `7afa717`
+  (`Merge GitHub repository seed`).
 - Remote `origin` is configured as
   `https://github.com/niljuanzo89/Teachers-Assistant.git`.
 - `git push` is blocked because command-line git has no GitHub credentials on this Mac:
   `fatal: could not read Username for 'https://github.com': Device not configured`.
-- Codex settings UI shows the GitHub connector as connected, but GitHub MCP tool checks still
-  return zero installed accounts/repositories and `niljuanzo89/Teachers-Assistant` returns
-  404 from the connector. This likely means the connector is connected at the app level but
-  has not been granted access to that specific private repository, or the connector state has
-  not propagated into the tool session.
+- After the owner made the repository public, the GitHub connector could see
+  `niljuanzo89/Teachers-Assistant` and reported push/admin permissions. However, the
+  available connector tools did not expose a whole-repo branch-ref push path, so command-line
+  git authentication is still required for syncing the local project history.
 
 Continue local work; retry connector visibility and/or git push at the next 50-step sync
 checkpoint or when the owner adjusts GitHub access.
+
+---
+
+### Batch 012 — 2026-07-29 — Planning Preview Sunrise redesign
+
+**Compute:** medium. **Model shape:** single sufficient — contained View-layer reskin with
+existing behavior preserved and verified locally.
+
+**Goal.** Continue the staged "Sunrise Planner" redesign by re-skinning the Planning Preview
+lesson editor without changing lesson persistence, approval, or output generation logic.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Re-read continuation docs and current git state | Confirmed local branch `main`, clean before this batch, GitHub push still set aside |
+| 2 | Read the Sunrise design plan/reference for Planning Preview | Confirmed target: 280pt sidebar, warm editor pane, status tags, accordion-style sections |
+| 3 | Read existing `DraftLessonView` and output controls | Found stock `List`, `GroupBox`, native buttons, and plain readiness styling |
+| 4 | Replaced the lesson sidebar container | Now uses `DSCard`, Sunrise heading typography, secondary New button, and custom scroll rows |
+| 5 | Added `LessonSidebarRow` | Rows show lesson title and status tag; selected row gets accent background/border |
+| 6 | Added `LessonStatusTag` | Maps Draft/Reviewed/Approved/Generated to the design-system tag variants |
+| 7 | Reworked the editor header | Uses DS serif heading and muted helper copy while preserving the native status picker |
+| 8 | Replaced AI warning GroupBox | Added warm `LessonWarningBanner` with accent styling |
+| 9 | Added `LessonEditorSection` state | Tracks open/closed editor sections locally in the view |
+| 10 | Added `LessonEditorSectionCard` | Reusable rounded card with icon, title, chevron, divider, and collapsible body |
+| 11 | Re-skinned Core lesson fields | Existing bound TextFields now use the Sunrise text-field style |
+| 12 | Re-skinned Instructional sequence | Existing steps display as neutral cards; Add step behavior is unchanged |
+| 13 | Re-skinned Materials, Differentiation, and Source provenance | Existing bindings and text-selection behavior preserved |
+| 14 | First compile check | Failed on non-exhaustive lesson status switch; real code issue caught before runtime |
+| 15 | Fixed Generated status handling | Generated lessons now display as outline status tags |
+| 16 | Verified Swift build | `swift build` with temp caches passed |
+| 17 | Verified full Swift tests | 103 tests passed, 0 failures |
+| 18 | Verified Xcode app build | Real `xcodebuild` succeeded |
+| 19 | Captured Planning Preview screenshot | Saved `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png` |
+| 20 | Polished lower output area and reverified | Export readiness and output buttons now use DS styling; Swift build and Xcode build passed again |
+
+**Outcome.** Planning Preview now matches the Sunrise visual language: warm lesson list,
+status tags, carded/collapsible editor sections, styled warnings, readiness, and compact
+output actions. The underlying lesson selection, save, approval, fill-empty-fields, and
+generate-output paths remain unchanged.
+
+**Screenshot.**
+
+`Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`
+
+**Dead ends / notes.**
+
+- A plain `swift build -Xswiftc -gnone` hit the known SwiftPM cache permission issue before
+  compiling. The documented temp-cache command was used successfully.
+- Multiple LessonPlanner app instances were still present during screenshot capture. The
+  newest window was selected by PID/window ID; do not treat older same-sized windows as proof
+  of the current build.
+
+**Still open.**
+
+1. Owner visual approval of the Planning Preview redesign.
+2. Continue the Sunrise redesign with Document Intake and Workspace after visual approval.
+3. GitHub push remains blocked by command-line authentication; keep working locally.

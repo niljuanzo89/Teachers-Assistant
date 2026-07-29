@@ -1620,36 +1620,56 @@ struct DraftLessonView: View {
     @State private var printablePrompt = ""
     @State private var latestOutput: GeneratedOutputRecord?
     @State private var isGeneratingSlideDeck = false
+    @State private var openSections: Set<LessonEditorSection> = Set(LessonEditorSection.allCases)
 
     var body: some View {
         HStack(alignment: .top, spacing: 20) {
-            VStack(alignment: .leading, spacing: 12) {
+            DSCard(radius: DS.radiusLG, padding: 0) {
+                VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("Lessons").font(.title.bold())
+                        Text("Lessons")
+                            .font(DS.font(26, weight: .semibold))
+                            .foregroundStyle(DS.text)
                     Spacer()
                     Button("New") {
                         store.saveDraftLesson(title: "Untitled lesson", objective: "")
                     }
+                        .buttonStyle(.dsSecondary)
                 }
-                List(store.lessons, selection: $selectedLessonID) { item in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(item.title).lineLimit(1)
-                        Text(item.status.rawValue.capitalized)
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    .tag(item.id)
-                }
-                .onChange(of: selectedLessonID) { _, id in loadLesson(id) }
-            }
-            .frame(width: 250)
+                    .padding([.horizontal, .top], 16)
 
-            Divider()
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 8) {
+                            ForEach(store.lessons) { item in
+                                LessonSidebarRow(
+                                    lesson: item,
+                                    isSelected: selectedLessonID == item.id
+                                ) {
+                                    selectedLessonID = item.id
+                                    loadLesson(item.id)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 16)
+                    }
+                    .scrollContentBackground(.hidden)
+                }
+            }
+            .frame(width: 280)
 
             if let binding = lessonBinding {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                     HStack {
-                        Text("Lesson editor").font(.largeTitle.bold())
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Lesson editor")
+                                .font(DS.font(32, weight: .semibold))
+                                .foregroundStyle(DS.text)
+                            Text("Review the lesson record, then generate the aligned outputs.")
+                                .font(DS.font(14))
+                                .foregroundStyle(DS.neutral700)
+                        }
                         Spacer()
                         Picker("Status", selection: binding.status) {
                             Text("Draft").tag(LessonStatus.draft)
@@ -1658,8 +1678,6 @@ struct DraftLessonView: View {
                         }
                         .frame(width: 180)
                     }
-                    Text("Edit and review this record before output generation. It remains local and traceable to its source.")
-                        .foregroundStyle(.secondary)
 
                     if binding.sourceTextSnapshot.wrappedValue?.isEmpty == false {
                         Button("Fill empty fields from labeled source text") {
@@ -1668,63 +1686,109 @@ struct DraftLessonView: View {
                             materialsText = updated.materials.joined(separator: "\n")
                         }
                         .help("Uses only explicit labels such as Objective, Materials, Assessment, or Differentiation. It does not infer missing content.")
+                        .buttonStyle(.dsSecondary)
                     }
 
                     if let warnings = binding.aiReviewWarnings.wrappedValue, !warnings.isEmpty {
-                        GroupBox("AI review warnings") {
-                            VStack(alignment: .leading, spacing: 6) {
-                                ForEach(warnings, id: \.self) { warning in
-                                    Label(warning, systemImage: "exclamationmark.triangle")
-                                        .foregroundStyle(.orange)
+                        LessonWarningBanner(warnings: warnings)
+                    }
+
+                    LessonEditorSectionCard(
+                        title: "Core lesson",
+                        systemImage: "book.closed",
+                        isOpen: sectionBinding(.core)
+                    ) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            TextField("Lesson title", text: binding.title)
+                                .textFieldStyle(.ds)
+                            TextField("Subject", text: binding.subject)
+                                .textFieldStyle(.ds)
+                            TextField("Grade or age range", text: binding.gradeOrAgeRange)
+                                .textFieldStyle(.ds)
+                            TextField("Learning objective", text: binding.objective, axis: .vertical)
+                                .textFieldStyle(.ds)
+                        }
+                    }
+
+                    LessonEditorSectionCard(
+                        title: "Instructional sequence",
+                        systemImage: "list.number",
+                        isOpen: sectionBinding(.sequence)
+                    ) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(binding.instructionalSequence.wrappedValue, id: \.id) { step in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(step.title)
+                                        .font(DS.font(15, weight: .semibold))
+                                        .foregroundStyle(DS.text)
+                                    if !step.notes.isEmpty {
+                                        Text(step.notes)
+                                            .font(DS.font(13))
+                                            .foregroundStyle(DS.neutral700)
+                                    }
                                 }
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(DS.neutral100)
+                                .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
                             }
+                            TextField("Step title", text: $newStepTitle)
+                                .textFieldStyle(.ds)
+                            TextField("Step notes", text: $newStepNotes)
+                                .textFieldStyle(.ds)
+                            Button("Add step") { addStep() }
+                                .disabled(newStepTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                .buttonStyle(.dsSecondary)
                         }
                     }
 
-                    GroupBox("Core lesson") {
+                    LessonEditorSectionCard(
+                        title: "Materials and assessment",
+                        systemImage: "checklist",
+                        isOpen: sectionBinding(.materials)
+                    ) {
                         VStack(alignment: .leading, spacing: 12) {
-                        TextField("Lesson title", text: binding.title)
-                        TextField("Subject", text: binding.subject)
-                        TextField("Grade or age range", text: binding.gradeOrAgeRange)
-                        TextField("Learning objective", text: binding.objective, axis: .vertical)
+                            TextField("Materials (one per line)", text: $materialsText, axis: .vertical)
+                                .textFieldStyle(.ds)
+                            TextField("Assessment or success check", text: binding.assessmentSummary, axis: .vertical)
+                                .textFieldStyle(.ds)
                         }
                     }
 
-                    GroupBox("Instructional sequence") {
-                        VStack(alignment: .leading, spacing: 12) {
-                        ForEach(binding.instructionalSequence.wrappedValue, id: \.id) { step in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(step.title).bold()
-                                if !step.notes.isEmpty { Text(step.notes).foregroundStyle(.secondary) }
-                            }
-                        }
-                        TextField("Step title", text: $newStepTitle)
-                        TextField("Step notes", text: $newStepNotes)
-                        Button("Add step") { addStep() }
-                            .disabled(newStepTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        }
-                    }
-
-                    GroupBox("Materials and assessment") {
-                        VStack(alignment: .leading, spacing: 12) {
-                        TextField("Materials (one per line)", text: $materialsText, axis: .vertical)
-                        TextField("Assessment or success check", text: binding.assessmentSummary, axis: .vertical)
-                        }
-                    }
-
-                    GroupBox("Differentiation") {
+                    LessonEditorSectionCard(
+                        title: "Differentiation",
+                        systemImage: "person.2",
+                        isOpen: sectionBinding(.differentiation)
+                    ) {
                         VStack(alignment: .leading, spacing: 12) {
                             TextField("Scaffolds, groups, extensions, and printable resources", text: binding.differentiationSummary, axis: .vertical)
+                                .textFieldStyle(.ds)
                             TextField("Student printable prompt (optional)", text: $printablePrompt, axis: .vertical)
+                                .textFieldStyle(.ds)
                         }
                     }
 
-                    GroupBox("Source provenance") {
+                    LessonEditorSectionCard(
+                        title: "Source provenance",
+                        systemImage: "doc.text.magnifyingglass",
+                        isOpen: sectionBinding(.source)
+                    ) {
                         if binding.sourceReferences.wrappedValue.isEmpty {
-                            Text("This is a manually created lesson record.").foregroundStyle(.secondary)
+                            Text("This is a manually created lesson record.")
+                                .font(DS.font(13))
+                                .foregroundStyle(DS.neutral700)
                         } else {
-                            ForEach(binding.sourceReferences.wrappedValue, id: \.self) { source in
-                            Text(source).font(.footnote).textSelection(.enabled)
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(binding.sourceReferences.wrappedValue, id: \.self) { source in
+                                    Text(source)
+                                        .font(DS.font(12))
+                                        .foregroundStyle(DS.neutral700)
+                                        .textSelection(.enabled)
+                                        .padding(10)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(DS.neutral100)
+                                        .clipShape(RoundedRectangle(cornerRadius: DS.radiusSM))
+                                }
                             }
                         }
                     }
@@ -1746,10 +1810,16 @@ struct DraftLessonView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
-                ContentUnavailableView("Select or create a lesson", systemImage: "book.closed", description: Text("Imported sources become editable lesson records here."))
-                    .frame(maxWidth: .infinity)
+                DSCard {
+                    ContentUnavailableView("Select or create a lesson", systemImage: "book.closed", description: Text("Imported sources become editable lesson records here."))
+                        .foregroundStyle(DS.neutral700)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .padding(28)
+        .background(DS.bg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear { selectMostRecentLesson() }
         .onChange(of: store.mostRecentLessonID) { _, id in
@@ -1769,6 +1839,19 @@ struct DraftLessonView: View {
         return Binding(
             get: { lesson ?? LessonRecord.draft() },
             set: { lesson = $0 }
+        )
+    }
+
+    private func sectionBinding(_ section: LessonEditorSection) -> Binding<Bool> {
+        Binding(
+            get: { openSections.contains(section) },
+            set: { isOpen in
+                if isOpen {
+                    openSections.insert(section)
+                } else {
+                    openSections.remove(section)
+                }
+            }
         )
     }
 
@@ -1813,18 +1896,132 @@ struct DraftLessonView: View {
     }
 }
 
+private enum LessonEditorSection: CaseIterable {
+    case core, sequence, materials, differentiation, source
+}
+
+private struct LessonSidebarRow: View {
+    var lesson: LessonRecord
+    var isSelected: Bool
+    var select: () -> Void
+
+    var body: some View {
+        Button(action: select) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(lesson.title)
+                    .font(DS.font(13.5, weight: .semibold))
+                    .foregroundStyle(DS.text)
+                    .lineLimit(2)
+                LessonStatusTag(status: lesson.status)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? DS.accent100 : DS.neutral100.opacity(0.58))
+            .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
+            .overlay {
+                RoundedRectangle(cornerRadius: DS.radiusMD)
+                    .stroke(isSelected ? DS.accent300 : DS.divider, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct LessonStatusTag: View {
+    var status: LessonStatus
+
+    var body: some View {
+        DSTag(text: title, variant: variant)
+    }
+
+    private var title: String {
+        switch status {
+        case .draft: "Draft"
+        case .reviewed: "Needs review"
+        case .approved: "Approved"
+        case .generated: "Generated"
+        }
+    }
+
+    private var variant: DSTag.Variant {
+        switch status {
+        case .draft: .neutral
+        case .reviewed: .accent2
+        case .approved: .accent
+        case .generated: .outline
+        }
+    }
+}
+
+private struct LessonWarningBanner: View {
+    var warnings: [String]
+
+    var body: some View {
+        DSCard(radius: DS.radiusMD, padding: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Review warnings", systemImage: "exclamationmark.triangle")
+                    .font(DS.font(15, weight: .semibold))
+                    .foregroundStyle(DS.accent800)
+                ForEach(warnings, id: \.self) { warning in
+                    Text(warning)
+                        .font(DS.font(13))
+                        .foregroundStyle(DS.accent800)
+                }
+            }
+        }
+        .background(DS.accent100)
+        .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
+    }
+}
+
+private struct LessonEditorSectionCard<Content: View>: View {
+    var title: String
+    var systemImage: String
+    @Binding var isOpen: Bool
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: isOpen ? 14 : 0) {
+                Button {
+                    isOpen.toggle()
+                } label: {
+                    HStack {
+                        Label(title, systemImage: systemImage)
+                            .font(DS.font(17, weight: .semibold))
+                            .foregroundStyle(DS.text)
+                            .symbolRenderingMode(.hierarchical)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .foregroundStyle(DS.neutral600)
+                            .rotationEffect(.degrees(isOpen ? 180 : 0))
+                    }
+                }
+                .buttonStyle(.plain)
+
+                if isOpen {
+                    Divider().overlay(DS.divider)
+                    content()
+                }
+            }
+        }
+    }
+}
+
 private struct LessonExportReadinessView: View {
     var report: LessonExportReadinessReport
 
     var body: some View {
-        GroupBox("Export readiness") {
+        DSCard(radius: DS.radiusMD, padding: 14) {
             VStack(alignment: .leading, spacing: 8) {
                 Label(report.title, systemImage: report.isReady ? "checkmark.circle" : "exclamationmark.triangle")
-                    .foregroundStyle(report.isReady ? Color.secondary : Color.orange)
+                    .font(DS.font(15, weight: .semibold))
+                    .foregroundStyle(report.isReady ? DS.accent700 : DS.accent2_700)
                 if !report.blockingIssues.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Required before output")
-                            .font(.footnote.weight(.semibold))
+                            .font(DS.font(13, weight: .semibold))
+                            .foregroundStyle(DS.text)
                         ForEach(report.blockingIssues) { issue in
                             readinessRow(issue)
                         }
@@ -1833,7 +2030,8 @@ private struct LessonExportReadinessView: View {
                 if !report.advisoryIssues.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Review before sharing")
-                            .font(.footnote.weight(.semibold))
+                            .font(DS.font(13, weight: .semibold))
+                            .foregroundStyle(DS.text)
                         ForEach(report.advisoryIssues) { issue in
                             readinessRow(issue)
                         }
@@ -1842,15 +2040,18 @@ private struct LessonExportReadinessView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(report.isReady ? DS.accent100.opacity(0.55) : DS.accent2_100.opacity(0.65))
+        .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
     }
 
     private func readinessRow(_ issue: LessonExportReadinessIssue) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(issue.title)
-                .font(.footnote.weight(.semibold))
+                .font(DS.font(13, weight: .semibold))
+                .foregroundStyle(DS.text)
             Text(issue.instruction)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(DS.font(12.5))
+                .foregroundStyle(DS.neutral700)
         }
     }
 }
@@ -1864,27 +2065,35 @@ private struct LessonOutputControls: View {
     private var readiness: LessonExportReadinessReport { LessonExportReadinessReport.analyze(lesson) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             LessonExportReadinessView(report: readiness)
-            HStack {
+            HStack(spacing: 10) {
                 Button("Save lesson") { saveLesson() }
+                    .buttonStyle(.dsSecondary)
                 if lesson.status != .approved {
                     Button("Mark approved") {
                         lesson.status = .approved
                         saveLesson()
                     }
+                    .buttonStyle(.dsPrimary)
                 }
-                Button("Generate HTML plan") {
+                Button {
                     saveLesson()
                     latestOutput = store.generateLessonPlanHTML(for: lesson)
+                } label: {
+                    Label("Plan", systemImage: "doc.text")
                 }
                 .disabled(lesson.status != .approved || !readiness.isReady)
-                Button("Generate differentiation guide") {
+                .buttonStyle(.dsSecondary)
+                Button {
                     saveLesson()
                     latestOutput = store.generateDifferentiationGuideHTML(for: lesson)
+                } label: {
+                    Label("Guide", systemImage: "person.2")
                 }
                 .disabled(lesson.status != .approved || !readiness.isReady)
-                Button("Generate PowerPoint deck") {
+                .buttonStyle(.dsSecondary)
+                Button {
                     saveLesson()
                     let approvedLesson = lesson
                     isGeneratingSlideDeck = true
@@ -1892,20 +2101,25 @@ private struct LessonOutputControls: View {
                         latestOutput = await store.generateSlideDeckPPTX(for: approvedLesson)
                         isGeneratingSlideDeck = false
                     }
+                } label: {
+                    Label("Deck", systemImage: "rectangle.on.rectangle")
                 }
                 .disabled(lesson.status != .approved || !readiness.isReady || isGeneratingSlideDeck || !store.slideDeckAvailability.isAvailable)
+                .buttonStyle(.dsSecondary)
                 if isGeneratingSlideDeck { ProgressView().controlSize(.small) }
             }
-            Label(store.slideDeckAvailability.title, systemImage: store.slideDeckAvailability.isAvailable ? "checkmark.circle" : "exclamationmark.triangle")
-                .font(.footnote)
-                .foregroundStyle(store.slideDeckAvailability.isAvailable ? Color.secondary : Color.orange)
-            Text(store.slideDeckAvailability.detail)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            if let template = store.activePresentationTemplate {
-                Label("Using presentation template: \(template.displayName)", systemImage: "rectangle.on.rectangle")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                Label(store.slideDeckAvailability.title, systemImage: store.slideDeckAvailability.isAvailable ? "checkmark.circle" : "exclamationmark.triangle")
+                    .font(DS.font(12.5, weight: .semibold))
+                    .foregroundStyle(store.slideDeckAvailability.isAvailable ? DS.neutral700 : DS.accent2_700)
+                Text(store.slideDeckAvailability.detail)
+                    .font(DS.font(12.5))
+                    .foregroundStyle(DS.neutral700)
+                if let template = store.activePresentationTemplate {
+                    Label("Using presentation template: \(template.displayName)", systemImage: "rectangle.on.rectangle")
+                        .font(DS.font(12.5))
+                        .foregroundStyle(DS.neutral700)
+                }
             }
         }
     }

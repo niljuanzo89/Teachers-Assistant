@@ -588,9 +588,10 @@ System Events/Accessibility is not needed and has historically been unavailable.
 
 Likely next development sequence, in the owner's stated priority order as of 2026-07-29:
 
-1. Visually confirm the Batch B This Week redesign after clearing the stale app process.
-   If approved, continue the "Sunrise Planner" redesign with Batch C (Planning Preview),
-   then Batch D (Document Intake + Workspace), following
+1. Visually confirm the Batch C Planning Preview redesign:
+   `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`.
+   If approved, continue the "Sunrise Planner" redesign with Batch D
+   (Document Intake + Workspace), following
    /Users/nils/.claude/plans/snuggly-brewing-elephant.md.
 2. Layout-preserving PowerPoint export: use `PowerPointTemplateInspector.resolvePlaceholders(url:)`
    (Batch 005/006) to actually place approved-lesson content into a customer-owned template's
@@ -634,7 +635,7 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 008), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 012), the app has a working local-first prototype path:
 
 document/folder import -> automatic role sorting and pacing scaffold -> weekly planner
 population -> interactive weekly lesson cells -> lesson plan/deck/differentiation guide
@@ -642,18 +643,30 @@ outputs -> weekly hub package -> (new, not yet exporter-integrated) template pla
 inheritance resolution for customer-owned PowerPoint templates.
 
 The project is paused mid-way through the "Sunrise Planner" visual redesign. The design-system
-foundation and Today screen are done, committed, and visually confirmed. The This Week screen
-has uncommitted Batch B code that builds and passes tests, but visual confirmation is blocked
-by the stale old LessonPlanner PID 23296. Planning Preview, Document Intake, and Workspace are
-unchanged and should wait until This Week is visually approved.
+foundation and Today screen are done, committed, and visually confirmed. This Week has been
+reskinned and polished with compact P/D/G output chips. Planning Preview has now been
+reskinned in Batch 012 with a warm lesson sidebar, status tags, collapsible editor cards,
+styled warning/readiness/output controls, and preserved lesson/output behavior. Document
+Intake and Workspace are the remaining stock-looking screens, except for the already-added
+Workspace Progress safety section.
+
+Local verification for Batch 012: Swift build with temp caches passed; full Swift test suite
+passed 103 tests with 0 failures; real Xcode build succeeded. Screenshot:
+`Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`.
+
+GitHub status: local branch is `main`; remote is
+`https://github.com/niljuanzo89/Teachers-Assistant.git`; the repo is public and visible to
+the connector, but command-line `git push` is blocked by missing local GitHub credentials.
+Continue local work and retry syncing at the next 50-step checkpoint or when the owner signs
+in through GitHub Desktop/GitHub CLI.
 
 Immediate next session should:
 
 1. Read CONTINUITY_LOG.md's Batch 008 entry and this document's sections 4/11/13 for full
    context — do not re-derive the font/icon/staging decisions, they're already made.
-2. Ask the owner to reboot or otherwise clear the stale old LessonPlanner process if it is
-   still present.
-3. Relaunch the current build with `LESSONPLANNER_INITIAL_TAB=week`, capture the real This
-   Week screen, and ask for visual confirmation.
-4. If green-lit, propose Batch C (Planning Preview) — compute/model-shape declaration,
-   following the same DesignSystem.swift foundation already built.
+2. Ask the owner for visual approval of
+   `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`.
+3. If green-lit, propose Batch D (Document Intake + Workspace) — compute/model-shape
+   declaration first, following the same DesignSystem.swift foundation already built.
+4. Keep the GitHub push blocker visible but do not spend more local development time on it
+   unless the owner asks or a 50-step sync checkpoint is reached.

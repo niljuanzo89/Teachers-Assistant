@@ -114,7 +114,7 @@ a finished diff — not as a routine step.
 
 ## Where things stand
 
-**Recently completed and verified (through Batch 011):**
+**Recently completed and verified (through Batch 012):**
 
 - Weekly planning grid: rows size to their tallest cell (88pt floor), nearby start times
   cluster into one row via the tested `WeeklyGridLayout` type. Visually confirmed.
@@ -159,25 +159,33 @@ a finished diff — not as a routine step.
   local profile/workspace/output folder shell. It does not delete generated files from disk.
   Snapshot restore deliberately skips readable-document auto-sync so reloading is exact.
   Verification: 103 tests passed and Xcode build succeeded.
+- **"Sunrise Planner" visual redesign, Batch C (Planning Preview) — implemented, verified,
+  and captured; awaiting owner visual approval.** Planning Preview now uses the warm lesson
+  sidebar, status tags, editor heading, warning banner, collapsible editor cards, styled text
+  fields, source provenance rows, export readiness, and output action buttons. Existing
+  behavior is preserved: lesson selection, New lesson, status changes, fill-empty-fields, add
+  step, save, approve, and Plan/Guide/Deck generation still call the same store methods.
+  Verification: Swift build with temp caches passed, 103 tests passed, and real Xcode build
+  succeeded. Screenshot:
+  `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`.
 
 **This is a deliberate pause point, not a finished feature.** Planning Preview, Document
-Intake, and Workspace still use the *original* stock-SwiftUI look. Do not move to them until
-This Week has been visually captured and approved.
+now has the Sunrise look, but Document Intake and most of Workspace still use the *original*
+stock-SwiftUI look. Do not move to them until Planning Preview has owner visual approval.
 
 ## Start here
 
-1. **Ask me to visually approve the latest This Week screenshot and the new Workspace
-   Progress safety section** before making more UI
-   redesign changes:
+1. **Ask me to visually approve the latest Planning Preview screenshot and the new Workspace
+   Progress safety section** before making more UI redesign changes:
 
-   `Design Screenshots/2026-07-29/11-this-week-output-button-fix.png`
+   `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`
 
-   Mention that the output actions now use compact P/D/G icon chips to avoid wrapping, and
-   generated outputs turn green rather than staying orange. Also mention that the new
-   Progress safety controls are functionally verified but have not yet had owner visual QA.
+   Mention that Planning Preview now has the Sunrise lesson sidebar, collapsible editor cards,
+   status tags, and styled output/readiness controls. Also mention that the new Progress
+   safety controls are functionally verified but have not yet had owner visual QA.
 
-2. **If I approve or give feedback that doesn't change the approach**: continue with Batch C
-   of the redesign — Planning Preview — following
+2. **If I approve or give feedback that doesn't change the approach**: continue with Batch D
+   of the redesign — Document Intake + Workspace — following
    `/Users/nils/.claude/plans/snuggly-brewing-elephant.md`'s described rollout (foundation is
    already built; each remaining batch re-skins one/two screens onto it). Declare compute
    level and model shape first, as always.
