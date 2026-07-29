@@ -693,3 +693,28 @@ active profile's current planning data after an explicit destructive confirmatio
 1. Visual confirmation of the new Workspace "Progress safety" section.
 2. Owner decision later on whether clearing should also delete generated files from disk or
    only remove their app history records. Current implementation keeps files on disk.
+
+---
+
+### GitHub Sync Policy — 2026-07-29
+
+Owner requested continued local-drive development while using GitHub as a periodic sync
+checkpoint. New operating rule: after every **50 logged development steps** since the last
+GitHub sync/checkpoint, commit appropriate local work and attempt to sync to GitHub.
+
+Current GitHub state:
+
+- Local repo is clean on `master` as of commit `e1c9b86` (`Batch 008-011: redesign This Week
+  and add progress safety`).
+- Remote `origin` is configured as
+  `https://github.com/niljuanzo89/Teachers-Assistant.git`.
+- `git push` is blocked because command-line git has no GitHub credentials on this Mac:
+  `fatal: could not read Username for 'https://github.com': Device not configured`.
+- Codex settings UI shows the GitHub connector as connected, but GitHub MCP tool checks still
+  return zero installed accounts/repositories and `niljuanzo89/Teachers-Assistant` returns
+  404 from the connector. This likely means the connector is connected at the app level but
+  has not been granted access to that specific private repository, or the connector state has
+  not propagated into the tool session.
+
+Continue local work; retry connector visibility and/or git push at the next 50-step sync
+checkpoint or when the owner adjusts GitHub access.

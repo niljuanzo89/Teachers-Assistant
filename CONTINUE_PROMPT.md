@@ -40,6 +40,10 @@ dependency.
 
 - Work in batches of **up to 20 numbered steps**. Log every step to `CONTINUITY_LOG.md` as a
   new batch entry when the batch ends.
+- Continue working locally even when GitHub sync is blocked. As an efficiency rule, after
+  every **50 logged development steps** since the last GitHub sync/checkpoint, commit the
+  current local work if appropriate and attempt to sync to GitHub. If the connector or git
+  credentials are still blocked, log the blocker and keep the local repo clean.
 - **Before starting a batch, tell me the compute level** (low / medium / high) **and the model
   shape** (single sufficient / dual helpful / dual recommended).
 - **Stop and notify me** — do not push through — when a judgment call is mine, when
@@ -64,9 +68,14 @@ xcodebuild -project LessonPlanner.xcodeproj -scheme LessonPlanner \
   build CODE_SIGNING_ALLOWED=NO
 ```
 
-Baseline is **101 tests passing**. The project is under git — `git log --oneline` for the
-current commit history. As of this handoff, the latest committed redesign work is Batch A;
-Batch B This Week changes are verified but still awaiting owner visual approval before commit.
+Baseline is **103 tests passing**. The project is under git — `git log --oneline` for the
+current commit history. As of this handoff, local work through Batch 011 is committed at
+`e1c9b86` (`Batch 008-011: redesign This Week and add progress safety`). GitHub remote is
+configured as `https://github.com/niljuanzo89/Teachers-Assistant.git`, but command-line push
+is currently blocked by missing local GitHub credentials and the Codex GitHub connector
+currently reports zero visible accounts/repositories from tool calls despite showing
+connected in settings. Continue local work and retry GitHub sync after every 50 logged steps
+or when credentials/access are fixed.
 
 Use a second model (Codex, via the `codex-bridge` skill) only when an independent opinion is
 genuinely valuable — e.g. an unfamiliar file format's exact rules, or a correctness review of

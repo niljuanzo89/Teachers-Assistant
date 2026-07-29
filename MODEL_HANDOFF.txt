@@ -36,6 +36,14 @@ as a routine step.
 The project has been under git since 2026-07-29 (Batch 004); see "Version control" under
 section 3 for the current commit.
 
+GitHub sync policy as of 2026-07-29: continue working locally, and after every 50 logged
+development steps since the last sync/checkpoint, commit appropriate local work and attempt
+to sync to GitHub. Remote `origin` is configured as
+`https://github.com/niljuanzo89/Teachers-Assistant.git`, but push is currently blocked by
+missing command-line GitHub credentials. The Codex GitHub connector shows connected in the
+settings UI, but tool calls currently return zero visible accounts/repositories and 404 for
+the target private repo.
+
 The owner's standing working agreement is recorded in full in CONTINUITY_LOG.md: work in
 batches of up to 20 numbered steps, declare compute level and single-vs-dual model shape
 before each batch, stop and notify when human judgment/eyes/credentials are needed or when
