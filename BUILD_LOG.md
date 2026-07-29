@@ -894,3 +894,20 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   9:45-10:45 Math block and not in other blocks.
 - Verification: full Swift test suite passed 104 tests with 0 failures; real Xcode build
   succeeded.
+
+### 2026-07-29 — One lesson per subject block guard
+
+- Fixed the follow-up scheduling issue where multiple lessons could still stack into the
+  same 9:45 Math block on one day when pacing/content dates pointed to the same date.
+- Auto-scheduling now tracks occupied date/time slots and finds the next open weekday slot
+  for the same preferred time. This preserves the daily schedule frame: one Math block per
+  day means at most one auto-filled Math lesson in that block.
+- Added regression coverage for the exact failure mode: several math lessons all initially
+  prefer Monday 9:45, and the app spreads them across separate 9:45-10:45 Math blocks on
+  different weekdays.
+- Confirmed the broader product direction: the intake flow should become multi-step, with
+  the daily schedule establishing the weekly/daily structure first, content documents filling
+  subject blocks second, and pacing guides governing/refining order/timing rather than
+  directly creating duplicate schedule blocks.
+- Verification: full Swift test suite passed 105 tests with 0 failures; real Xcode build
+  succeeded.

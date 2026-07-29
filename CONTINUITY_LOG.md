@@ -923,6 +923,49 @@ block only, not every block in the uploaded daily schedule.
 
 - Full Swift test suite passed: 104 tests, 0 failures.
 - Real Xcode build succeeded.
+
+---
+
+### Batch 019 — 2026-07-29 — Enforce one lesson per subject block per day
+
+**Compute:** medium. **Model shape:** single sufficient — follow-up scheduling bug plus
+architecture note.
+
+**Goal.** Fix the remaining auto-scheduling issue where multiple lessons could stack into the
+same 9:45 Math block on one day, and record the multi-step document-intake direction.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Received owner follow-up | The app now created multiple 9:45 blocks/cards in one day |
+| 2 | Confirmed architecture diagnosis | Daily schedule should establish the weekly/daily structure before lesson content conforms to it |
+| 3 | Re-read scheduling loop | Found auto-sync still placed suggestions directly without guarding one occupied date/time slot per day |
+| 4 | Added occupied-slot tracking | Auto-scheduler now tracks date + start time + end time for existing assignments |
+| 5 | Added placement helper | If the preferred slot is already occupied, the scheduler searches the same time block on later open weekdays |
+| 6 | Preserved existing assignment updates | Existing auto-created pacing assignments remove their old slot before being repositioned |
+| 7 | Strengthened prior regression test | Now also checks the math schedule produces five distinct scheduled days |
+| 8 | Added duplicate-slot regression | Three math lessons all preferring Monday 9:45 now spread across three distinct 9:45 Math blocks |
+| 9 | First test run | Failed because the new test used the system week start while the app uses Monday-first weeks |
+| 10 | Fixed test setup | Test calendar now matches the app's Monday-first planning week |
+| 11 | Final full Swift test run | 105 tests passed, 0 failures |
+| 12 | Real Xcode build | BUILD SUCCEEDED |
+| 13 | Updated handoff/milestone docs | Recorded the one-block-per-day guard and multi-step intake direction |
+
+**Outcome.** The immediate duplicate 9:45 block issue is fixed. Auto-population now respects
+the daily schedule as a frame: each subject/time block can receive only one auto-filled lesson
+per day, and overflow content moves to the same subject/time block on another weekday.
+
+**Architecture direction.** The next UI/data-model pass should explicitly separate:
+
+1. Daily schedule upload/confirmation.
+2. Subject block detection and placeholder weekly/daily structure.
+3. Content-material and pacing-guide upload.
+4. Population of one lesson per matching subject block, leaving empty subject placeholders
+   available for manual teacher entry.
+
+**Verification.**
+
+- Full Swift test suite passed: 105 tests, 0 failures.
+- Real Xcode build succeeded.
 - Visual inspection of the fresh weekly-tab build showed the alignment improvement, but no
   clean screenshot artifact was retained because capture attempts grabbed overlays or Codex.
 

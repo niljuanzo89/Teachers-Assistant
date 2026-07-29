@@ -862,27 +862,45 @@ final class AppStore: ObservableObject {
 
         let secondPass = WeeklyPacingSuggestionReport.analyze(weeklyPlan: weeklyPlan, pacingPlan: plan, lessons: lessons)
         let scheduleBlocks = importedDailyScheduleBlocks(from: readableSources)
+        var occupiedAutoSlots = Set(weeklyPlan.assignments.map { autoScheduleSlotKey(date: $0.date, start: $0.start, end: $0.end) })
         for suggestion in secondPass.suggestions where suggestion.status == .readyToSchedule || suggestion.status == .alreadyScheduled {
             guard let lessonID = suggestion.lessonRecordID else { continue }
             guard !Self.isPlaceholderPacingTitle(suggestion.pacingLessonTitle) else { continue }
-            let timeRange = scheduledTimeRange(for: suggestion, on: suggestion.suggestedDate, scheduleBlocks: scheduleBlocks)
+            let preferredTimeRange = scheduledTimeRange(for: suggestion, on: suggestion.suggestedDate, scheduleBlocks: scheduleBlocks)
             if let existingIndex = weeklyPlan.assignments.firstIndex(where: { $0.lessonRecordID == lessonID }) {
                 let existingNotes = weeklyPlan.assignments[existingIndex].planningNotes ?? ""
                 guard existingNotes.hasPrefix("Pacing:") else { continue }
-                weeklyPlan.assignments[existingIndex].date = suggestion.suggestedDate
-                weeklyPlan.assignments[existingIndex].start = timeRange.start
-                weeklyPlan.assignments[existingIndex].end = timeRange.end
+                occupiedAutoSlots.remove(autoScheduleSlotKey(
+                    date: weeklyPlan.assignments[existingIndex].date,
+                    start: weeklyPlan.assignments[existingIndex].start,
+                    end: weeklyPlan.assignments[existingIndex].end
+                ))
+                let placement = firstAvailableSchedulePlacement(
+                    preferredDate: suggestion.suggestedDate,
+                    preferredTimeRange: preferredTimeRange,
+                    occupiedSlots: occupiedAutoSlots
+                )
+                weeklyPlan.assignments[existingIndex].date = placement.date
+                weeklyPlan.assignments[existingIndex].start = placement.start
+                weeklyPlan.assignments[existingIndex].end = placement.end
                 weeklyPlan.assignments[existingIndex].planningNotes = suggestion.planningNote
+                occupiedAutoSlots.insert(autoScheduleSlotKey(date: placement.date, start: placement.start, end: placement.end))
                 continue
             }
+            let placement = firstAvailableSchedulePlacement(
+                preferredDate: suggestion.suggestedDate,
+                preferredTimeRange: preferredTimeRange,
+                occupiedSlots: occupiedAutoSlots
+            )
             weeklyPlan.assignments.append(WeeklyLessonAssignment(
                 id: UUID(),
                 lessonRecordID: lessonID,
-                date: suggestion.suggestedDate,
-                start: timeRange.start,
-                end: timeRange.end,
+                date: placement.date,
+                start: placement.start,
+                end: placement.end,
                 planningNotes: suggestion.planningNote
             ))
+            occupiedAutoSlots.insert(autoScheduleSlotKey(date: placement.date, start: placement.start, end: placement.end))
         }
         weeklyPlan.assignments.sort { $0.date == $1.date ? $0.start < $1.start : $0.date < $1.date }
         saveWeeklyPlan()
@@ -944,6 +962,44 @@ final class AppStore: ObservableObject {
         components.minute = minute
         components.second = 0
         return Calendar.current.date(from: components) ?? date
+    }
+
+    private func firstAvailableSchedulePlacement(
+        preferredDate: Date,
+        preferredTimeRange: (start: Date, end: Date),
+        occupiedSlots: Set<String>
+    ) -> (date: Date, start: Date, end: Date) {
+        let calendar = Calendar.current
+        let weekStart = Self.startOfWeek(for: preferredDate)
+        let preferredDay = calendar.startOfDay(for: preferredDate)
+        let weekdays = (0..<5).compactMap { calendar.date(byAdding: .day, value: $0, to: weekStart) }
+        let orderedDays = ([preferredDay] + weekdays).reduce(into: [Date]()) { result, day in
+            let normalized = calendar.startOfDay(for: day)
+            if !result.contains(where: { calendar.isDate($0, inSameDayAs: normalized) }) {
+                result.append(normalized)
+            }
+        }
+        let startComponents = calendar.dateComponents([.hour, .minute], from: preferredTimeRange.start)
+        let endComponents = calendar.dateComponents([.hour, .minute], from: preferredTimeRange.end)
+
+        for day in orderedDays {
+            let start = dateAt(hour: startComponents.hour ?? 9, minute: startComponents.minute ?? 0, on: day)
+            let end = dateAt(hour: endComponents.hour ?? 9, minute: endComponents.minute ?? 45, on: day)
+            let key = autoScheduleSlotKey(date: day, start: start, end: end)
+            if !occupiedSlots.contains(key) {
+                return (day, start, end)
+            }
+        }
+
+        return (preferredDate, preferredTimeRange.start, preferredTimeRange.end)
+    }
+
+    private func autoScheduleSlotKey(date: Date, start: Date, end: Date) -> String {
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: date).timeIntervalSinceReferenceDate
+        let startMinutes = calendar.component(.hour, from: start) * 60 + calendar.component(.minute, from: start)
+        let endMinutes = calendar.component(.hour, from: end) * 60 + calendar.component(.minute, from: end)
+        return "\(Int(day))-\(startMinutes)-\(endMinutes)"
     }
 
     private func bestScheduleBlock(

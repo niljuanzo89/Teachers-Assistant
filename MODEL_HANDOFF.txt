@@ -1,5 +1,5 @@
 LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
-Last updated: 2026-07-29 (through Batch 018, local commits ahead of GitHub)
+Last updated: 2026-07-29 (through Batch 019, local commits ahead of GitHub)
 
 PURPOSE OF THIS DOCUMENT
 
@@ -637,7 +637,7 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 018), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 019), the app has a working local-first prototype path:
 
 document/folder import -> automatic role sorting and pacing scaffold -> weekly planner
 population -> interactive weekly lesson cells -> lesson plan/deck/differentiation guide
@@ -654,7 +654,7 @@ ready-state panel, styled source detail/review cards, and guarded clear/start-ov
 Workspace is the remaining stock-looking screen, except for the already-added Progress safety
 section.
 
-Local verification for Batch 018: full Swift test suite passed 104 tests with 0 failures;
+Local verification for Batch 019: full Swift test suite passed 105 tests with 0 failures;
 real Xcode build succeeded. Screenshot:
 `Design Screenshots/2026-07-29/15-this-week-output-key.png`.
 
@@ -662,7 +662,7 @@ GitHub status: local branch is `main`; remote is
 `https://github.com/niljuanzo89/Teachers-Assistant.git`; GitHub Desktop successfully
 published the real LessonPlanner project to GitHub after an earlier empty-clone mismatch was
 corrected. Batch 016 pushed Batches 014-016 to GitHub through GitHub Desktop after
-command-line git again failed for missing HTTPS credentials. Batches 017-018 are local
+command-line git again failed for missing HTTPS credentials. Batches 017-019 are local
 commits/commit candidates until the next sync cadence.
 
 Immediate next session should:
@@ -679,5 +679,9 @@ Immediate next session should:
    documents govern pacing/time, content packets drive the concrete lesson sequence. A
    subject-specific content packet, such as a math unit, should schedule into the matching
    subject block only.
+5. Next intake architecture should be multi-step: first ingest/confirm the daily schedule so
+   subject blocks establish the weekly/daily frame, then upload content materials and pacing
+   guides, then populate one lesson per matching subject block per day. Empty blocks should
+   remain subject placeholders with manual teacher entry options.
 4. Use the approved GitHub cadence: commit each verified batch, then push every 2-3 committed
    batches or before risky/handoff work. If command-line auth fails, use GitHub Desktop.

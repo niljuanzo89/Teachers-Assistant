@@ -1395,6 +1395,117 @@ final class LessonPlannerTests: XCTestCase {
                 || calendar.component(.hour, from: assignment.start) == 10
                 || calendar.component(.hour, from: assignment.start) == 12
         })
+        let scheduledDays = Set(store.weeklyPlan.assignments.map { calendar.startOfDay(for: $0.date) })
+        XCTAssertEqual(scheduledDays.count, 5)
+    }
+
+    @MainActor
+    func testDocumentImportSpreadsSameDayPacingAcrossOpenSubjectBlocks() throws {
+        let repository = try makeRepository()
+        var calendar = Calendar.current
+        calendar.firstWeekday = 2
+        let weekOf = calendar.dateInterval(of: .weekOfYear, for: .now)?.start ?? calendar.startOfDay(for: .now)
+        let monday = weekOf
+        let workspace = repository.rootURL.appending(path: "workspace")
+        let lessons = [
+            CoursePacingLesson(
+                id: UUID(),
+                sequence: 1,
+                title: "Place value review",
+                startDate: monday,
+                estimatedInstructionalDays: 1,
+                dependencyNotes: "",
+                sourceNotes: "Proposed from 04 Math Unit Lessons.docx"
+            ),
+            CoursePacingLesson(
+                id: UUID(),
+                sequence: 2,
+                title: "Rounding in context",
+                startDate: monday,
+                estimatedInstructionalDays: 1,
+                dependencyNotes: "",
+                sourceNotes: "Proposed from 04 Math Unit Lessons.docx"
+            ),
+            CoursePacingLesson(
+                id: UUID(),
+                sequence: 3,
+                title: "Addition strategies",
+                startDate: monday,
+                estimatedInstructionalDays: 1,
+                dependencyNotes: "",
+                sourceNotes: "Proposed from 04 Math Unit Lessons.docx"
+            )
+        ]
+        let pacingPlan = CoursePacingPlan(
+            id: UUID(),
+            sourceReferenceNames: ["04 Math Unit Lessons.docx"],
+            units: [
+                CoursePacingUnit(
+                    id: UUID(),
+                    sequence: 1,
+                    title: "Math Unit 1",
+                    startDate: monday,
+                    endDate: nil,
+                    estimatedInstructionalDays: lessons.count,
+                    modules: [
+                        CoursePacingModule(
+                            id: UUID(),
+                            sequence: 1,
+                            title: "Math Module",
+                            estimatedInstructionalDays: lessons.count,
+                            lessons: lessons,
+                            notes: ""
+                        )
+                    ],
+                    assessmentWindows: [],
+                    skippedDays: [],
+                    notes: ""
+                )
+            ],
+            teacherRefinementNotes: "Approved imported math unit.",
+            reviewStatus: .approved,
+            createdAt: .now,
+            updatedAt: .now
+        )
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Generic QA Workspace",
+            workspaceReference: FileReference(url: workspace),
+            coursePacingPlan: pacingPlan
+        ))
+        try repository.saveImportedSources([
+            ImportedSource(
+                id: UUID(),
+                reference: FileReference(url: URL(fileURLWithPath: "/tmp/02 Sample Daily Schedule.docx")),
+                extractionMethod: .embeddedText,
+                confidence: nil,
+                extractedText: """
+                Sample Daily Schedule
+                8:35 AM - 9:35 AM
+                Reading
+                9:45 AM - 10:45 AM
+                Math
+                10:45 AM - 11:15 AM
+                Science
+                """,
+                reviewStatus: .reviewed,
+                importedAt: .now,
+                updatedAt: .now
+            )
+        ])
+
+        let store = AppStore(repository: repository)
+        let slotKeys = store.weeklyPlan.assignments.map { assignment in
+            "\(calendar.startOfDay(for: assignment.date).timeIntervalSinceReferenceDate)-\(calendar.component(.hour, from: assignment.start)):\(calendar.component(.minute, from: assignment.start))"
+        }
+
+        XCTAssertEqual(store.weeklyPlan.assignments.count, 3)
+        XCTAssertEqual(Set(slotKeys).count, 3)
+        XCTAssertTrue(store.weeklyPlan.assignments.allSatisfy { assignment in
+            calendar.component(.hour, from: assignment.start) == 9
+                && calendar.component(.minute, from: assignment.start) == 45
+                && calendar.component(.hour, from: assignment.end) == 10
+                && calendar.component(.minute, from: assignment.end) == 45
+        })
     }
 
     func testWeeklyPlanningPromptStatusIsDueAfterPromptTime() throws {
