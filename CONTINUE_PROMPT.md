@@ -15,10 +15,15 @@ that are already recorded.
 Read these, in this order, before touching anything:
 
 1. `CLAUDE.md` — environment, build/test commands, architecture rules, traps, open items.
-2. `CONTINUITY_LOG.md` — my standing operating protocol, plus a step-level log of the last
-   three batches **including a dead-ends list**. Do not retry anything on that list.
-3. `MODEL_HANDOFF.txt` — full product intent, architecture decisions, and IP boundaries.
+2. `CONTINUITY_LOG.md` — my standing operating protocol, plus a step-level log of recent
+   batches **including a dead-ends list**. Do not retry anything on that list.
+3. `MODEL_HANDOFF.txt` — full product intent, architecture decisions, current state, and IP
+   boundaries.
 4. `BUILD_LOG.md` — long-form milestone history and the current capability inventory.
+
+Also read `/Users/nils/.claude/plans/snuggly-brewing-elephant.md` — the approved
+implementation plan for the visual redesign in progress (see below). Don't re-plan it; follow
+it, or ask me if something in it seems stale.
 
 ## What this product is
 
@@ -40,17 +45,16 @@ dependency.
 - **Stop and notify me** — do not push through — when a judgment call is mine, when
   verification needs my eyes or my accounts, when a credential or OS permission is missing,
   or when the same approach has failed twice. Tell me exactly what to do to unblock it.
+- For anything visual or interactive (a UI redesign, a new screen), **stop for my visual
+  confirmation before moving to the next screen/area** — don't redesign everything in one
+  pass on spec alone. This is exactly where we paused this session; see below.
 - Log **dead ends with the reason**. An unrecorded dead end gets retried by the next model.
-- **Confirm a file actually landed on disk before logging that it was written.** An earlier
-  session logged a documentation rewrite that never saved, and the docs sat out of sync for a
-  day.
+- **Confirm a file actually landed on disk before logging that it was written.**
 
-## Environment — you can do more than the previous sessions could
+## Environment
 
-Earlier work ran in a sandbox with **no Swift toolchain and no GUI**, so every build, test,
-and screenshot had to be delegated to Codex, and `git` was blocked entirely. You are in Claude
-Code with a real shell on my Mac. Build, test, run `git`, and launch the app directly. Use a
-second model only when an independent opinion is genuinely valuable, not out of habit.
+You have a real shell on my Mac in Claude Code: build, test, run `git`, and launch the app
+directly.
 
 ```sh
 swift test -Xswiftc -gnone
@@ -60,9 +64,14 @@ xcodebuild -project LessonPlanner.xcodeproj -scheme LessonPlanner \
   build CODE_SIGNING_ALLOWED=NO
 ```
 
-Baseline is **93 tests passing**.
+Baseline is **101 tests passing**. The project is under git — `git log --oneline` for the
+current commit history (7 commits as of this handoff, most recent `f7f921a`).
 
-## Three traps that have already bitten this project
+Use a second model (Codex, via the `codex-bridge` skill) only when an independent opinion is
+genuinely valuable — e.g. an unfamiliar file format's exact rules, or a correctness review of
+a finished diff — not as a routine step.
+
+## Traps and gotchas already discovered — don't rediscover these
 
 1. **`swift test` without `-Xswiftc -gnone`** can die during dSYM generation with
    `Operation not permitted` and report **zero tests run**. Zero tests is a failure, not a
@@ -71,82 +80,98 @@ Baseline is **93 tests passing**.
    source file is invisible to the Xcode target until you add four entries to
    `project.pbxproj` (PBXBuildFile, PBXFileReference, PBXGroup children,
    PBXSourcesBuildPhase). SwiftPM auto-discovers files, so **`swift test` will pass while the
-   Xcode build fails.** `WeeklyGridLayout.swift` (IDs `...015`) is the worked example.
-3. **Never trust a build result without checking the binary's timestamp.** A previous
-   background build returned a PID and an empty log while a stale binary made it look
-   successful.
+   Xcode build fails.** `WeeklyGridLayout.swift` and `DesignSystem.swift` are worked examples.
+3. **Never trust a build result without checking the binary's timestamp.** A background build
+   can return a PID and an empty log while a stale binary makes it look successful.
+4. **`screencapture -l <windowID>` fails with "could not create image from window"** unless
+   the target window is frontmost. Run
+   `osascript -e 'tell application "LessonPlanner" to activate'` first (a plain Apple Event,
+   no Accessibility permission needed) before capturing by window ID. When several
+   same-bundle-ID processes are running (a stuck old instance is common in this project),
+   this `activate` call — not a generic app-launcher tool — reliably brings the *correct*,
+   most-recently-launched instance forward.
+5. **If using `computer-use` to type into the app**, insert a short `wait` (~0.3s) between a
+   `left_click` that changes text-field focus and the `type` that follows it — SwiftUI's
+   focus-change can lag behind the click, and typed text will land in the previously-focused
+   field instead.
+6. **A blinking text-field caret can visually merge with a placeholder's first letter in a
+   screenshot**, making it misread (e.g. "Add a task" briefly reading as "Id a task"). Not a
+   bug — re-screenshot after the field loses focus before concluding there's a real defect.
+7. **Codex MCP calls that set `cwd` and expect it to explore repo files can time out**, even
+   for a single well-scoped ask. Pasting the relevant code/question directly into the prompt
+   (no file access needed) is more reliable for this project. Also: a Codex `threadId` from an
+   earlier turn can go stale (`"Session not found"`) — be ready to start a fresh thread.
 
 ## Where things stand
 
-**Recently completed and test-verified:**
+**Recently completed and verified (through Batch 007):**
 
-- The weekly planning grid no longer uses a fixed row height. Rows size to their tallest cell
-  with an 88pt floor, so crowded cells no longer clip lesson cards mid-card and sparse rows no
-  longer hold tall blank bands. The nested per-cell `ScrollView` was removed — it captured
-  scroll-wheel events away from the grid and hid clipped content with no affordance.
-- Slot identity was being recomputed by exact hour-and-minute in three separate places, so a
-  block starting 9:45 Monday and 9:50 Wednesday produced two nearly empty rows. That logic now
-  lives in one pure, tested type, `Sources/LessonPlanner/WeeklyGridLayout.swift`, which
-  clusters start times within a 15-minute tolerance. Clustering anchors on the first start in
-  each cluster, not the previous one, so 8:00 → 8:14 → 8:28 → 8:42 cannot chain into a single
-  row. 8 tests cover it.
+- Weekly planning grid: rows size to their tallest cell (88pt floor), nearby start times
+  cluster into one row via the tested `WeeklyGridLayout` type. Visually confirmed.
+- Version control initialized; the `project.pbxproj` hand-edits are validated by real
+  `xcodebuild` runs, not just `swift test`.
+- `PowerPointTemplateInspector.resolvePlaceholders(url:)` resolves placeholder type/idx/
+  geometry inherited from slide layouts and masters (ECMA-376 rules), for arbitrary
+  customer-owned `.pptx` templates — reviewed with Codex for correctness. Wired into the
+  Workspace tab as a "Placeholder inheritance" list (transient state, not persisted).
+- **"Sunrise Planner" visual redesign, Batch A (foundation + Today screen) — done and
+  committed.** I supplied a full design handoff (warm/rounded/serif reskin of all 5 screens);
+  Claude built `Sources/LessonPlanner/Views/DesignSystem.swift` (color/radius/shadow tokens,
+  reusable card/tag/button/text-field components), replaced the native `TabView` chrome with
+  a custom top nav + profile band, and fully re-skinned the Today screen. Typography uses
+  system serif (New York), icons stay SF Symbols (hierarchical rendering) — both confirmed
+  with me up front rather than assumed. Screenshot:
+  `Design Screenshots/2026-07-29/09-today-sunrise-redesign.png`. Design reference preserved
+  at `Design Reference/warm-morning-2026-07-29/`.
 
-## Start here — three unverified items, in order
+**This is a deliberate pause point, not a finished feature.** This Week, Planning Preview,
+Document Intake, and Workspace still use the *original* stock-SwiftUI look. I asked to pause
+after the Today screen so I could review it before the same treatment rolls out further.
 
-**1. Put the project under version control. Do this before anything else — there is currently
-no rollback path for any of the work above.**
+## Start here
 
-```sh
-cd "/Users/nils/Documents/Program Development Folder/LessonPlanner"
-rm -rf .git        # a partial .git may exist from a sandbox that could not clean up
-git init
-git add -A && git commit -m "Initial commit: LessonPlanner local-first macOS teacher planning app"
-```
+1. **Ask me directly whether the Today screen redesign looks right**, or whether I have
+   feedback first. Don't assume approval — I paused here specifically to look at it. If you
+   want the screenshot again, it's at
+   `Design Screenshots/2026-07-29/09-today-sunrise-redesign.png`, or launch the app:
 
-A correct `.gitignore` is already in place — it excludes `.build/`, `DerivedData/`,
-`xcuserdata/`, `.DS_Store`, and generated `.pptx` files, and keeps `Design Screenshots/`
-tracked as the visual QA record.
+   ```sh
+   open -n /private/tmp/LessonPlannerDerivedData/Build/Products/Debug/LessonPlanner.app \
+     --env LESSONPLANNER_DESIGN_CAPTURE=1 --env LESSONPLANNER_INITIAL_TAB=today
+   ```
 
-**2. Validate the hand-edited `project.pbxproj`.** Four entries were added to register
-`WeeklyGridLayout.swift`, but this has never been confirmed with a real Xcode build. Run
-`xcodebuild` and check it compiles. `swift test` passing does **not** prove this.
+   (Rebuild first if `/private/tmp/LessonPlannerDerivedData` is stale or missing — it doesn't
+   survive a reboot.)
 
-**3. Confirm the weekly grid visually.** No screenshot capture has ever succeeded here —
-several attempts failed on window registration and session timeouts. Build and launch:
+2. **If I approve or give feedback that doesn't change the approach**: continue with Batch B
+   of the redesign — This Week — following
+   `/Users/nils/.claude/plans/snuggly-brewing-elephant.md`'s described rollout (foundation is
+   already built; each remaining batch re-skins one/two screens onto it). Declare compute
+   level and model shape first, as always.
 
-```sh
-open -n /private/tmp/LessonPlannerDerivedData/Build/Products/Debug/LessonPlanner.app \
-  --env LESSONPLANNER_DESIGN_CAPTURE=1 --env LESSONPLANNER_INITIAL_TAB=week
-```
+3. **If I want changes to the approach itself** (different font/icon strategy, different
+   pacing, different screen order): treat that as a new judgment call, not a deviation from
+   the plan — the plan file reflects what was approved *before* I'd seen the result, and my
+   in-hand feedback now supersedes it where the two conflict.
 
-Open **This Week** and compare against
-`Design Screenshots/2026-07-28/07-this-week-cell-flow-compact.png`, confirming that:
+## Then, further down my priority list (after the redesign, or in parallel if it makes sense)
 
-- lesson cards in crowded cells are fully visible rather than sliced through the middle;
-- sparse and empty rows have collapsed instead of holding a tall blank band;
-- row borders still align across the Time column and every day column;
-- blocks that start a few minutes apart across days now share one row.
-
-Save the result to `Design Screenshots/<today>/`. **Capture the window only, never the full
-screen** — full-screen capture can pick up unrelated sensitive content.
-
-## Then propose the next batch
-
-Once those three are settled, tell me the compute level and model shape and propose the next
-batch. My current priority order:
-
-1. **Template layout/master inheritance in `PowerPointTemplateInspector`** — the inspector
-   reads slide-level XML but does not resolve placeholders inherited from slide layouts and
-   masters. This is the largest gap between the exporter and the release gates in
-   `POWERPOINT_EXPORTER_STRATEGY_ADR.md`. *High compute, dual model recommended — Open XML
-   inheritance is subtle and worth a second opinion.*
+1. **Layout-preserving PowerPoint export** — use the placeholder-inheritance resolution
+   (`PowerPointTemplateInspector.resolvePlaceholders(url:)`) to actually place approved-lesson
+   content into a customer-owned template's resolved placeholder frames, instead of only
+   displaying the resolution in the UI. *High compute, dual model recommended if the
+   placement/layout logic gets subtle.*
 2. **Source-readiness screen** — classify extracted content as embedded text, OCR text,
    uncertain text, diagram, handwriting, or math notation, and give me an explicit review path
    for anything unreliable. *Medium-to-high, dual helpful.*
 3. **Document Intake polish** — make the import → weekly-plan path feel like there are no
    steps between A and B, with a clear "import complete, weekly plan ready" success state.
-   *Low-to-medium, single sufficient.*
+   *Low-to-medium, single sufficient.* (Batch D of the redesign will cover some of this
+   visually; the underlying flow/copy work is separate.)
 4. **PowerPoint and Google Slides round-trip review** of a generated deck. *Needs me.*
+5. **Visual confirmation of the "Placeholder inheritance" list** against a real customer-owned
+   `.pptx` template (register one through the interactive file picker and click "Inspect
+   presentation template"). *Needs me — this project's own generated decks can't exercise it.*
 
 ## Boundaries — non-negotiable
 
@@ -159,3 +184,6 @@ batch. My current priority order:
   runtime. Do not extend it and do not treat it as sellable architecture. The native Swift
   Open XML exporter is the supported path.
 - Do not generate outputs from unapproved lessons, and do not auto-approve generated drafts.
+- Do not reintroduce native `TabView` chrome, bundle actual Source Serif 4 font files, or
+  hand-draw custom icons for the redesign without checking with me first — these were
+  explicit, confirmed decisions this session, not defaults to silently reconsider.

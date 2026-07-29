@@ -1,5 +1,5 @@
 LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
-Last updated: 2026-07-29
+Last updated: 2026-07-29 (through Batch 007)
 
 PURPOSE OF THIS DOCUMENT
 
@@ -23,36 +23,24 @@ READ ORDER FOR A MODEL JOINING THIS PROJECT
    step-level running log of recent batches including dead ends that should not be retried.
 4. BUILD_LOG.md — long-form chronological milestones and capability inventory.
 
-MOVING THIS PROJECT INTO CLAUDE CODE
+ENVIRONMENT
 
-FASTEST PATH: open CONTINUE_PROMPT.md and paste its body into a fresh Claude Code session.
-It is this handoff rewritten as a ready-to-use continuation prompt — orientation, working
-agreement, environment notes, known traps, current state, and the exact next three tasks in
-order. Everything below is the longer-form version of the same thing.
+This project is developed in Claude Code with a real shell on the owner's Mac — build, test,
+run git, and launch the app directly. (Much earlier work ran in a sandbox with no Swift
+toolchain and no GUI, requiring every build/test/screenshot to be delegated to a second model;
+that constraint no longer applies and should not be reintroduced out of habit.) Use a second
+model (Codex, via the codex-bridge skill) only when an independent opinion is genuinely
+valuable — an unfamiliar spec's exact rules, or a correctness review of a finished diff — not
+as a routine step.
 
-The project is set up to be picked up in Claude Code with no re-briefing. Open the folder
+The project has been under git since 2026-07-29 (Batch 004); see "Version control" under
+section 3 for the current commit.
 
-  /Users/nils/Documents/Program Development Folder/LessonPlanner
-
-as the working directory. CLAUDE.md is loaded automatically and carries the environment
-notes, build commands, the project.pbxproj trap, and the working agreement.
-
-The important environment difference: earlier work was done from a sandbox with NO Swift
-toolchain and NO GUI, so every build, test, and screenshot had to be delegated to Codex,
-and git operations were blocked outright. Claude Code has a real shell on the owner's Mac
-and can build, test, run git, and launch the app directly. Do not carry the Codex-for-
-everything habit across; use a second model only when an independent opinion is genuinely
-wanted.
-
-Three things are unverified and should be settled in the first Claude Code session:
-git is not yet initialized, the hand-edited project.pbxproj has not been validated with a
-real xcodebuild run, and the weekly grid changes have never been confirmed visually.
-
-The owner's standing working agreement is recorded in CONTINUITY_LOG.md: work in batches of
-up to 20 numbered steps, stop and notify when human intervention is required, and declare
-compute level and single-vs-dual model shape before each batch. Claude has file access but
-no Swift toolchain and no GUI; Codex runs on the owner's Mac and performs all builds, tests,
-and screen captures. Any claim that code works must be backed by a Codex run.
+The owner's standing working agreement is recorded in full in CONTINUITY_LOG.md: work in
+batches of up to 20 numbered steps, declare compute level and single-vs-dual model shape
+before each batch, stop and notify when human judgment/eyes/credentials are needed or when
+the same approach has failed twice, log dead ends so they aren't retried, and never log a
+documentation change without confirming the file actually landed on disk.
 
 
 1. CURRENT PRODUCT GOAL
@@ -102,7 +90,8 @@ Main files:
   Swift package manifest used by SwiftPM builds/tests.
 
 - LessonPlanner.xcodeproj/
-  Xcode project for normal macOS app launch.
+  Xcode project for normal macOS app launch. Uses explicit file references, not synchronized
+  groups — see CLAUDE.md for the four-entry registration trap this creates for new files.
 
 - Sources/LessonPlanner/Models/AppModels.swift
   Domain models: configuration, imported sources, local teacher profiles, course pacing, weekly plans, lessons, generated outputs, readiness reports, and template metadata.
@@ -111,19 +100,41 @@ Main files:
   Main local app state and workflow logic: import, extraction, source role inference, pacing creation, weekly auto-planning, lesson/output generation, local profile scoping, and persistence.
 
 - Sources/LessonPlanner/Views/WorkspaceView.swift
-  Main SwiftUI workspace. Contains tabs for Today, This Week, Planning Preview, Document Intake, and Workspace. Recent weekly planner UI changes are here.
+  Main SwiftUI workspace. Contains the five screens (Today, This Week, Planning Preview,
+  Document Intake, Workspace) and their top-level chrome. The Today screen and the top
+  nav/profile band now use the new "Sunrise Planner" design system (see section 4); the other
+  four screens are still the original stock-SwiftUI look, pending Batches B–D.
+
+- Sources/LessonPlanner/Views/DesignSystem.swift
+  New as of Batch 007. The "Sunrise Planner" design-system layer: warm color tokens, radii,
+  shadow/hover-lift modifiers, a system-serif typography helper, and reusable `DSCard`,
+  `DSTag`, `DSPrimaryButtonStyle`/`DSSecondaryButtonStyle`, `DSTextFieldStyle`.
+
+- Sources/LessonPlanner/PowerPointTemplateInspector.swift
+  Reads `.pptx` template packages. As of Batch 005, `resolvePlaceholders(url:)` resolves
+  placeholder type/idx/geometry across the slide -> layout -> master inheritance chain for
+  arbitrary customer-owned templates (ECMA-376 rules). Wired into the Workspace tab's
+  "Placeholder inheritance" display as of Batch 006 (transient `AppStore` state, not
+  persisted). Not yet used by any exporter.
 
 - Sources/LessonPlanner/LessonPlanRenderer.swift
   Deterministic HTML renderers for lesson plan, weekly hub, and differentiation guide outputs.
 
+- Sources/LessonPlanner/NativePowerPointExporter.swift
+  The supported PowerPoint export path (native Swift Open XML writer). Its own generated
+  decks use plain absolutely-positioned text boxes, not placeholders — placeholder
+  inheritance resolution (above) is entirely about *reading* arbitrary imported templates,
+  not about this exporter's own output.
+
 - Sources/LessonPlanner/SlideDeckBridge.swift
-  Slide-deck generation bridge. Native OpenXML export is the default path; personal bridge remains owner-local QA only.
+  Personal-only legacy slide-deck bridge depending on an owner-local Node runtime. Not the
+  supported path; do not extend or treat as sellable architecture.
 
 - Resources/SlideDeckGenerator.mjs
   Personal/development deck generator resource. Do not treat as sellable dependency.
 
 - Tests/LessonPlannerTests/LessonPlannerTests.swift
-  Test suite. Last verified: 85 tests passing.
+  Test suite. Current baseline: 101 tests passing, 0 failures.
 
 - BUILD_LOG.md
   Chronological development log. Keep updating after material changes.
@@ -133,23 +144,30 @@ Main files:
 
 Version control:
 
-Initialized 2026-07-29 (Batch 004). Root commit 1c38146. .gitignore excludes .build/,
-DerivedData/, xcuserdata/, .DS_Store, and generated .pptx files; Design Screenshots/ is
-tracked as the visual QA record.
+Initialized 2026-07-29 (Batch 004), root commit 1c38146. As of Batch 007 the branch is at
+commit f7f921a (7 batch commits total — see `git log --oneline` for the full list).
+.gitignore excludes .build/, DerivedData/, xcuserdata/, .DS_Store, and generated .pptx files;
+Design Screenshots/ and Design Reference/ are tracked.
 
 Design screenshot folder:
 
-/Users/nils/Documents/Program Development Folder/LessonPlanner/Design Screenshots/2026-07-28
+/Users/nils/Documents/Program Development Folder/LessonPlanner/Design Screenshots/
 
-Important current screenshots:
+Contains dated subfolders — 2026-07-28/ (original UI, pre-redesign baseline) and 2026-07-29/
+(intrinsic-row-height weekly-grid confirmation, and 09-today-sunrise-redesign.png — the first
+redesigned screen).
 
-- 00-main-screens-contact-sheet.png
-- 01-today.png
-- 02-this-week.png
-- 03-planning-preview.png
-- 04-document-intake.png
-- 05-workspace.png
-- 07-this-week-cell-flow-compact.png
+Design reference folder (new as of Batch 007):
+
+/Users/nils/Documents/Program Development Folder/LessonPlanner/Design Reference/warm-morning-2026-07-29/
+
+The owner's full "Sunrise Planner" design handoff (README spec, HTML/CSS design reference,
+design-system stylesheet, one screenshot per screen), preserved in the project so later
+batches don't need the original zip re-supplied.
+
+Approved implementation plan for the redesign:
+
+/Users/nils/.claude/plans/snuggly-brewing-elephant.md
 
 
 4. CURRENT APP CAPABILITIES
@@ -162,6 +180,22 @@ Local app shell:
 - Local testing profiles to simulate multiple users without real login/cloud infrastructure.
 - Active local profile banner to reduce testing confusion.
 - Local profile creation/switching panel.
+
+Visual design ("Sunrise Planner" redesign, in progress as of Batch 007):
+
+- A warm, rounded, serif visual language (color tokens, shadows, typography) is implemented
+  in Sources/LessonPlanner/Views/DesignSystem.swift, recreating the owner's design handoff
+  natively rather than embedding its HTML reference.
+- Typography uses SwiftUI's system serif design (renders as New York) rather than bundling
+  the handoff's Source Serif 4 files (not included in the handoff — only a Google Fonts web
+  import, unusable natively). Icons stay SF Symbols with hierarchical rendering rather than
+  hand-drawn shapes matching the handoff's custom duotone SVGs. Both decisions were confirmed
+  with the owner before implementation.
+- Done and visually confirmed: the custom top nav bar + profile band (replacing the native
+  TabView chrome) and the full Today screen (card-grid periods, notepad-styled full-height
+  checklist).
+- Not yet re-skinned: This Week, Planning Preview, Document Intake, Workspace — still the
+  original stock-SwiftUI look. This is a deliberate stop point; see section 13.
 
 Document intake:
 
@@ -189,6 +223,10 @@ Weekly planner:
 
 - Weekly schedule uses a compact table-style layout based on the user-provided weekly lesson plan reference.
 - Weekly planner can auto-populate from approved course pacing and imported setup documents.
+- Rows size to their tallest cell (88pt floor) rather than a fixed height — crowded cells
+  don't clip, sparse rows don't hold tall blank bands (Batch 001/003).
+- Nearby start times (within 15 minutes) cluster into one row instead of one row per exact
+  minute, via the pure, tested `WeeklyGridLayout` type (Batch 003).
 - Weekly cells are interactive:
   - clicking a lesson card opens the scheduled-lesson edit panel;
   - Plan / Deck / Guide controls generate missing outputs or open existing ones;
@@ -199,6 +237,14 @@ Weekly planner:
 - Weekly prompt preference stores day/time and shows next target.
 - In-app weekly prompt banner appears when due.
 - Weekly pacing check-in can draft pacing refinements from teacher notes; accepted refinements update pacing notes/date ranges.
+
+Today screen:
+
+- Schedule blocks (periods) and a checklist, side by side.
+- Periods can be added (title, instruction, subject, start/end) and removed
+  (`AppStore.removeScheduleBlock`, added Batch 007).
+- Checklist tasks can be added, toggled complete, and removed (`AppStore.removeTask`, added
+  Batch 007 — toggle and add already existed).
 
 Lesson and outputs:
 
@@ -218,6 +264,11 @@ Template/export groundwork:
 - Template readiness guidance distinguishes metadata/provenance from true visual layout fidelity.
 - Template layout-plan records can store source-slide inventory, output frame mapping, and fidelity-review status.
 - Basic `.pptx` template inspection can read slide XML and create first-pass candidates.
+- `PowerPointTemplateInspector.resolvePlaceholders(url:)` (Batch 005) resolves placeholder
+  type/idx/geometry inherited from slide layouts and masters, for arbitrary customer-owned
+  templates. Surfaced in the Workspace tab (Batch 006) as a "Placeholder inheritance" list.
+  Not yet used by the exporter to actually place lesson content into a customer template —
+  that's the natural next increment on this line of work.
 
 QA/support screens:
 
@@ -252,6 +303,21 @@ Local testing profiles are for QA only:
 - They simulate multiple users locally.
 - They do not represent production accounts, cloud identity, sync, permissions, or admin infrastructure.
 - Real login/user assignment will require larger infrastructure later.
+
+Visual redesign approach (added Batch 007):
+
+- When the owner supplies a design handoff, recreate it natively in the target codebase's own
+  environment (SwiftUI here) — do not embed the handoff's HTML/CSS reference directly.
+- For a redesign spanning multiple screens, propose a staged rollout (foundation + one screen
+  first) and stop for visual confirmation before continuing to the rest, rather than
+  redesigning everything before any feedback.
+- Where the handoff specifies an asset the platform can't use natively as-is (a web font, a
+  hand-drawn icon set), confirm the substitution strategy with the owner before implementing,
+  rather than silently picking one.
+- If a design calls for an interaction (e.g. a remove button) the data layer doesn't yet
+  support, add the small supporting method rather than ship a decorative control that doesn't
+  work — this is a natural extension of the approved work, not a new scope decision requiring
+  a stop.
 
 
 6. PROBLEMS ENCOUNTERED, ATTEMPTED SOLUTIONS, AND WORKABLE SOLUTIONS
@@ -312,8 +378,8 @@ Problem: Weekly planner cell-flow problems and huge blank bands.
   off its Plan/Deck/Guide controls, while rows holding zero or one card still consumed
   the full 176pt and left large empty bands. The nested per-cell ScrollView also captured
   scroll-wheel events away from the surrounding grid and hid the clipped content with no
-  visible affordance. Both effects are visible in the 2026-07-28 screenshot below.
-- Workable solution as of 2026-07-29 — INTRINSIC ROW HEIGHT:
+  visible affordance.
+- Workable solution as of 2026-07-29 (Batch 001) — INTRINSIC ROW HEIGHT:
   - Metrics.rowHeight (fixed 176) became Metrics.minRowHeight (a floor of 88);
   - each row's HStack takes intrinsic height via .fixedSize(horizontal: false, vertical: true),
     so the row is exactly as tall as its tallest cell;
@@ -322,19 +388,16 @@ Problem: Weekly planner cell-flow problems and huge blank bands.
     to the row height and the grid lines stay aligned;
   - the nested per-cell ScrollView and LazyVStack were replaced with a plain VStack, so
     nothing is clipped and the scroll wheel reaches the surrounding grid again.
-  All changes are in Sources/LessonPlanner/Views/WorkspaceView.swift.
-  Compiles clean; 85/85 tests pass. HUMAN VISUAL CONFIRMATION IS STILL OUTSTANDING.
-- Visual QA screenshot (shows the superseded 2026-07-28 behavior, useful as a before/after
-  baseline):
-  /Users/nils/Documents/Program Development Folder/LessonPlanner/Design Screenshots/2026-07-28/07-this-week-cell-flow-compact.png
+  Visually confirmed 2026-07-29 (Batch 004) against the pre-fix baseline screenshot
+  (Design Screenshots/2026-07-28/07-this-week-cell-flow-compact.png): crowded cells fully
+  visible, sparse rows collapsed instead of holding a blank band, grid lines still aligned.
 
-Problem: the weekly grid creates a separate time row for every distinct start time.
+Problem: the weekly grid created a separate time row for every distinct start time.
 
-- Not yet addressed. Slot matching is on exact hour AND minute, so days whose blocks start
-  at slightly different times produce extra near-empty rows. The intrinsic-height fix
-  collapses those rows so they cost little space, but the row count is still higher than
-  a teacher would draw by hand. Consider tolerance-based slot grouping if the grid still
-  feels sparse after visual review.
+- Workable solution as of 2026-07-29 (Batch 003): slot identity now lives in one pure, tested
+  type, Sources/LessonPlanner/WeeklyGridLayout.swift, which clusters start times within a
+  15-minute tolerance (anchored on the first start in each cluster, so drift can't chain
+  multiple nearby starts into one row). 8 tests cover it.
 
 Problem: Screenshot capture of whole display was unsafe.
 
@@ -344,80 +407,71 @@ Problem: Screenshot capture of whole display was unsafe.
 
 Problem: macOS UI automation through System Events failed.
 
-- Error: `osascript is not allowed assistive access. (-1719)`.
-- Workable solution: add capture-only launch environment flags so the app opens directly to a selected tab without UI clicking.
-- Relevant environment flags:
-  - LESSONPLANNER_DESIGN_CAPTURE=1
-  - LESSONPLANNER_INITIAL_TAB=today|week|planning|intake|workspace
+- Error: `osascript is not allowed assistive access. (-1719)` (or `-1728` depending on call site).
+- Workable solution: add capture-only launch environment flags so the app opens directly to a selected tab without UI clicking (LESSONPLANNER_DESIGN_CAPTURE=1, LESSONPLANNER_INITIAL_TAB=...). For window-ID screenshot capture specifically, System Events is not needed at all — see the next problem.
 
-Problem: scripted app executable launch sometimes did not appear in the window list after rebuild.
+Problem: `screencapture -l <windowID>` failed with "could not create image from window" (blocked visual QA across several earlier sessions).
 
-- Workable solution: launch via macOS `open -n ... --env ...`, then capture the window-only screenshot once Quartz lists the LessonPlanner window.
+- Cause: the target window was not frontmost/on-screen yet.
+- Workable solution, found 2026-07-29 (Batch 004): run
+  `osascript -e 'tell application "LessonPlanner" to activate'` first — a plain Apple Event,
+  not System Events, so it needs no Accessibility permission. After that,
+  `CGWindowListCopyWindowInfo` reports the window `onscreen=true` and
+  `screencapture -l <windowID>` succeeds. When multiple same-bundle-ID processes are running
+  (e.g. a stuck old instance), this `activate` call is also more reliable than generic
+  app-launcher tools for bringing the *correct* (most recently launched) instance forward.
+
+Problem (Batch 007): `computer-use` clicks immediately followed by typed text sometimes all
+landed in the field that was focused *before* the click.
+
+- Cause: the click and the following `type` action were outrunning SwiftUI's AppKit
+  focus-change timing — the synthetic keystrokes arrived before first-responder status had
+  actually moved.
+- Workable solution: insert a short `wait` (~0.3s) between a `left_click` that changes focus
+  and the `type` that follows it.
+
+Problem (Batch 007): a SwiftUI TextField's placeholder text ("Add a task") appeared to read as
+something else ("Id a task") in a screenshot.
+
+- Cause: the blinking text-insertion caret visually merged with the first letter of the
+  placeholder at that instant. Not a real rendering bug.
+- Workable solution: re-screenshot after the field loses focus (or after the blink cycles)
+  before concluding there's a genuine text-rendering defect.
 
 
 7. CURRENT LIMITATIONS
 
-- Visual PDF content, handwriting, diagrams, and some fraction/equation formatting are not reliably extracted.
-- OCR/math/diagram understanding remains a future source-quality pipeline.
+- Visual PDF content, handwriting, diagrams, and some fraction/equation formatting are not reliably extracted. OCR/math/diagram understanding remains a future source-quality pipeline.
 - Weekly package generation can create/link missing outputs, but OS-level notifications are not implemented.
-- UI is functionally improving but not final visual design. User wants screenshots/visuals to run through a design tool.
-- As of 2026-07-29 (Batch 007), a full visual redesign ("Sunrise Planner" — warm/rounded/serif)
-  is underway. Design handoff preserved at Design Reference/warm-morning-2026-07-29/; plan at
-  /Users/nils/.claude/plans/snuggly-brewing-elephant.md. Foundation (Sources/LessonPlanner/
-  Views/DesignSystem.swift) and the Today screen are done and visually confirmed
-  (Design Screenshots/2026-07-29/09-today-sunrise-redesign.png). This Week, Planning Preview,
-  Document Intake, and Workspace still use the old stock-SwiftUI look — a deliberate stop
-  point to confirm the approach before continuing. Typography uses system serif (New York),
-  not bundled Source Serif 4; icons stay SF Symbols (hierarchical rendering), not hand-drawn
-  duotone shapes — both confirmed with the owner as pragmatic native substitutes.
-- Weekly planner rows now size to their tallest cell, so nothing is clipped and sparse rows collapse. Very dense cells will make a row tall; if that becomes a problem the answer is a different overflow pattern (collapsed cards with click-to-expand, a detail drawer, or an agenda view), NOT a return to fixed row heights.
-- Local teacher profiles are test scaffolding only, not real accounts.
-- Real login, user assignment, cloud sync, permissions, and admin roles are future infrastructure work.
-- Native PowerPoint exporter is functional but generic/minimal. It does not yet preserve or fill real customer-owned PowerPoint layouts.
-- Template inspection reads slide-level XML and proposes candidates. As of 2026-07-29 (Batch
-  005), `PowerPointTemplateInspector.resolvePlaceholders(url:)` can additionally resolve each
-  slide placeholder's effective type/idx/geometry by walking slide -> slideLayout ->
-  slideMaster (ECMA-376 inheritance rules; idx-first matching with type fallback; title/
-  ctrTitle treated as the same slot). Scoped to `<p:sp>` text placeholders; picture/
-  graphicFrame placeholders are not resolved (documented, not a bug). It does not yet perform
-  visual fidelity QA.
-- As of 2026-07-29 (Batch 006), this resolution is wired into the Workspace tab: registering a
-  presentation template and clicking "Inspect presentation template" now shows a "Placeholder
-  inheritance" list (per slide, per placeholder: type, idx, and whether geometry came from the
-  slide/layout/master). Stored as transient `AppStore` state
-  (`lastPresentationTemplatePlaceholderResolution`), not persisted to `AppConfiguration` — no
-  migration risk. Not yet wired into any layout-preserving export path. The actual on-screen
-  list has not been visually confirmed by a human — it needs a real customer-owned `.pptx`
-  registered through the interactive file picker; this project's own generated decks never
-  populate it since they don't use placeholders.
+- Visual redesign ("Sunrise Planner") is in progress: Today screen and top-level chrome are done and visually confirmed; This Week, Planning Preview, Document Intake, and Workspace still use the original stock-SwiftUI look. See section 4 and section 13.
+- Weekly planner rows size to their tallest cell, so nothing is clipped and sparse rows collapse. Very dense cells will make a row tall; if that becomes a problem the answer is a different overflow pattern (collapsed cards with click-to-expand, a detail drawer, or an agenda view), NOT a return to fixed row heights.
+- Local teacher profiles are test scaffolding only, not real accounts. Real login, user assignment, cloud sync, permissions, and admin roles are future infrastructure work.
+- Native PowerPoint exporter is functional but generic/minimal. It does not yet preserve or fill real customer-owned PowerPoint layouts — `PowerPointTemplateInspector.resolvePlaceholders(url:)` (Batch 005) is a prerequisite building block for that, not yet consumed by the exporter itself.
+- Template placeholder-inheritance resolution is scoped to `<p:sp>` text placeholders; picture/graphicFrame placeholders are not resolved (documented, not a bug). It does not perform visual fidelity QA. The on-screen "Placeholder inheritance" list (Batch 006) has not been visually confirmed against a real customer-owned `.pptx` — this project's own generated decks never populate it, since they don't use placeholders at all.
 - Google Slides is supported through PowerPoint upload/conversion testing, not a native Google Slides API integration.
 - No school curriculum, student data, or proprietary templates should be embedded in product code or tests.
 
 
 8. VERIFICATION STATUS
 
-Last verified 2026-07-29 (Batch 004, in Claude Code with a real shell):
+Current baseline (as of Batch 007): `swift test -Xswiftc -gnone` — 101 tests passed, 0
+failures. Real `xcodebuild` (not just SwiftPM) also passes and has been re-confirmed after
+every new source file added this session (WeeklyGridLayout.swift, DesignSystem.swift).
 
-- `swift test -Xswiftc -gnone`: 93 tests passed, 0 failures.
-- Real `xcodebuild` (not just SwiftPM): BUILD SUCCEEDED, confirming the hand-edited
-  project.pbxproj entries for WeeklyGridLayout.swift actually register with the Xcode target.
-  Binary timestamp checked against wall clock to rule out a stale-build false positive.
-- Visual confirmation of the intrinsic-row-height grid: DONE. Captured
-  Design Screenshots/2026-07-29/08-this-week-intrinsic-height.png and compared against
-  Design Screenshots/2026-07-28/07-this-week-cell-flow-compact.png:
-  (a) cards in crowded cells (2 stacked cards) are fully visible, Plan/Deck/Guide controls intact;
-  (b) the old fixed-height totally-blank "9:00-9:45" row is gone; the new single-card row is
-      visibly shorter than the two-card rows around it, confirming rows size to content;
-  (c) row borders still align across the Time column and all day columns.
-- Window-capture note for future sessions: `screencapture -l <windowID>` fails with "could not
-  create image from window" unless the target window is frontmost. Run
-  `osascript -e 'tell application "LessonPlanner" to activate'` first (a plain Apple Event,
-  no Accessibility permission required) before capturing by window ID.
+Full batch-by-batch verification history (what was tested, how, and what's still
+unconfirmed) lives in CONTINUITY_LOG.md — that is the authoritative source, not a duplicate
+summary here. Headlines:
 
-Previously verified 2026-07-28, after the weekly planner cell-flow cleanup:
-
-- Xcode command-line build: passed.
-- `swift test`: 85 tests passed, 0 failures.
+- Batch 004: git initialized; the WeeklyGridLayout.swift pbxproj edit confirmed with a real
+  xcodebuild; the intrinsic-row-height weekly grid fix visually confirmed for the first time
+  after several earlier sessions failed at window-ID screenshot capture (root cause and fix
+  logged under section 6 above).
+- Batch 005: placeholder-inheritance resolution algorithm designed and correctness-reviewed
+  with Codex; 7 new tests including one full ZIP-package integration test.
+- Batch 006: that resolution wired into the Workspace tab as transient UI state; 1 new test.
+  Real customer-template visual confirmation still needed from the owner.
+- Batch 007: design-system foundation + Today screen redesign; 101/101 tests unaffected
+  (pure View-layer change); visually confirmed with live data via `computer-use`.
 
 Known environment gotchas:
 
@@ -427,6 +481,8 @@ Known environment gotchas:
   generation and the suite then runs normally.
 - Xcode may warn that traditional headermap style is no longer supported and recommends
   changing `ALWAYS_SEARCH_USER_PATHS`. This warning has not blocked the build.
+- `screencapture -l <windowID>` and `computer-use` click/type timing both have known gotchas
+  — see section 6, "Problem" entries for Batch 004 and Batch 007.
 
 
 9. HOW TO RUN
@@ -445,64 +501,67 @@ Preferred manual workflow:
 
 Command-line test:
 
-swift test
+swift test -Xswiftc -gnone
 
-If that fails at the dSYM step (see section 8), use:
-
-CLANG_MODULE_CACHE_PATH=/private/tmp/lessonplanner-clang-cache \
-SWIFTPM_CACHE_PATH=/private/tmp/lessonplanner-swiftpm-cache \
-swift test --disable-sandbox --scratch-path /private/tmp/lessonplanner-build -Xswiftc -gnone
+(The `-Xswiftc -gnone` flag matters — see section 8's "known environment gotchas.")
 
 Command-line Xcode build:
 
-xcodebuild -quiet -project LessonPlanner.xcodeproj -scheme LessonPlanner -configuration Debug -derivedDataPath /private/tmp/LessonPlannerDerivedData build CODE_SIGNING_ALLOWED=NO
+xcodebuild -project LessonPlanner.xcodeproj -scheme LessonPlanner -configuration Debug -derivedDataPath /private/tmp/LessonPlannerDerivedData build CODE_SIGNING_ALLOWED=NO
 
-Design-review launch examples:
+Design-review launch example:
 
-LESSONPLANNER_DESIGN_CAPTURE=1 LESSONPLANNER_INITIAL_TAB=week open -n /private/tmp/LessonPlannerDerivedData/Build/Products/Debug/LessonPlanner.app
+open -n /private/tmp/LessonPlannerDerivedData/Build/Products/Debug/LessonPlanner.app --env LESSONPLANNER_DESIGN_CAPTURE=1 --env LESSONPLANNER_INITIAL_TAB=today
 
-If `open --env` is available/preferred:
+(`LESSONPLANNER_INITIAL_TAB` accepts today|week|planning|intake|workspace.)
 
-open -n /private/tmp/LessonPlannerDerivedData/Build/Products/Debug/LessonPlanner.app --env LESSONPLANNER_DESIGN_CAPTURE=1 --env LESSONPLANNER_INITIAL_TAB=week
+Window-only screenshot capture (never full-screen — see section 6):
+
+osascript -e 'tell application "LessonPlanner" to activate'
+screencapture -l <windowID> -o -x <destination.png>
+
+(Get `<windowID>` via a small Swift/CoreGraphics script using `CGWindowListCopyWindowInfo` —
+System Events/Accessibility is not needed and has historically been unavailable.)
 
 
 10. NEXT HUMAN NEEDED ACTIONS
 
-The project is now at a point where human-guided QA and design feedback are the most valuable next steps.
-
-Recommended next actions:
-
-1. Run the app with a local test profile.
-2. Import the full sample planning packet folder.
-3. Confirm weekly planner population feels automatic from import to schedule.
-4. Check whether the new intrinsic-height weekly cells read well in a real teacher workflow — nothing clipped, no wasted vertical space, grid lines aligned.
-5. Open generated lesson plans, differentiation guides, and decks.
-6. Inspect a generated PowerPoint deck in Microsoft PowerPoint.
-7. Upload/open a generated deck in Google Slides for compatibility review.
-8. Use the captured screenshots in a design tool to define the desired visual style.
-9. Decide whether the weekly planner still needs a dedicated overflow pattern for very
-   dense blocks now that rows grow to fit:
-   - compact collapsed cards with click-to-expand;
-   - day/time detail drawer;
-   - separate agenda view for dense blocks.
-   (Internal per-cell scroll has been tried and removed; do not reach for it again.)
-10. Decide whether OS-level notifications are required beyond the in-app weekly prompt.
+1. Review the Today screen redesign (Design Screenshots/2026-07-29/09-today-sunrise-redesign.png)
+   and say go/no-go/adjust before Batches B–D (This Week, Planning Preview, Document Intake,
+   Workspace) continue the same visual treatment.
+2. Register a real customer-owned `.pptx` template (through the interactive file picker) and
+   click "Inspect presentation template" to visually confirm the new "Placeholder inheritance"
+   list — this project's own generated decks can't exercise it, since they don't use
+   placeholders.
+3. Inspect a generated PowerPoint deck in Microsoft PowerPoint.
+4. Upload/open a generated deck in Google Slides for compatibility review.
+5. Decide whether the weekly planner still needs a dedicated overflow pattern for very dense
+   blocks now that rows grow to fit (collapsed cards with click-to-expand, a detail drawer, or
+   a separate agenda view — internal per-cell scroll has been tried and removed; do not reach
+   for it again).
+6. Decide whether OS-level notifications are required beyond the in-app weekly prompt.
 
 
 11. NEXT IMPLEMENTATION STEPS
 
-Likely next development sequence:
+Likely next development sequence, in the owner's stated priority order as of 2026-07-29:
 
-1. Continue UI polish of Weekly Planner based on human feedback.
-2. Reassess dense-cell behavior after visual review of the intrinsic-row-height change.
-3. Refine Document Intake copy and status indicators so import-to-weekly-plan feels obvious.
-4. Add an explicit "import complete -> weekly plan ready" success path.
-5. Improve generated weekly hub visual layout.
-6. Run full end-to-end QA from import through weekly hub generation.
-7. Record QA findings in BUILD_LOG.md.
-8. Perform PowerPoint and Google Slides compatibility review.
-9. Extend template inspection to resolve inherited placeholders from slide layouts/masters.
-10. Begin visual redesign implementation once design-tool mockups are available.
+1. Continue the "Sunrise Planner" redesign — Batches B (This Week), C (Planning Preview),
+   D (Document Intake + Workspace) — once the owner has reviewed Batch A (this session's
+   Today-screen work). Follow the plan at
+   /Users/nils/.claude/plans/snuggly-brewing-elephant.md.
+2. Layout-preserving PowerPoint export: use `PowerPointTemplateInspector.resolvePlaceholders(url:)`
+   (Batch 005/006) to actually place approved-lesson content into a customer-owned template's
+   resolved placeholder frames, instead of only displaying the resolution in the UI.
+3. Source-readiness screen — classify extracted content as embedded text, OCR text, uncertain
+   text, diagram, handwriting, or math notation, with an explicit review path for anything
+   unreliable.
+4. Document Intake polish — make the import -> weekly-plan path feel like there are no steps
+   between A and B, with a clear "import complete, weekly plan ready" success state. (Batch D
+   of the redesign will likely cover some of this visually; the underlying flow/copy work is
+   separate.)
+5. PowerPoint and Google Slides round-trip review of a generated deck (needs the owner).
+6. Record QA findings from any of the above in BUILD_LOG.md.
 
 
 12. WHAT NOT TO REDO
@@ -517,21 +576,41 @@ Likely next development sequence:
 - Do not reintroduce a fixed row height or a nested per-cell ScrollView in the weekly
   planning grid. Both were tried and both caused the clipping and blank-band problems
   described in section 6.
-- Do not record a documentation change in BUILD_LOG.md without confirming the file
-  actually landed on disk. A prior session logged a handoff refresh that was never saved,
-  leaving the log and the handoff out of sync for a day.
+- Do not record a documentation change in BUILD_LOG.md (or any handoff doc) without
+  confirming the file actually landed on disk. A prior session logged a handoff rewrite that
+  was never saved, leaving the docs out of sync for a day.
+- Do not reintroduce native `TabView` chrome in `WorkspaceView` — the custom "Sunrise Planner"
+  top nav bar replaced it deliberately (Batch 007); this affects all 5 screens even before
+  Batches B–D re-skin their content.
+- Do not silently bundle actual Source Serif 4 font files or hand-draw custom duotone icons
+  for the redesign without re-confirming with the owner — system serif (New York) and SF
+  Symbols (hierarchical rendering) were explicitly chosen as the pragmatic native substitutes.
+- Do not redesign multiple screens in one pass without stopping for visual confirmation in
+  between — the owner explicitly wants a staged rollout with a checkpoint after each screen
+  or logical group of screens.
 
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29, the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 007), the app has a working local-first prototype path:
 
-document/folder import -> automatic role sorting and pacing scaffold -> weekly planner population -> interactive weekly lesson cells -> lesson plan/deck/differentiation guide outputs -> weekly hub package.
+document/folder import -> automatic role sorting and pacing scaffold -> weekly planner
+population -> interactive weekly lesson cells -> lesson plan/deck/differentiation guide
+outputs -> weekly hub package -> (new, not yet exporter-integrated) template placeholder
+inheritance resolution for customer-owned PowerPoint templates.
 
-The current focus should be hands-on QA and UI refinement, especially:
+The project is paused mid-way through the "Sunrise Planner" visual redesign, at a deliberate
+checkpoint the owner asked for: the design-system foundation and the Today screen are done,
+committed, and visually confirmed; This Week, Planning Preview, Document Intake, and
+Workspace are unchanged, waiting on the owner's review of the Today screen before continuing
+with the same treatment (Batches B–D, see section 11).
 
-- weekly planner density/overflow behavior;
-- document intake clarity;
-- visual redesign from screenshots;
-- PowerPoint/Google Slides output review;
-- making the import-to-weekly-plan path feel like "no steps between A and B."
+Immediate next session should:
+
+1. Read CONTINUITY_LOG.md's Batch 007 entry and this document's sections 4/11/13 for full
+   context — do not re-derive the font/icon/staging decisions, they're already made.
+2. Ask the owner whether the Today screen redesign looked right, or whether they have
+   feedback to fold in before continuing.
+3. If green-lit, propose Batch B (This Week) — compute/model-shape declaration, following the
+   same DesignSystem.swift foundation already built.
+4. Otherwise, address whatever feedback the owner gives on the Today screen first.

@@ -498,3 +498,11 @@ during implementation, not a new scope decision requiring a stop.
 3. Source-readiness screen — owner priority #2.
 4. Document Intake polish — owner priority #3 (will likely be partly satisfied by Batch C).
 5. PowerPoint/Google Slides round-trip review — needs the owner directly.
+
+**Handoff refresh (same batch, after the owner asked to pause here).** Did a full rewrite of
+`MODEL_HANDOFF.txt` (not another append — sections 8/10/11/13 had gone stale across Batches
+005–007, still framed around "moving into Claude Code" as a future event) and
+`CONTINUE_PROMPT.md` (rewritten to reflect current state: 101-test baseline, git history,
+the redesign pause point, the new traps/gotchas from Batches 004–007, and an explicit
+first-step instruction for the next session to ask the owner about the Today screen before
+assuming approval and continuing). Both confirmed on disk before this log entry.
