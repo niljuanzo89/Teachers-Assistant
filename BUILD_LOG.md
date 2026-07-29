@@ -838,3 +838,20 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
 - Visual inspection of the fresh weekly-tab build showed improved alignment. No screenshot was
   retained because the capture attempts included Codex overlays or the foreground Codex
   window, and false visual artifacts should not be kept as proof.
+
+### 2026-07-29 — Weekly output key and richer-output roadmap
+
+- Added a compact top-right key to the This Week header explaining the weekly card output
+  controls: P = Planner, D = Slide deck, G = Differentiation guide.
+- Kept the key visually aligned with the existing P/D/G chip style so teachers can understand
+  the card controls without leaving the weekly board.
+- Reviewed the output-generation path and recorded the likely reason lesson plans, decks, and
+  differentiation guides still feel bare: source-to-lesson extraction is intentionally
+  conservative, and the supported native renderers/exporter are generic first slices.
+- Identified the likely path to recover the stronger early slide-generation quality: port the
+  richer slide arc into the supported native PowerPoint exporter while also enriching the
+  `LessonRecord` fields from source text in a teacher-editable way.
+- Verification: Swift build passed with the documented temp-cache/no-sandbox workaround; full
+  Swift test suite passed 103 tests with 0 failures; real Xcode build succeeded.
+- Visual record saved at
+  `Design Screenshots/2026-07-29/15-this-week-output-key.png`.

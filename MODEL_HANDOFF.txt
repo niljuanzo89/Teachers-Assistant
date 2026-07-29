@@ -667,8 +667,8 @@ Immediate next session should:
    context — do not re-derive the font/icon/staging decisions, they're already made.
 2. If this is a fresh model session, ask the owner for visual approval of
    `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`.
-3. Continue the active weekly-planner cell-flow polish, then proceed to the Workspace
-   redesign — compute/model-shape declaration first, following the same DesignSystem.swift
-   foundation already built.
+3. Continue Workspace visual polish, then start the richer-output phase: improve lesson
+   content enrichment from source text, port the stronger early slide-deck arc into the
+   supported native exporter, and expand lesson-plan/differentiation-guide templates.
 4. Keep using GitHub as the 50-step checkpoint sync path; the previous GitHub push blocker is
    resolved through GitHub Desktop.

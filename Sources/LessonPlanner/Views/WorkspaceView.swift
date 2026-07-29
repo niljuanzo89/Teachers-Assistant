@@ -1224,9 +1224,60 @@ private struct WeeklyPlannerHeader: View {
                     .foregroundStyle(DS.neutral700)
             }
             Spacer()
-            DSTag(text: "\(assignmentCount) lesson(s)", variant: .neutral)
-            DatePicker("Planning week", selection: $planningWeekDate, displayedComponents: .date)
-                .onChange(of: planningWeekDate) { _, date in weekChanged(date) }
+            VStack(alignment: .trailing, spacing: 8) {
+                HStack(spacing: 10) {
+                    DSTag(text: "\(assignmentCount) lesson(s)", variant: .neutral)
+                    DatePicker("Planning week", selection: $planningWeekDate, displayedComponents: .date)
+                        .onChange(of: planningWeekDate) { _, date in weekChanged(date) }
+                }
+                WeeklyOutputLegendView()
+            }
+        }
+    }
+}
+
+private struct WeeklyOutputLegendView: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("Outputs")
+                .font(DS.font(11, weight: .semibold))
+                .foregroundStyle(DS.neutral600)
+            legendItem("P", systemImage: "doc.text", label: "Planner")
+            legendItem("D", systemImage: "rectangle.stack", label: "Slide deck")
+            legendItem("G", systemImage: "person.2", label: "Differentiation guide")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(DS.surface.opacity(0.82), in: RoundedRectangle(cornerRadius: DS.radiusSM))
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.radiusSM)
+                .stroke(DS.divider, lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Output key: P planner, D slide deck, G differentiation guide")
+    }
+
+    private func legendItem(_ abbreviation: String, systemImage: String, label: String) -> some View {
+        HStack(spacing: 4) {
+            HStack(spacing: 3) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 9, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                Text(abbreviation)
+                    .font(DS.font(10, weight: .bold))
+            }
+            .frame(width: 32, height: 24)
+            .background(DS.surface, in: RoundedRectangle(cornerRadius: 7))
+            .overlay {
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(DS.accent200, lineWidth: 1)
+            }
+            .foregroundStyle(DS.accent700)
+
+            Text(label)
+                .font(DS.font(11))
+                .foregroundStyle(DS.neutral700)
+                .lineLimit(1)
         }
     }
 }

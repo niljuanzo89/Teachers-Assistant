@@ -893,3 +893,64 @@ reality: GitHub Desktop sync works and `main` tracks `origin/main`.
   state.
 - `CGWindowListCopyWindowInfo` returned no usable window list in this environment even though
   `screencapture` works; do not spend a third attempt on that path without a new reason.
+
+---
+
+### Batch 015 — 2026-07-29 — Weekly output key and richer-output roadmap
+
+**Compute:** medium. **Model shape:** single sufficient — one small weekly UI addition plus
+pipeline analysis for the next product phase.
+
+**Goal.** Add a clear key for the weekly-card P/D/G output controls and clarify the next
+development steps for improving bare lesson plans, slide decks, and differentiation guides.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Received owner request | Add a top-right weekly key for Planner, Slide deck, and Differentiation guide buttons |
+| 2 | Checked git state | Local `main` was clean except Batch 014 ahead of GitHub by one commit |
+| 3 | Re-read `WeeklyPlannerHeader` | Found the top-right header area already held lesson count and planning-week picker |
+| 4 | Re-read weekly output chips | Confirmed card controls use compact P/D/G buttons with doc/stack/people icons |
+| 5 | Added `WeeklyOutputLegendView` | New reusable view displays "Outputs" plus P Planner, D Slide deck, G Differentiation guide |
+| 6 | Placed legend in the weekly header | Top-right under lesson count/date picker, preserving the main board layout |
+| 7 | Added accessibility label | VoiceOver reads the full key: P planner, D slide deck, G differentiation guide |
+| 8 | Inspected `LessonPlanRenderer` | Lesson plan and differentiation guide renderers are deterministic but intentionally generic/bare |
+| 9 | Inspected `NativePowerPointExporter` | Native sellable exporter creates a simple editable arc from `LessonRecord` fields |
+| 10 | Inspected draft/extraction flow | Conservative extraction intentionally avoids inventing details; schedule-only and sparse sources produce sparse lesson records |
+| 11 | Identified likely cause of bare outputs | Both upstream lesson-field richness and downstream render/export templates need improvement |
+| 12 | Identified early richer-slide path | Earlier stronger decks likely came from the personal bridge / richer generator path, not the native default |
+| 13 | Ran Swift build | Passed with documented temp-cache/no-SwiftPM-sandbox workaround |
+| 14 | Ran full Swift test suite | 103 tests passed, 0 failures |
+| 15 | Ran real Xcode build | BUILD SUCCEEDED |
+| 16 | Launched fresh weekly tab | Used `LESSONPLANNER_INITIAL_TAB=week`, the correct enum value |
+| 17 | Captured visual record | Saved `Design Screenshots/2026-07-29/15-this-week-output-key.png` |
+| 18 | Inspected screenshot | Output key appears in the intended top-right weekly header area; a small Codex overlay remains at bottom-right but does not cover the key |
+| 19 | Logged richer-output direction | Next sensible phase should separate lesson enrichment from output-template/rendering polish |
+| 20 | Stopped before changing generation semantics | Richer output content is a product/architecture phase, not a tiny UI tweak |
+
+**Outcome.** This Week now explains the P/D/G controls directly in the weekly header. The app
+also has a clearer next-phase diagnosis: generated outputs are bare because the current
+records are often sparse and the native outputs are intentionally generic. The better early
+slide generation can likely be recaptured by porting the richer slide arc into the supported
+native exporter, while improving document-to-lesson enrichment in parallel.
+
+**Screenshot.**
+
+`Design Screenshots/2026-07-29/15-this-week-output-key.png`
+
+**Verification.**
+
+- Swift build passed with the documented temp-cache / no-SwiftPM-sandbox workaround.
+- Full Swift test suite passed: 103 tests, 0 failures.
+- Real Xcode build succeeded.
+
+**Next sensible development steps.**
+
+1. Finish any remaining Workspace visual reskin/polish so the shell feels coherent.
+2. Add a lesson-content enrichment pass that turns readable source text into stronger,
+   teacher-editable lesson records while keeping blank/unknown fields honest.
+3. Port the stronger early slide-deck structure into the supported native PowerPoint exporter
+   instead of relying on the personal bridge.
+4. Expand lesson-plan and differentiation-guide HTML templates so they produce more useful
+   classroom artifacts from the same enriched lesson record.
+5. Add output QA fixtures for a representative enriched lesson and compare Plan/Deck/Guide
+   together before calling the output layer ready.
