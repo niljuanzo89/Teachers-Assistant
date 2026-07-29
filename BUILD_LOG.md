@@ -926,3 +926,17 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   schedule exists, then unlocks after a planning import detects a schedule block.
 - Verification: full Swift test suite passed 107 tests with 0 failures; real Xcode build
   succeeded.
+
+### 2026-07-29 — Visible schedule scaffold build action
+
+- Added an explicit "Build schedule scaffold" action after a readable daily schedule has
+  been imported in the Planning lane.
+- Exposed imported daily schedule blocks to the weekly UI as scaffold rows instead of using
+  them only as hidden lesson-placement helpers.
+- Updated the This Week view so planning documents can show empty schedule placeholders even
+  before lesson content exists. Empty blocks now display their subject label and prompt the
+  teacher to add content files or enter the lesson manually.
+- Added a regression test verifying that planning import produces visible scaffold blocks
+  with the expected labels and times.
+- Verification: full Swift test suite passed 108 tests with 0 failures; real Xcode build
+  succeeded.

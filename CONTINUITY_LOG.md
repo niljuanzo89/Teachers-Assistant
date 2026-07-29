@@ -891,6 +891,43 @@ reality: GitHub Desktop sync works and `main` tracks `origin/main`.
 
 ---
 
+### Batch 021 — 2026-07-29 — Visible schedule scaffold build action
+
+**Compute:** medium. **Model shape:** single sufficient — small data exposure plus focused
+weekly-board UI behavior.
+
+**Goal.** Fix the teacher-facing confusion where a planning document could be uploaded, but
+the This Week screen still showed an empty "No lessons scheduled" state because no content
+lessons existed yet.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Reviewed owner screenshot | Confirmed planning upload still left This Week looking empty |
+| 2 | Diagnosed root cause | Daily schedule blocks were hidden placement helpers, not visible board scaffold rows |
+| 3 | Added scaffold block model | New `WeeklyScheduleScaffoldBlock` carries label and start/end time for UI rows |
+| 4 | Added scaffold build result | New `WeeklyScaffoldBuildResult` provides clear teacher-facing success/failure messages |
+| 5 | Exposed imported schedule blocks | `AppStore.importedScheduleScaffoldBlocks` now maps readable schedule text into UI blocks |
+| 6 | Added explicit build action | `buildWeeklyScheduleScaffoldFromPlanningDocuments()` refreshes planning sync and returns a message |
+| 7 | Updated Document Intake | Planning card now shows "Build schedule scaffold" once schedule blocks are detected |
+| 8 | Updated This Week empty state | If no schedule is detected, the screen offers a scaffold build action instead of only telling the user to import files |
+| 9 | Updated weekly board rendering | Imported schedule blocks render as empty placeholder rows even when no lessons are scheduled |
+| 10 | Preserved existing lesson behavior | When lessons exist in a scaffold block, the normal Plan/Deck/Guide lesson card still appears in that row |
+| 11 | Added regression coverage | Test verifies planning import produces visible schedule scaffold blocks with expected labels/times |
+| 12 | Ran full Swift suite | 108 tests passed, 0 failures |
+| 13 | Ran real Xcode build | BUILD SUCCEEDED |
+| 14 | Updated logs | `BUILD_LOG.md` and `CONTINUITY_LOG.md` now record the scaffold action and visible-placeholder behavior |
+
+**Outcome.** Uploading planning documents can now produce a visible weekly schedule scaffold
+before content is uploaded. This makes the two-stage intake flow understandable: Planning
+creates the daily/weekly structure; Content fills the structure.
+
+**Verification.**
+
+- Full Swift test suite passed: 108 tests, 0 failures.
+- Real Xcode build succeeded.
+
+---
+
 ### Batch 020 — 2026-07-29 — Two-stage document intake gate
 
 **Compute:** medium. **Model shape:** single sufficient — focused UI workflow and import

@@ -223,6 +223,46 @@ struct WeeklyPlanningPromptStatus: Equatable {
     }
 }
 
+struct WeeklyScheduleScaffoldBlock: Equatable, Identifiable {
+    var startHour: Int
+    var startMinute: Int
+    var endHour: Int
+    var endMinute: Int
+    var label: String
+
+    var id: String {
+        "\(startHour)-\(startMinute)-\(endHour)-\(endMinute)-\(label)"
+    }
+
+    var timeLabel: String {
+        let start = Self.formattedTime(hour: startHour, minute: startMinute)
+        let end = Self.formattedTime(hour: endHour, minute: endMinute)
+        return "\(start)\n\(end)"
+    }
+
+    private static func formattedTime(hour: Int, minute: Int) -> String {
+        var components = DateComponents()
+        components.hour = hour
+        components.minute = minute
+        let date = Calendar.current.date(from: components) ?? Date(timeIntervalSinceReferenceDate: 0)
+        return date.formatted(.dateTime.hour().minute())
+    }
+}
+
+enum WeeklyScaffoldBuildResult: Equatable {
+    case built(blockCount: Int)
+    case noReadableSchedule
+
+    var message: String {
+        switch self {
+        case .built(let blockCount):
+            "\(blockCount) daily schedule block(s) are ready. Add content files to fill them with lessons."
+        case .noReadableSchedule:
+            "No readable daily schedule blocks were found yet. Add a daily schedule under Planning."
+        }
+    }
+}
+
 struct TeacherProfile: Codable, Equatable, Identifiable {
     let id: UUID
     var displayName: String

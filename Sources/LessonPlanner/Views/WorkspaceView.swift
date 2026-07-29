@@ -360,9 +360,14 @@ struct SourceImportView: View {
                             status: intakeReport.hasScheduleScaffold ? "\(intakeReport.scheduleBlockCount) schedule block(s) detected" : "Daily schedule needed",
                             systemImage: "calendar.badge.clock",
                             isReady: intakeReport.hasScheduleScaffold,
-                            buttonTitle: "Add planning files…"
+                            buttonTitle: "Add planning files…",
+                            secondaryButtonTitle: intakeReport.hasScheduleScaffold ? "Build schedule scaffold" : nil
                         ) {
                             chooseDocumentItems(.planning)
+                        } secondaryAction: {
+                            let result = store.buildWeeklyScheduleScaffoldFromPlanningDocuments()
+                            actionMessage = result.message
+                            selectedTab = .week
                         }
                         DocumentIntakeStepCard(
                             number: "2",
@@ -690,8 +695,10 @@ private struct DocumentIntakeStepCard: View {
     var systemImage: String
     var isReady: Bool
     var buttonTitle: String
+    var secondaryButtonTitle: String? = nil
     var isDisabled = false
     var action: () -> Void
+    var secondaryAction: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -718,9 +725,15 @@ private struct DocumentIntakeStepCard: View {
             Text(status)
                 .font(DS.font(12.5, weight: .semibold))
                 .foregroundStyle(isReady ? DS.accent700 : DS.accent2_700)
-            Button(buttonTitle, action: action)
-                .buttonStyle(.dsPrimary)
-                .disabled(isDisabled)
+            HStack(spacing: 8) {
+                Button(buttonTitle, action: action)
+                    .buttonStyle(.dsPrimary)
+                    .disabled(isDisabled)
+                if let secondaryButtonTitle, let secondaryAction {
+                    Button(secondaryButtonTitle, action: secondaryAction)
+                        .buttonStyle(.dsSecondary)
+                }
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1138,20 +1151,27 @@ struct WeeklyPlannerView: View {
                     loadWeeklyPacingRefinement()
                 }
 
-                if store.weeklyPlan.assignments.isEmpty {
+                if store.weeklyPlan.assignments.isEmpty && store.importedScheduleScaffoldBlocks.isEmpty {
                     DSCard {
-                        ContentUnavailableView(
-                            "No lessons scheduled",
-                            systemImage: "calendar.badge.plus",
-                            description: Text("Add planning documents in Document Intake; readable files can populate this week automatically.")
-                        )
-                        .foregroundStyle(DS.neutral700)
+                        VStack(spacing: 16) {
+                            ContentUnavailableView(
+                                "No schedule scaffold yet",
+                                systemImage: "calendar.badge.plus",
+                                description: Text("Add planning documents in Document Intake, then build the schedule scaffold.")
+                            )
+                            .foregroundStyle(DS.neutral700)
+                            Button("Build schedule scaffold") {
+                                pacingActionMessage = store.buildWeeklyScheduleScaffoldFromPlanningDocuments().message
+                            }
+                            .buttonStyle(.dsSecondary)
+                        }
                         .frame(maxWidth: .infinity, minHeight: 360)
                     }
                 } else {
                     WeeklyPlanningGridView(
                         days: weekDays,
                         assignments: store.weeklyPlan.assignments,
+                        scaffoldBlocks: store.importedScheduleScaffoldBlocks,
                         selectedAssignmentID: selectedAssignmentID,
                         lesson: lesson(for:),
                         outputLinks: outputLinks(for:),
@@ -1729,6 +1749,7 @@ private struct WeeklyOutputSummaryView: View {
 private struct WeeklyPlanningGridView: View {
     var days: [Date]
     var assignments: [WeeklyLessonAssignment]
+    var scaffoldBlocks: [WeeklyScheduleScaffoldBlock]
     var selectedAssignmentID: UUID?
     var lesson: (WeeklyLessonAssignment) -> LessonRecord?
     var outputLinks: (WeeklyLessonAssignment) -> LessonOutputLinkSet
@@ -1743,6 +1764,7 @@ private struct WeeklyPlanningGridView: View {
                 WeeklyDayColumnView(
                     day: day,
                     assignments: assignments(for: day),
+                    scaffoldBlocks: scaffoldBlocks,
                     selectedAssignmentID: selectedAssignmentID,
                     lesson: lesson,
                     outputLinks: outputLinks,
@@ -1771,6 +1793,7 @@ private struct WeeklyPlanningGridView: View {
 private struct WeeklyDayColumnView: View {
     var day: Date
     var assignments: [WeeklyLessonAssignment]
+    var scaffoldBlocks: [WeeklyScheduleScaffoldBlock]
     var selectedAssignmentID: UUID?
     var lesson: (WeeklyLessonAssignment) -> LessonRecord?
     var outputLinks: (WeeklyLessonAssignment) -> LessonOutputLinkSet
@@ -1800,17 +1823,27 @@ private struct WeeklyDayColumnView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        ForEach(assignments) { assignment in
-                            WeeklyDayAssignmentRow(
-                                assignment: assignment,
-                                isSelected: selectedAssignmentID == assignment.id,
-                                lesson: lesson(assignment),
-                                links: outputLinks(assignment),
-                                isGeneratingOutput: { kind in isGeneratingOutput(assignment, kind) },
-                                outputAction: { kind in outputAction(assignment, kind) },
-                                editAssignment: { editAssignment(assignment) },
-                                removeAssignment: { removeAssignment(assignment) }
-                            )
+                        if scaffoldBlocks.isEmpty {
+                            ForEach(assignments) { assignment in
+                                assignmentRow(assignment)
+                            }
+                        } else {
+                            ForEach(scaffoldBlocks) { block in
+                                WeeklyScheduleScaffoldRow(
+                                    block: block,
+                                    assignments: assignments(in: block),
+                                    selectedAssignmentID: selectedAssignmentID,
+                                    lesson: lesson,
+                                    outputLinks: outputLinks,
+                                    isGeneratingOutput: isGeneratingOutput,
+                                    outputAction: outputAction,
+                                    editAssignment: editAssignment,
+                                    removeAssignment: removeAssignment
+                                )
+                            }
+                            ForEach(assignmentsWithoutScaffoldBlock) { assignment in
+                                assignmentRow(assignment)
+                            }
                         }
                     }
                     .padding(14)
@@ -1820,6 +1853,112 @@ private struct WeeklyDayColumnView: View {
         .frame(minWidth: 230, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
+    private func assignmentRow(_ assignment: WeeklyLessonAssignment) -> some View {
+        WeeklyDayAssignmentRow(
+            assignment: assignment,
+            isSelected: selectedAssignmentID == assignment.id,
+            lesson: lesson(assignment),
+            links: outputLinks(assignment),
+            isGeneratingOutput: { kind in isGeneratingOutput(assignment, kind) },
+            outputAction: { kind in outputAction(assignment, kind) },
+            editAssignment: { editAssignment(assignment) },
+            removeAssignment: { removeAssignment(assignment) }
+        )
+    }
+
+    private func assignments(in block: WeeklyScheduleScaffoldBlock) -> [WeeklyLessonAssignment] {
+        assignments.filter { assignment in
+            matches(assignment, block: block)
+        }
+    }
+
+    private var assignmentsWithoutScaffoldBlock: [WeeklyLessonAssignment] {
+        assignments.filter { assignment in
+            !scaffoldBlocks.contains { block in matches(assignment, block: block) }
+        }
+    }
+
+    private func matches(_ assignment: WeeklyLessonAssignment, block: WeeklyScheduleScaffoldBlock) -> Bool {
+        let calendar = Calendar.current
+        return calendar.component(.hour, from: assignment.start) == block.startHour
+            && calendar.component(.minute, from: assignment.start) == block.startMinute
+            && calendar.component(.hour, from: assignment.end) == block.endHour
+            && calendar.component(.minute, from: assignment.end) == block.endMinute
+    }
+}
+
+private struct WeeklyScheduleScaffoldRow: View {
+    var block: WeeklyScheduleScaffoldBlock
+    var assignments: [WeeklyLessonAssignment]
+    var selectedAssignmentID: UUID?
+    var lesson: (WeeklyLessonAssignment) -> LessonRecord?
+    var outputLinks: (WeeklyLessonAssignment) -> LessonOutputLinkSet
+    var isGeneratingOutput: (WeeklyLessonAssignment, GeneratedOutputKind) -> Bool
+    var outputAction: (WeeklyLessonAssignment, GeneratedOutputKind) -> Void
+    var editAssignment: (WeeklyLessonAssignment) -> Void
+    var removeAssignment: (WeeklyLessonAssignment) -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(block.timeLabel)
+                .font(DS.font(10.5, weight: .semibold))
+                .foregroundStyle(DS.accent800)
+                .lineLimit(2)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 52, alignment: .topTrailing)
+                .padding(.top, 10)
+                .padding(.trailing, 8)
+                .overlay(alignment: .trailing) {
+                    Rectangle().fill(DS.accent200).frame(width: 2)
+                }
+
+            VStack(alignment: .leading, spacing: 8) {
+                if assignments.isEmpty {
+                    WeeklySchedulePlaceholderCard(block: block)
+                } else {
+                    ForEach(assignments) { assignment in
+                        WeeklyAssignmentCompactCard(
+                            assignment: assignment,
+                            isSelected: selectedAssignmentID == assignment.id,
+                            lesson: lesson(assignment),
+                            links: outputLinks(assignment),
+                            isGeneratingOutput: { kind in isGeneratingOutput(assignment, kind) },
+                            outputAction: { kind in outputAction(assignment, kind) },
+                            editAssignment: { editAssignment(assignment) },
+                            removeAssignment: { removeAssignment(assignment) }
+                        )
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+}
+
+private struct WeeklySchedulePlaceholderCard: View {
+    var block: WeeklyScheduleScaffoldBlock
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(block.label)
+                .font(DS.font(13.5, weight: .semibold))
+                .foregroundStyle(DS.text)
+                .lineLimit(2)
+            Text("Add content files or enter this lesson manually.")
+                .font(DS.font(11))
+                .foregroundStyle(DS.neutral600)
+                .lineLimit(2)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 76, alignment: .topLeading)
+        .background(DS.neutral100.opacity(0.52))
+        .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.radiusMD)
+                .stroke(DS.divider, style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
+        }
+    }
 }
 
 private struct WeeklyDayAssignmentRow: View {

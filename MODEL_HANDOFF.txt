@@ -246,6 +246,8 @@ Document intake:
   guides.
 - Content import is disabled until at least one readable daily schedule time block is
   detected, so lessons cannot populate before the schedule scaffold exists.
+- A "Build schedule scaffold" action appears after a readable daily schedule is detected.
+  This Week can show empty subject/time placeholders before content is uploaded.
 - Readable imports are usable by default.
 - Manual text edits/fill-ins remain optional for unreadable or blank content.
 - Document-level teacher approval was intentionally removed because it was too cumbersome.
@@ -643,7 +645,7 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 020), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 021), the app has a working local-first prototype path:
 
 two-stage document intake -> automatic role sorting and pacing scaffold -> weekly planner
 population -> interactive weekly lesson cells -> lesson plan/deck/differentiation guide
@@ -658,11 +660,12 @@ styled warning/readiness/output controls, and preserved lesson/output behavior. 
 Intake has been reskinned in Batch 013 and then updated in Batch 020 into a two-stage
 workflow: Planning files first, Content files second. Content import is disabled until a
 readable daily schedule time block is detected, so the schedule scaffold exists before lesson
-content populates the planner.
+content populates the planner. Batch 021 added an explicit "Build schedule scaffold" action
+and visible empty schedule placeholders on This Week.
 Workspace is the remaining stock-looking screen, except for the already-added Progress safety
 section.
 
-Local verification for Batch 020: full Swift test suite passed 107 tests with 0 failures;
+Local verification for Batch 021: full Swift test suite passed 108 tests with 0 failures;
 real Xcode build succeeded. Screenshot:
 `Design Screenshots/2026-07-29/15-this-week-output-key.png`.
 
@@ -670,8 +673,8 @@ GitHub status: local branch is `main`; remote is
 `https://github.com/niljuanzo89/Teachers-Assistant.git`; GitHub Desktop successfully
 published the real LessonPlanner project to GitHub after an earlier empty-clone mismatch was
 corrected. Batch 016 pushed Batches 014-016 to GitHub through GitHub Desktop after
-command-line git again failed for missing HTTPS credentials. Batches 017-019 were later
-synced; Batch 020 should be committed and then synced according to the approved cadence.
+command-line git again failed for missing HTTPS credentials. Batches 017-20 were later
+synced; Batch 021 should be committed and then synced according to the approved cadence.
 
 Immediate next session should:
 
@@ -687,7 +690,7 @@ Immediate next session should:
    daily schedule and pacing/time scaffold first; content packets then drive concrete lesson
    sequence. A subject-specific content packet, such as a math unit, should schedule into the
    matching subject block only.
-5. Continue the intake architecture by adding teacher-visible schedule confirmation and empty
-   subject placeholders with manual entry options.
+5. Continue the intake architecture by making the empty scaffold placeholders directly
+   editable for manual teacher entry.
 6. Use the approved GitHub cadence: commit each verified batch, then push every 2-3 committed
    batches or before risky/handoff work. If command-line auth fails, use GitHub Desktop.

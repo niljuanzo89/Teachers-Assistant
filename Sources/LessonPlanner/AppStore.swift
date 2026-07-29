@@ -94,6 +94,18 @@ final class AppStore: ObservableObject {
         !importedDailyScheduleBlocks(from: importedSources).isEmpty
     }
 
+    var importedScheduleScaffoldBlocks: [WeeklyScheduleScaffoldBlock] {
+        importedDailyScheduleBlocks(from: importedSources).map {
+            WeeklyScheduleScaffoldBlock(
+                startHour: $0.startHour,
+                startMinute: $0.startMinute,
+                endHour: $0.endHour,
+                endMinute: $0.endMinute,
+                label: $0.label
+            )
+        }
+    }
+
     var localWorkflowQAReport: LocalWorkflowQAReport {
         LocalWorkflowQAReport.analyze(
             activeTeacherProfile: activeTeacherProfile,
@@ -845,6 +857,18 @@ final class AppStore: ObservableObject {
 
     func refreshWeeklyPlannerFromReadableDocuments() {
         syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: false)
+    }
+
+    @discardableResult
+    func buildWeeklyScheduleScaffoldFromPlanningDocuments() -> WeeklyScaffoldBuildResult {
+        let blockCount = importedScheduleScaffoldBlocks.count
+        guard blockCount > 0 else {
+            lastError = WeeklyScaffoldBuildResult.noReadableSchedule.message
+            return .noReadableSchedule
+        }
+        refreshWeeklyPlannerFromReadableDocuments()
+        lastError = nil
+        return .built(blockCount: blockCount)
     }
 
     private func syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: Bool) {

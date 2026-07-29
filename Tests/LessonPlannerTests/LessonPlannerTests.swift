@@ -2249,6 +2249,28 @@ final class LessonPlannerTests: XCTestCase {
     }
 
     @MainActor
+    func testPlanningImportBuildsVisibleScheduleScaffoldBlocks() throws {
+        let repository = try makeRepository()
+        let scheduleURL = repository.rootURL.appending(path: "Daily Schedule.docx")
+        try makeDOCX(at: scheduleURL, paragraphs: [
+            "Sample Daily Schedule",
+            "8:35 AM - 9:35 AM",
+            "Reading",
+            "9:45 AM - 10:45 AM",
+            "Math"
+        ])
+        let store = AppStore(repository: repository)
+
+        store.importPlanningDocumentItems([scheduleURL])
+        let result = store.buildWeeklyScheduleScaffoldFromPlanningDocuments()
+
+        XCTAssertEqual(result, .built(blockCount: 2))
+        XCTAssertEqual(store.importedScheduleScaffoldBlocks.map(\.label), ["Reading", "Math"])
+        XCTAssertEqual(store.importedScheduleScaffoldBlocks.map(\.startHour), [8, 9])
+        XCTAssertEqual(store.importedScheduleScaffoldBlocks.map(\.startMinute), [35, 45])
+    }
+
+    @MainActor
     func testDocumentImportAutomaticallyBuildsWeeklyPlanningScaffold() throws {
         let repository = try makeRepository()
         try repository.saveConfiguration(AppConfiguration(
