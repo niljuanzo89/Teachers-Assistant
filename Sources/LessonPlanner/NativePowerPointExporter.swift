@@ -22,9 +22,9 @@ private struct NativePowerPointDeck {
 
     func packageData() throws -> Data {
         var zip = StoredZipWriter()
-        let title = xmlEscape(lesson.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Lesson" : lesson.title)
-        let objective = xmlEscape(lesson.objective.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Teacher-reviewed objective" : lesson.objective)
-        let slides = slideContents(title: title, objective: objective)
+        let content = LessonOutputContent(lesson: lesson)
+        let title = xmlEscape(content.title)
+        let slides = slideContents(content: content)
 
         zip.add("[Content_Types].xml", contentTypes(slideCount: slides.count))
         zip.add("_rels/.rels", rootRelationships)
@@ -53,7 +53,7 @@ private struct NativePowerPointDeck {
     }
 
     private var sourceReferences: [String] {
-        lesson.sourceReferences.map(cleaned).filter { !$0.isEmpty }
+        LessonOutputContent(lesson: lesson).sourceReferences
     }
 
     private var templateReferences: [String] {
@@ -71,44 +71,73 @@ private struct NativePowerPointDeck {
         return lines
     }
 
-    private func slideContents(title: String, objective: String) -> [SlideContent] {
+    private func slideContents(content: LessonOutputContent) -> [SlideContent] {
+        let title = xmlEscape(content.title)
+        let objective = xmlEscape(content.objective)
         var slides: [SlideContent] = [
             SlideContent(
                 title: title,
                 subtitle: objective,
-                body: [
-                    metadataLine(label: "Subject", value: lesson.subject),
-                    metadataLine(label: "Grade", value: lesson.gradeOrAgeRange)
-                ].filter { !$0.isEmpty }.joined(separator: "\n")
+                body: content.metadataLines.map(xmlEscape).joined(separator: "\n")
             )
         ]
 
-        let stepLines = lesson.instructionalSequence
-            .flatMap(stepLines)
-        for chunk in stepLines.chunked(into: 8) {
+        slides.append(SlideContent(
+            title: "Learning goal",
+            subtitle: title,
+            body: [
+                "I can...",
+                objective,
+                "",
+                "Success looks like explaining your strategy and showing your work clearly."
+            ].joined(separator: "\n")
+        ))
+
+        slides.append(SlideContent(
+            title: "Warm up and connect",
+            subtitle: objective,
+            body: (
+                content.stepLines(range: 0..<3, emptyMessage: "Connect this lesson to what students already know.")
+                + ["", "Talk with a partner: What do you already know that can help?"]
+            ).map(xmlEscape).joined(separator: "\n")
+        ))
+
+        slides.append(SlideContent(
+            title: "Build understanding together",
+            subtitle: objective,
+            body: (
+                content.stepLines(range: 3..<6, emptyMessage: "Use diagrams, models, and clear explanations to make reasoning visible.")
+                + ["", "Use examples and discussion to make thinking visible."]
+            ).map(xmlEscape).joined(separator: "\n")
+        ))
+
+        for (index, group) in content.practiceStepGroups(startingAt: 6, size: 4).enumerated() {
+            let promptLines = [
+                "Show your work",
+                "1. Choose a strategy.",
+                "2. Represent it with a model, evidence, or explanation.",
+                "3. Explain why it works.",
+                "",
+                "Student prompt: \(content.printablePrompt)"
+            ]
             slides.append(SlideContent(
-                title: "Instructional Sequence",
-                subtitle: objective,
-                body: chunk.joined(separator: "\n")
+                title: index == 0 ? "Practice and explain" : "Continue practice",
+                subtitle: title,
+                body: (group + [""] + promptLines).map(xmlEscape).joined(separator: "\n")
             ))
         }
 
         let supports = [
-            section(title: "Materials", values: lesson.materials),
-            section(title: "Differentiation", value: lesson.differentiationSummary)
+            section(title: "Materials", values: content.materials),
+            section(title: "Differentiation", value: content.differentiation)
         ].filter { !$0.isEmpty }.joined(separator: "\n")
-        if !supports.isEmpty {
-            slides.append(SlideContent(title: "Materials and Supports", subtitle: title, body: supports))
-        }
+        slides.append(SlideContent(title: "Choose the support you need", subtitle: title, body: supports))
 
-        if let printablePrompt = lesson.printableResourcePrompt.map(cleaned), !printablePrompt.isEmpty {
-            slides.append(SlideContent(title: "Student Practice", subtitle: title, body: xmlEscape(printablePrompt)))
-        }
-
-        let assessment = cleaned(lesson.assessmentSummary)
-        if !assessment.isEmpty {
-            slides.append(SlideContent(title: "Assessment", subtitle: title, body: xmlEscape(assessment)))
-        }
+        slides.append(SlideContent(
+            title: "Exit ticket",
+            subtitle: title,
+            body: xmlEscape("\(content.assessment)\n\nBefore you leave: What strategy helped you most?")
+        ))
 
         return slides
     }
@@ -325,34 +354,14 @@ private struct NativePowerPointDeck {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func metadataLine(label: String, value: String) -> String {
-        let cleanedValue = cleaned(value)
-        return cleanedValue.isEmpty ? "" : "\(label): \(xmlEscape(cleanedValue))"
-    }
-
-    private func stepLines(_ step: InstructionalStep) -> [String] {
-        let title = cleaned(step.title)
-        let notes = cleaned(step.notes)
-        guard !title.isEmpty || !notes.isEmpty else { return [] }
-        if title.isEmpty {
-            return ["• \(xmlEscape(notes))"]
-        }
-        if notes.isEmpty {
-            return ["• \(xmlEscape(title))"]
-        }
-        return ["• \(xmlEscape(title))", "  Notes: \(xmlEscape(notes))"]
-    }
-
     private func section(title: String, values: [String]) -> String {
-        let cleanedValues = values.map(cleaned).filter { !$0.isEmpty }
-        guard !cleanedValues.isEmpty else { return "" }
-        return "\(title):\n" + cleanedValues.map { "• \(xmlEscape($0))" }.joined(separator: "\n")
+        guard !values.isEmpty else { return "" }
+        return xmlEscape("\(title):") + "\n" + values.map { "• \(xmlEscape($0))" }.joined(separator: "\n")
     }
 
     private func section(title: String, value: String) -> String {
-        let cleanedValue = cleaned(value)
-        guard !cleanedValue.isEmpty else { return "" }
-        return "\(title):\n\(xmlEscape(cleanedValue))"
+        guard !value.isEmpty else { return "" }
+        return xmlEscape("\(title):\n\(value)")
     }
 }
 

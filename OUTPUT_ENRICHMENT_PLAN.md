@@ -84,10 +84,13 @@ next phase needs a shared enrichment layer plus upgraded renderers.
 
 ## First Coding Pass
 
-Start with the native slide exporter because it has the clearest existing comparison:
+Started in Batch 017 with the native slide exporter because it has the clearest existing
+comparison:
 
-1. Add a small `LessonOutputContent` view model or equivalent helper that normalizes title,
-   objective, steps, differentiation, assessment, subject, and grade.
-2. Make `NativePowerPointExporter` use the richer slide sequence from the old bridge.
-3. Add tests that inspect the generated `.pptx` package for expected slide count and key text.
-4. Then apply the same helper to `LessonPlanRenderer` and the differentiation guide.
+1. Done: add a small `LessonOutputContent` view model that normalizes title, objective,
+   steps, differentiation, assessment, subject, grade, materials, prompt, and source
+   references.
+2. Done: make `NativePowerPointExporter` use the richer slide sequence from the old bridge.
+3. Done: add tests that inspect the generated `.pptx` package for expected slide count and
+   key text.
+4. Next: apply the same helper to `LessonPlanRenderer` and the differentiation guide.

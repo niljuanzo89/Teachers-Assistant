@@ -214,7 +214,7 @@ enum PowerPointTemplateInspector {
     private static func inferredReusableRole(slideNumber: Int, title: String, xml: String) -> String {
         let searchable = "\(title) \(xml)".lowercased()
         if slideNumber == 1 { return "Opening" }
-        if searchable.contains("assessment") { return "Assessment" }
+        if searchable.contains("assessment") || searchable.contains("exit ticket") { return "Assessment" }
         if searchable.contains("practice") { return "Student practice" }
         if searchable.contains("material") || searchable.contains("support") { return "Materials and supports" }
         if searchable.contains("differentiation") { return "Differentiation" }

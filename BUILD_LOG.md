@@ -855,3 +855,21 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   Swift test suite passed 103 tests with 0 failures; real Xcode build succeeded.
 - Visual record saved at
   `Design Screenshots/2026-07-29/15-this-week-output-key.png`.
+
+### 2026-07-29 — Native slide deck enrichment pass
+
+- Added `LessonOutputContent`, a shared normalization helper for lesson output generation.
+  It trims lesson fields, filters empty steps/materials/source references, and supplies
+  honest local fallbacks for classroom-output wording.
+- Ported the stronger early slide arc into `NativePowerPointExporter`, replacing the generic
+  five-slide skeleton with a richer editable sequence: opening, learning goal, warm up,
+  build understanding, practice, supports, and exit ticket.
+- Kept the PowerPoint path local and native; the older `Resources/SlideDeckGenerator.mjs`
+  bridge remains available as reference, but the default output no longer depends on the
+  personal presentation runtime.
+- Updated PowerPoint inspection so "Exit ticket" slides are treated as assessment-role slides
+  for template-layout inventory/mapping.
+- Updated tests to verify the seven-slide native deck, key lesson text, prompt text, escaped
+  XML content, and template-inspector inventory/frame-map behavior.
+- Verification: Swift build passed with the documented temp-cache/no-sandbox workaround; full
+  Swift test suite passed 103 tests with 0 failures; real Xcode build succeeded.

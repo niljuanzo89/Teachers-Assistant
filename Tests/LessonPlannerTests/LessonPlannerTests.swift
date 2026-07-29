@@ -1502,8 +1502,8 @@ final class LessonPlannerTests: XCTestCase {
 
         let result = try PowerPointTemplateInspector.inspect(url: deckURL)
 
-        XCTAssertEqual(result.slideInventory.map(\.sourceSlideNumber), [1, 2, 3, 4, 5])
-        XCTAssertEqual(result.frameMap.map(\.outputSlideNumber), [1, 2, 3, 4, 5])
+        XCTAssertEqual(result.slideInventory.map(\.sourceSlideNumber), Array(1...7))
+        XCTAssertEqual(result.frameMap.map(\.outputSlideNumber), Array(1...7))
         XCTAssertEqual(result.slideInventory.first?.reusableRole, "Opening")
         XCTAssertTrue(result.frameMap.first?.mappedSlotNames.contains("lesson.title") == true)
         XCTAssertTrue(result.frameMap.contains { $0.mappedSlotNames.contains("lesson.assessment") })
@@ -1744,13 +1744,13 @@ final class LessonPlannerTests: XCTestCase {
 
         let savedTemplate = try XCTUnwrap(repository.loadConfiguration()?.outputTemplates.first(where: { $0.id == templateID }))
         XCTAssertEqual(savedTemplate.layoutPlan?.fidelityReviewCompleted, false)
-        XCTAssertEqual(savedTemplate.layoutPlan?.slideInventory.count, 3)
-        XCTAssertEqual(savedTemplate.layoutPlan?.frameMap.count, 3)
+        XCTAssertEqual(savedTemplate.layoutPlan?.slideInventory.count, 7)
+        XCTAssertEqual(savedTemplate.layoutPlan?.frameMap.count, 7)
 
         // NativePowerPointExporter's own decks never use placeholders, so inspecting one
         // should populate one resolution per slide, each with no placeholders — proving the
         // wiring runs cleanly on the no-placeholders case rather than crashing or omitting slides.
-        XCTAssertEqual(store.lastPresentationTemplatePlaceholderResolution.count, 3)
+        XCTAssertEqual(store.lastPresentationTemplatePlaceholderResolution.count, 7)
         XCTAssertTrue(store.lastPresentationTemplatePlaceholderResolution.allSatisfy { $0.placeholders.isEmpty })
     }
 
@@ -2344,8 +2344,8 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertEqual(store.slideDeckExporterPreference, .nativeOpenXML)
         XCTAssertTrue(packageText.contains("ppt/presentation.xml"))
         XCTAssertTrue(packageText.contains("Native Default Deck"))
-        XCTAssertTrue(packageText.contains("Student Practice"))
-        XCTAssertTrue(packageText.contains("Use fraction strips."))
+        XCTAssertTrue(packageText.contains("Practice and explain"))
+        XCTAssertTrue(packageText.contains("Student prompt: Draw equivalent models."))
     }
 
     @MainActor
@@ -2426,17 +2426,21 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertTrue(packageText.contains("[Content_Types].xml"))
         XCTAssertTrue(packageText.contains("ppt/presentation.xml"))
         XCTAssertTrue(packageText.contains("ppt/slides/slide1.xml"))
-        XCTAssertTrue(packageText.contains("ppt/slides/slide5.xml"))
+        XCTAssertTrue(packageText.contains("ppt/slides/slide7.xml"))
         XCTAssertTrue(packageText.contains("ppt/notesSlides/notesSlide1.xml"))
-        XCTAssertTrue(packageText.contains("<Slides>5</Slides>"))
+        XCTAssertTrue(packageText.contains("<Slides>7</Slides>"))
         XCTAssertTrue(packageText.contains("A &lt; B &amp; Fraction Strategies"))
         XCTAssertTrue(packageText.contains("Compare 1/2 &amp; 2/4 using visual models."))
+        XCTAssertTrue(packageText.contains("Learning goal"))
+        XCTAssertTrue(packageText.contains("Warm up and connect"))
+        XCTAssertTrue(packageText.contains("Build understanding together"))
+        XCTAssertTrue(packageText.contains("Practice and explain"))
         XCTAssertTrue(packageText.contains("Model 1/2 &lt; 2/4"))
         XCTAssertTrue(packageText.contains("Check the whole &amp; labels."))
-        XCTAssertTrue(packageText.contains("Materials and Supports"))
-        XCTAssertTrue(packageText.contains("Student Practice"))
+        XCTAssertTrue(packageText.contains("Choose the support you need"))
+        XCTAssertTrue(packageText.contains("Student prompt: Draw &lt;two&gt; equivalent models."))
         XCTAssertTrue(packageText.contains("Draw &lt;two&gt; equivalent models."))
-        XCTAssertTrue(packageText.contains("Assessment"))
+        XCTAssertTrue(packageText.contains("Exit ticket"))
         XCTAssertTrue(packageText.contains("Exit ticket: explain one equivalent pair."))
         XCTAssertTrue(packageText.contains("[Sources]"))
         XCTAssertTrue(packageText.contains("Source reference: /tmp/source &lt;one&gt;.pdf"))

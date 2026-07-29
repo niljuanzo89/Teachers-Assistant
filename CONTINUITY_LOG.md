@@ -999,3 +999,46 @@ plan and differentiation guide from the same enriched content.
 - Documentation diff check passed.
 - Active stale-reference search found no remaining 50-step workflow rule.
 - No Swift build/test run was needed because this batch changed docs only.
+
+---
+
+### Batch 017 — 2026-07-29 — Native slide deck enrichment
+
+**Compute:** medium. **Model shape:** single sufficient — focused exporter/template tests
+without a broad UI change.
+
+**Goal.** Start the richer-output phase by bringing the stronger early slide-generation arc
+into the supported native PowerPoint path.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Confirmed GitHub sync state after Batch 016 | GitHub Desktop pushed Batches 014-016; local `main` matched `origin/main` before coding |
+| 2 | Inspected output pipeline | Re-read `LessonPlanRenderer`, `NativePowerPointExporter`, `PowerPointTemplateInspector`, and `Resources/SlideDeckGenerator.mjs` |
+| 3 | Chose first implementation target | Started with native slide decks because the early richer deck arc had a clear reference implementation |
+| 4 | Added `LessonOutputContent` | New shared helper normalizes title, objective, subject, grade, steps, materials, differentiation, prompt, assessment, and source references |
+| 5 | Added Xcode project references | Explicit `.xcodeproj` source list now includes `LessonOutputContent.swift` |
+| 6 | Reworked `NativePowerPointExporter` slide sequencing | Native decks now generate opening, learning goal, warm-up, build-understanding, practice, supports, and exit-ticket slides |
+| 7 | Preserved local/offline path | The default exporter remains native Swift Open XML; no dependency on the personal JS bridge was introduced |
+| 8 | Fixed source escaping | Source references remain plain in the model and are escaped only when written into notes XML |
+| 9 | Updated template-inspector role inference | "Exit ticket" now counts as an assessment-style slide |
+| 10 | Updated native deck tests | Expectations now verify seven slides and key richer-output text instead of the old five-slide skeleton |
+| 11 | First Swift build | Failed on `Self.clean` function-reference use in `map` |
+| 12 | Fixed helper build issue | Switched to explicit closures for `materials` and `sourceReferences` cleanup |
+| 13 | Second Swift build | Passed with documented temp-cache/no-sandbox workaround |
+| 14 | First full test run | 101/103 passed; failures were stale test expectations after the richer deck sequence |
+| 15 | Fixed test/code expectations | Updated default-deck prompt assertion and taught inspector to classify exit-ticket slides as assessment |
+| 16 | Second full test run | 102/103 passed; one assertion expected the wrong prompt text |
+| 17 | Corrected final stale assertion | Test now expects the printable prompt "Draw equivalent models." |
+| 18 | Final full test run | 103 tests passed, 0 failures |
+| 19 | Real Xcode build | BUILD SUCCEEDED after adding the new source file to the explicit project file |
+| 20 | Updated milestone docs | `BUILD_LOG.md`, `OUTPUT_ENRICHMENT_PLAN.md`, and `MODEL_HANDOFF.txt` now describe Batch 017 |
+
+**Outcome.** The native PowerPoint deck is no longer the bare five-slide skeleton. It now
+generates a richer editable classroom sequence using the supported local Open XML exporter:
+opening, learning goal, warm-up, build understanding, practice, supports, and exit ticket.
+
+**Verification.**
+
+- Swift build passed with the documented temp-cache / no-SwiftPM-sandbox workaround.
+- Full Swift test suite passed: 103 tests, 0 failures.
+- Real Xcode build succeeded.
