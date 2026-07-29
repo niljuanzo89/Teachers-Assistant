@@ -1,5 +1,5 @@
 LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
-Last updated: 2026-07-29 (through Batch 022, synced to GitHub)
+Last updated: 2026-07-29 (through Batch 023, 2 commits ahead of GitHub — see "Version control")
 
 PURPOSE OF THIS DOCUMENT
 
@@ -113,10 +113,11 @@ Main files:
 
 - Sources/LessonPlanner/Views/WorkspaceView.swift
   Main SwiftUI workspace. Contains the five screens (Today, This Week, Planning Preview,
-  Document Intake, Workspace) and their top-level chrome. The Today screen and top
-  nav/profile band are visually confirmed in the "Sunrise Planner" design system. This Week,
-  Planning Preview, and Document Intake have been reskinned, verified, and owner-reviewed.
-  Workspace still needs the same treatment.
+  Document Intake, Workspace) and their top-level chrome, all now reskinned in the "Sunrise
+  Planner" design system as of Batch 023 — the redesign is code-complete across all 5 screens.
+  Today, This Week, Planning Preview, and Document Intake are owner-reviewed and approved.
+  Workspace (Batch 023) is built, tested, and self-verified (including every empty-state
+  card) but still awaiting the owner's visual sign-off — see section 13.
 
 - Sources/LessonPlanner/Views/DesignSystem.swift
   New as of Batch 007. The "Sunrise Planner" design-system layer: warm color tokens, radii,
@@ -202,7 +203,7 @@ Local app shell:
   destructive confirmation dialog. Clear keeps profile/workspace/output folder shell intact
   and currently removes generated-output history without deleting generated files from disk.
 
-Visual design ("Sunrise Planner" redesign, in progress as of Batch 013):
+Visual design ("Sunrise Planner" redesign, code-complete as of Batch 023):
 
 - A warm, rounded, serif visual language (color tokens, shadows, typography) is implemented
   in Sources/LessonPlanner/Views/DesignSystem.swift, recreating the owner's design handoff
@@ -212,18 +213,18 @@ Visual design ("Sunrise Planner" redesign, in progress as of Batch 013):
   import, unusable natively). Icons stay SF Symbols with hierarchical rendering rather than
   hand-drawn shapes matching the handoff's custom duotone SVGs. Both decisions were confirmed
   with the owner before implementation.
-- Done and visually confirmed: the custom top nav bar + profile band (replacing the native
-  TabView chrome) and the full Today screen (card-grid periods, notepad-styled full-height
-  checklist).
-- Code implemented, build/test verified, and captured after reboot: This Week. It now uses a
-  board-first five-day layout with day cards, time rails, lesson cards, and real Plan/Deck/
-  Guide output actions; weekly controls are preserved below the board in warm tool cards.
-  Owner feedback on the original text-heavy Plan/Deck/Guide chips was addressed in Batch 010:
-  output actions are now fixed-size icon + letter chips with green check styling for
-  generated/openable outputs and light outlined orange styling for pending outputs. Stop for
-  owner visual approval before moving on.
-- Not yet re-skinned: Planning Preview, Document Intake, Workspace. Do not start them until
-  the owner visually confirms the This Week screen.
+- All 5 screens now share the custom top nav bar + profile band (replacing the native
+  TabView chrome) and the same DesignSystem.swift foundation.
+- Owner-reviewed and approved: This Week (board-first five-day layout, day cards, time
+  rails, fixed-size icon+letter Plan/Deck/Guide output chips — green check styling when
+  generated/openable, outlined orange when pending), Planning Preview, and Document Intake.
+- Built, tested, and self-verified but not yet owner-reviewed: Today (Batch 007 — card-grid
+  periods, notepad-styled full-height checklist) and Workspace (Batch 023 — the settings/
+  admin screen, converted from native Form/Section to the same ScrollView + DSCard pattern
+  as the other screens; native controls without a DS equivalent, like Picker/DatePicker/the
+  destructive-clear confirmation dialog, were deliberately left native). Work continued past
+  Today without an explicit owner sign-off message being logged; Workspace is the one screen
+  where a stop-and-confirm checkpoint is explicitly still open — see section 13.
 
 Progress snapshots:
 
@@ -489,10 +490,9 @@ something else ("Id a task") in a screenshot.
 
 - Visual PDF content, handwriting, diagrams, and some fraction/equation formatting are not reliably extracted. OCR/math/diagram understanding remains a future source-quality pipeline.
 - Weekly package generation can create/link missing outputs, but OS-level notifications are not implemented.
-- Visual redesign ("Sunrise Planner") is in progress: Today screen and top-level chrome are
-  done and visually confirmed; This Week code is implemented and build/test verified but
-  blocked on visual confirmation; Planning Preview, Document Intake, and Workspace still use
-  the original stock-SwiftUI look. See section 4 and section 13.
+- Visual redesign ("Sunrise Planner") is code-complete across all 5 screens as of Batch 023.
+  Workspace, the final screen, is built/tested/self-verified but still awaiting the owner's
+  visual sign-off. See section 4 and section 13.
 - Weekly planner rows size to their tallest cell, so nothing is clipped and sparse rows collapse. Very dense cells will make a row tall; if that becomes a problem the answer is a different overflow pattern (collapsed cards with click-to-expand, a detail drawer, or an agenda view), NOT a return to fixed row heights.
 - Local teacher profiles are test scaffolding only, not real accounts. Real login, user assignment, cloud sync, permissions, and admin roles are future infrastructure work.
 - Native PowerPoint exporter is functional but generic/minimal. It does not yet preserve or fill real customer-owned PowerPoint layouts — `PowerPointTemplateInspector.resolvePlaceholders(url:)` (Batch 005) is a prerequisite building block for that, not yet consumed by the exporter itself.
@@ -503,7 +503,7 @@ something else ("Id a task") in a screenshot.
 
 8. VERIFICATION STATUS
 
-Current baseline (as of Batch 022): `swift test -Xswiftc -gnone` — 112 tests passed, 0
+Current baseline (as of Batch 023): `swift test -Xswiftc -gnone` — 112 tests passed, 0
 failures. Real `xcodebuild` (not just SwiftPM) also passes and has been re-confirmed after
 every new source file added (WeeklyGridLayout.swift, DesignSystem.swift).
 
@@ -542,6 +542,12 @@ summary here. Headlines:
   matching was rewritten to word-boundary keywords scored by match count, not first-match-wins.
   4 new regression tests. See CONTINUITY_LOG.md's Batch 022 entry and BUILD_LOG.md for full
   detail.
+- Batch 023: Workspace screen redesign — the last of the 5 screens. Converted from native
+  Form/Section to the ScrollView + DSCard pattern; 112/112 tests unaffected. Self-verified in
+  full, including every empty-state card, using a throwaway local test profile to avoid
+  capturing any screenshot containing the real test profile's large-scale licensed-curriculum
+  data. Awaiting owner visual sign-off. "Sunrise Planner" redesign is now code-complete
+  across all 5 screens.
 
 Known environment gotchas:
 
@@ -596,45 +602,50 @@ System Events/Accessibility is not needed and has historically been unavailable.
 
 10. NEXT HUMAN NEEDED ACTIONS
 
-1. Clear the stale old LessonPlanner instance (PID 23296). It survived `kill -9` during
-   Batch 008 and still owns the only visible app window. A reboot is likely the cleanest fix.
-2. After reboot/clear, launch the current build on This Week and visually confirm the Batch B
-   redesign before continuing to Planning Preview.
-3. Review the Today screen screenshot if needed:
-   Design Screenshots/2026-07-29/09-today-sunrise-redesign.png.
-4. Register a real customer-owned `.pptx` template (through the interactive file picker) and
-   click "Inspect presentation template" to visually confirm the new "Placeholder inheritance"
+1. **Visually confirm the Workspace screen redesign (Batch 023)** — the final screen of the
+   "Sunrise Planner" redesign. Screenshot: `Design Screenshots/2026-07-29/10-workspace-sunrise-redesign.png`
+   (or launch the app on the Workspace tab directly). This is the one open stop-and-confirm
+   checkpoint blocking the redesign initiative from being closed out.
+2. Push local git commits to GitHub — command-line push has been blocked all session (missing
+   HTTPS credentials); a computer-use request for GitHub Desktop access was denied once. Use
+   GitHub Desktop directly, or supply command-line credentials, whenever convenient.
+3. Register a real customer-owned `.pptx` template (through the interactive file picker) and
+   click "Inspect presentation template" to visually confirm the "Placeholder inheritance"
    list — this project's own generated decks can't exercise it, since they don't use
    placeholders.
-5. Inspect a generated PowerPoint deck in Microsoft PowerPoint.
-6. Upload/open a generated deck in Google Slides for compatibility review.
-7. Decide whether the weekly planner still needs a dedicated overflow pattern for very dense
+4. Inspect a generated PowerPoint deck in Microsoft PowerPoint.
+5. Upload/open a generated deck in Google Slides for compatibility review.
+6. Decide whether the weekly planner still needs a dedicated overflow pattern for very dense
    blocks now that rows grow to fit (collapsed cards with click-to-expand, a detail drawer, or
    a separate agenda view — internal per-cell scroll has been tried and removed; do not reach
    for it again).
-8. Decide whether OS-level notifications are required beyond the in-app weekly prompt.
+7. Decide whether OS-level notifications are required beyond the in-app weekly prompt.
 
 
 11. NEXT IMPLEMENTATION STEPS
 
 Likely next development sequence, in the owner's stated priority order as of 2026-07-29:
 
-1. Visually confirm the Batch D part 1 Document Intake redesign:
-   `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`.
-   If approved, continue the "Sunrise Planner" redesign with Workspace, following
-   /Users/nils/.claude/plans/snuggly-brewing-elephant.md.
-2. Layout-preserving PowerPoint export: use `PowerPointTemplateInspector.resolvePlaceholders(url:)`
+1. Once Workspace is visually confirmed (see section 10), the "Sunrise Planner" redesign is
+   fully closed. No further screens remain in scope.
+2. Continue the richer-output phase (Batch 017 already ported the stronger slide-deck arc
+   into the native exporter): apply `LessonOutputContent` to the lesson-plan and
+   differentiation-guide HTML templates next, then improve lesson-content enrichment from
+   source text. See `OUTPUT_ENRICHMENT_PLAN.md`.
+3. Layout-preserving PowerPoint export: use `PowerPointTemplateInspector.resolvePlaceholders(url:)`
    (Batch 005/006) to actually place approved-lesson content into a customer-owned template's
    resolved placeholder frames, instead of only displaying the resolution in the UI.
-3. Source-readiness screen — classify extracted content as embedded text, OCR text, uncertain
+4. Source-readiness screen — classify extracted content as embedded text, OCR text, uncertain
    text, diagram, handwriting, or math notation, with an explicit review path for anything
    unreliable.
-4. Document Intake polish — make the import -> weekly-plan path feel like there are no steps
-   between A and B, with a clear "import complete, weekly plan ready" success state. (Batch D
-   of the redesign will likely cover some of this visually; the underlying flow/copy work is
-   separate.)
-5. PowerPoint and Google Slides round-trip review of a generated deck (needs the owner).
-6. Record QA findings from any of the above in BUILD_LOG.md.
+5. Make the empty schedule-scaffold placeholders (Batch 021) directly editable for manual
+   teacher entry, continuing the two-stage intake architecture.
+6. The "Sources" field in Workspace's "Course pacing setup" renders as one long comma-joined
+   string of every source filename — fine for a handful of sources, unreadable once a course
+   pacing plan has hundreds (flagged in Batch 023; pre-existing, not a redesign regression).
+   Consider a collapsed count + expandable list.
+7. PowerPoint and Google Slides round-trip review of a generated deck (needs the owner).
+8. Record QA findings from any of the above in BUILD_LOG.md.
 
 
 12. WHAT NOT TO REDO
@@ -652,65 +663,65 @@ Likely next development sequence, in the owner's stated priority order as of 202
 - Do not record a documentation change in BUILD_LOG.md (or any handoff doc) without
   confirming the file actually landed on disk. A prior session logged a handoff rewrite that
   was never saved, leaving the docs out of sync for a day.
-- Do not reintroduce native `TabView` chrome in `WorkspaceView` — the custom "Sunrise Planner"
-  top nav bar replaced it deliberately (Batch 007); this affects all 5 screens even before
-  Batches B–D re-skin their content.
+- Do not reintroduce native `TabView` chrome anywhere in `WorkspaceView` — the custom
+  "Sunrise Planner" top nav bar replaced it deliberately (Batch 007) and now spans all 5
+  screens.
 - Do not silently bundle actual Source Serif 4 font files or hand-draw custom duotone icons
   for the redesign without re-confirming with the owner — system serif (New York) and SF
   Symbols (hierarchical rendering) were explicitly chosen as the pragmatic native substitutes.
 - Do not redesign multiple screens in one pass without stopping for visual confirmation in
   between — the owner explicitly wants a staged rollout with a checkpoint after each screen
-  or logical group of screens.
+  or logical group of screens. (This still applies to future redesign work even though the
+  current 5-screen initiative is code-complete.)
+- Do not capture or commit a screenshot of a local test profile that has real, large-scale
+  imported data without first checking what that data actually is — Batch 023 found a test
+  profile ("Nick") holding what is clearly licensed math curriculum content (315 units, 869
+  source filenames). Create a throwaway empty test profile for any screenshot meant to be
+  saved to the repo instead.
+- Do not treat `ImportedSourceRole`/two-stage intake matching (Batch 020-022) as "subject ==
+  literal keyword in the title." Batch 022 found and fixed exactly this assumption; matching
+  now scores keyword hits across a broad topic vocabulary plus the source document's full
+  body text, not a first-match-wins check over subject names alone.
 
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 021), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 023), the app has a working local-first prototype path:
 
 two-stage document intake -> automatic role sorting and pacing scaffold -> weekly planner
-population -> interactive weekly lesson cells -> lesson plan/deck/differentiation guide
-outputs -> weekly hub package -> template placeholder inheritance resolution for
-customer-owned PowerPoint templates.
+population (subject-matched to the correct schedule block, Batch 022) -> interactive weekly
+lesson cells -> lesson plan/deck/differentiation guide outputs -> weekly hub package ->
+template placeholder inheritance resolution for customer-owned PowerPoint templates.
 
-The project is paused mid-way through the "Sunrise Planner" visual redesign. The design-system
-foundation and Today screen are done, committed, and visually confirmed. This Week has been
-reskinned and polished with compact P/D/G output chips. Planning Preview has now been
-reskinned in Batch 012 with a warm lesson sidebar, status tags, collapsible editor cards,
-styled warning/readiness/output controls, and preserved lesson/output behavior. Document
-Intake has been reskinned in Batch 013 and then updated in Batch 020 into a two-stage
-workflow: Planning files first, Content files second. Content import is disabled until a
-readable daily schedule time block is detected, so the schedule scaffold exists before lesson
-content populates the planner. Batch 021 added an explicit "Build schedule scaffold" action
-and visible empty schedule placeholders on This Week.
-Workspace is the remaining stock-looking screen, except for the already-added Progress safety
-section.
+The "Sunrise Planner" visual redesign is code-complete across all 5 screens (Today, This
+Week, Planning Preview, Document Intake, Workspace). This Week, Planning Preview, and
+Document Intake are owner-reviewed and approved. Today and Workspace are built, tested, and
+self-verified (Workspace in exhaustive detail — every card and every empty state, in
+Batch 023) but have not had an explicit owner sign-off message logged. Workspace specifically
+is the one open stop-and-confirm checkpoint from the standing working agreement.
 
-Local verification for Batch 021: full Swift test suite passed 108 tests with 0 failures;
-real Xcode build succeeded. Screenshot:
-`Design Screenshots/2026-07-29/15-this-week-output-key.png`.
+Local verification for Batch 023: full Swift test suite passed 112 tests with 0 failures
+(unaffected — pure View-layer change); real Xcode build succeeded. Screenshot:
+`Design Screenshots/2026-07-29/10-workspace-sunrise-redesign.png`.
 
 GitHub status: local branch is `main`; remote is
-`https://github.com/niljuanzo89/Teachers-Assistant.git`; GitHub Desktop successfully
-published the real LessonPlanner project to GitHub after an earlier empty-clone mismatch was
-corrected. Batch 016 pushed Batches 014-016 to GitHub through GitHub Desktop after
-command-line git again failed for missing HTTPS credentials. Batches 017-20 were later
-synced; Batch 021 should be committed and then synced according to the approved cadence.
+`https://github.com/niljuanzo89/Teachers-Assistant.git`. Command-line push has been blocked
+all session ("could not read Username... Device not configured"); a computer-use request for
+GitHub Desktop access to push through was denied once (Batch 022). Local `main` is at least 2
+commits ahead of `origin/main` as of Batch 022, plus Batch 023's commit(s) — needs the owner
+to push via GitHub Desktop or supply command-line credentials.
 
 Immediate next session should:
 
-1. Read CONTINUITY_LOG.md's Batch 008 entry and this document's sections 4/11/13 for full
-   context — do not re-derive the font/icon/staging decisions, they're already made.
-2. If this is a fresh model session, ask the owner for visual approval of
-   `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`.
-3. Continue Workspace visual polish, then continue the richer-output phase: Batch 017 already
-   ported the stronger early slide-deck arc into the supported native exporter; next apply
-   `LessonOutputContent` to the lesson-plan and differentiation-guide HTML templates, then
-   improve lesson content enrichment from source text.
-4. Preserve the two-stage intake boundary from Batch 020: planning documents establish the
-   daily schedule and pacing/time scaffold first; content packets then drive concrete lesson
-   sequence. A subject-specific content packet, such as a math unit, should schedule into the
-   matching subject block only.
-5. Continue the intake architecture by making the empty scaffold placeholders directly
-   editable for manual teacher entry.
-6. Use the approved GitHub cadence: commit each verified batch, then push every 2-3 committed
+1. Read CONTINUITY_LOG.md's Batch 022 and 023 entries and this document's sections 4/11/13 —
+   do not re-derive the font/icon/staging decisions or the subject-matching design, they're
+   already made and (for subject matching) already Codex-reviewed.
+2. Ask the owner whether the Workspace screen redesign looked right, or whether they have
+   feedback — do not assume approval and move on unprompted.
+3. If approved (or feedback doesn't change the approach), move to the next priority item in
+   section 11 — most likely the output-enrichment phase or pushing the pending GitHub commits.
+4. Preserve the two-stage intake boundary (Batch 020) and the scored, full-text-aware subject
+   matching (Batch 022) — both were hard-won fixes to real reported bugs; do not simplify
+   either back toward "first keyword match wins" or "content type governs schedule timing."
+5. Use the approved GitHub cadence: commit each verified batch, then push every 2-3 committed
    batches or before risky/handoff work. If command-line auth fails, use GitHub Desktop.

@@ -46,7 +46,8 @@ xcodebuild -project LessonPlanner.xcodeproj -scheme LessonPlanner \
 dSYM generation with `generate-dSYM command failed / Operation not permitted` and report **zero
 tests run** — which reads like a pass if you skim. If you see 0 tests, that is a failure.
 
-Current baseline: **93 tests passing.**
+Current baseline: **112 tests passing** (as of Batch 023 — see `CONTINUITY_LOG.md` for the
+authoritative, up-to-date count; this file is not always refreshed every batch).
 
 ## ⚠️ Adding a new source file requires editing project.pbxproj by hand
 
@@ -99,7 +100,11 @@ Defined in full in `CONTINUITY_LOG.md`. In short:
 - **Stop and notify** when human judgment, human eyes, a credential, or an OS permission is
   needed — and when the same approach has failed twice.
 - **Declare compute (low/medium/high) and model shape (single / dual helpful / dual recommended)
-  before starting a batch.**
+  before starting a batch.** When compute is high, route through the `codex-router` pattern
+  to delegate rather than doing everything solo (owner instruction, added mid-Batch-023).
+- For anything visual/interactive (a redesigned screen, a new UI area), **stop for the
+  owner's visual confirmation before moving to the next one** — self-verification (screenshots,
+  scrolling through every state) is necessary but not sufficient; don't declare it "done."
 - Log **dead ends** with the reason. An unrecorded dead end gets retried by the next model.
 - Confirm a file actually landed on disk before logging that it was written.
 
@@ -107,14 +112,16 @@ Defined in full in `CONTINUITY_LOG.md`. In short:
 
 | File | Role |
 |---|---|
-| `Sources/LessonPlanner/Models/AppModels.swift` | Codable domain models (~1,660 lines) |
-| `Sources/LessonPlanner/AppStore.swift` | App state and workflow (~1,510 lines) |
-| `Sources/LessonPlanner/Views/WorkspaceView.swift` | Main workspace, all five tabs (~2,340 lines) |
+| `Sources/LessonPlanner/Models/AppModels.swift` | Codable domain models |
+| `Sources/LessonPlanner/AppStore.swift` | App state and workflow (~1,800 lines) |
+| `Sources/LessonPlanner/Views/WorkspaceView.swift` | Main workspace, all five tabs (~3,700 lines) |
+| `Sources/LessonPlanner/Views/DesignSystem.swift` | "Sunrise Planner" design-system layer (`DS` tokens, `DSCard`, `DSTag`, button/text-field styles) — added Batch 007 |
 | `Sources/LessonPlanner/WeeklyGridLayout.swift` | Pure, testable weekly-grid row clustering |
+| `Sources/LessonPlanner/LessonOutputContent.swift` | Shared lesson-output content normalizer, feeds the native slide exporter — added Batch 017 |
 | `Sources/LessonPlanner/NativePowerPointExporter.swift` | Supported PPTX writer |
-| `Sources/LessonPlanner/PowerPointTemplateInspector.swift` | Template slide-XML inspection |
+| `Sources/LessonPlanner/PowerPointTemplateInspector.swift` | Template slide-XML inspection + placeholder-inheritance resolution |
 | `Sources/LessonPlanner/LessonPlanRenderer.swift` | Deterministic HTML renderers |
-| `Tests/LessonPlannerTests/LessonPlannerTests.swift` | Full suite, 93 tests |
+| `Tests/LessonPlannerTests/LessonPlannerTests.swift` | Full suite, 112 tests as of Batch 023 |
 
 ## Running the app for visual QA
 
@@ -129,13 +136,47 @@ open -n /private/tmp/LessonPlannerDerivedData/Build/Products/Debug/LessonPlanner
 Screenshots go in `Design Screenshots/<date>/`. **Capture the window only, never the full
 screen** — full-screen capture can pick up unrelated sensitive content.
 
-## State as of 2026-07-29 (Batch 004)
+## State as of 2026-07-29 (Batch 023)
 
-**Done and verified:** weekly grid rows size to their tallest cell (no clipping, no blank
-bands); nearby start times cluster into one row instead of one row per exact minute; project
-is under git (`1c38146` root commit); `project.pbxproj` edit confirmed by a real `xcodebuild`
-build; weekly grid intrinsic-height fix confirmed by eye against the 2026-07-28 baseline
-(`Design Screenshots/2026-07-29/08-this-week-intrinsic-height.png`).
+This section is a snapshot and goes stale between refreshes — `CONTINUITY_LOG.md` (batch log)
+and `MODEL_HANDOFF.txt` (full current state, sections 4/10/11/13) are the sources of truth if
+this reads inconsistently with recent work.
+
+**"Sunrise Planner" visual redesign — code-complete across all 5 screens.** The owner supplied
+a full design handoff (warm/rounded/serif reskin), preserved at
+`Design Reference/warm-morning-2026-07-29/`; plan at
+`/Users/nils/.claude/plans/snuggly-brewing-elephant.md`. Font: system serif (New York), not
+bundled Source Serif 4. Icons: SF Symbols with `.symbolRenderingMode(.hierarchical)`, not
+hand-drawn shapes. Both confirmed with the owner up front. This Week, Planning Preview, and
+Document Intake are owner-reviewed and approved. Today (Batch 007) and Workspace (Batch 023)
+are built, tested, and self-verified but still need an explicit owner visual sign-off —
+**Workspace specifically is the one open stop-and-confirm checkpoint** right now (screenshot:
+`Design Screenshots/2026-07-29/10-workspace-sunrise-redesign.png`).
+
+**Two-stage document intake + subject-aware scheduling (Batches 018-022).** Document Intake
+splits imports into a Planning lane (schedules, pacing guides, calendars) and a Content lane
+(lesson packets, worksheets); Content import is locked until a readable daily schedule block
+exists (Batch 020). A "Build schedule scaffold" action then shows empty subject-block
+placeholders on This Week even before content exists (Batch 021). Content documents are
+matched to the correct schedule block by a scored, word-boundary keyword match against both
+the lesson's short fields *and* the source document's full extracted text (Batch 022) — not
+by requiring the literal subject name to appear in a title, which was the root cause of a
+real "Math content not filling the Math block" bug. Codex-reviewed; see Batch 022's log entry
+before changing this matching logic again.
+
+**Template placeholder inheritance (Batches 005-006).**
+`PowerPointTemplateInspector.resolvePlaceholders(url:)` resolves placeholder type/idx/
+geometry across slide -> layout -> master inheritance for arbitrary imported `.pptx`
+templates (ECMA-376 rules, Codex-reviewed). Wired into the Workspace tab's "Placeholder
+inheritance" list (transient state, not persisted) — still needs the owner to register a real
+`.pptx` template and click "Inspect presentation template" to visually confirm it; this
+project's own generated decks have no placeholders to show.
+
+**Native output enrichment (Batch 017).** The native PowerPoint exporter generates a 7-slide
+sequence (opening, learning goal, warm-up, build-understanding, practice, supports, exit
+ticket) via the shared `LessonOutputContent` normalizer, replacing the old bare 5-slide
+skeleton. Lesson-plan/differentiation-guide HTML templates have not yet been upgraded to use
+the same enriched content — see `OUTPUT_ENRICHMENT_PLAN.md`.
 
 **Window-capture trick, worth keeping:** `screencapture -l <windowID>` fails with "could not
 create image from window" unless the window is frontmost/on-screen. `osascript -e 'tell
@@ -144,38 +185,12 @@ needed) brings it forward first; `System Events` window enumeration still fails 
 `-1728` (assistive access not granted) — use `CGWindowListCopyWindowInfo` via a small Swift
 script instead.
 
-**Done and verified (Batch 005):** `PowerPointTemplateInspector.resolvePlaceholders(url:)`
-resolves placeholder type/idx/geometry across slide -> layout -> master inheritance for
-arbitrary imported `.pptx` templates, per ECMA-376 rules. Codex-reviewed for correctness
-(clean).
-
-**Done and test-verified, NOT yet visually confirmed (Batch 006):** the resolution above is
-now wired into the Workspace tab's "Presentation template readiness" section as a
-"Placeholder inheritance" list, driven by transient `AppStore` state (not persisted). Needs
-the owner to register a real `.pptx` template and click "Inspect presentation template" to
-see it — this project's own generated decks have no placeholders to show.
-
 **Open — needs the owner:**
 
-1. PowerPoint and Google Slides round-trip review of a generated deck (needs a human account/eyes).
-2. Visual confirmation of the new "Placeholder inheritance" list against a real template.
-3. A layout-preserving exporter path that actually uses the resolved placeholder frames —
+1. Visual sign-off on the Workspace screen redesign (Batch 023) — see above.
+2. Push pending local git commits to GitHub — command-line push is blocked (missing
+   credentials); a computer-use request for GitHub Desktop access was denied once (Batch 022).
+3. PowerPoint and Google Slides round-trip review of a generated deck (needs a human account/eyes).
+4. Visual confirmation of the "Placeholder inheritance" list against a real customer template.
+5. A layout-preserving exporter path that actually uses the resolved placeholder frames —
    not started.
-
-## "Sunrise Planner" visual redesign (Batch 007, in progress)
-
-The owner supplied a full design handoff (warm/rounded/serif reskin of all 5 screens),
-preserved at `Design Reference/warm-morning-2026-07-29/`. Plan at
-`/Users/nils/.claude/plans/snuggly-brewing-elephant.md`. Font: system serif (New York), not
-bundled Source Serif 4. Icons: SF Symbols with `.symbolRenderingMode(.hierarchical)`, not
-hand-drawn shapes. Both confirmed with the owner.
-
-**Done:** foundation (`Sources/LessonPlanner/Views/DesignSystem.swift` — `DS` color/radius/
-shadow tokens, `DSCard`, `DSTag`, button/text-field styles) and the Today screen, fully
-re-skinned and visually confirmed
-(`Design Screenshots/2026-07-29/09-today-sunrise-redesign.png`). All 101 tests still pass —
-this is a View-layer-only change.
-
-**Not started:** This Week, Planning Preview, Document Intake, Workspace. Per the plan, this
-was a deliberate stop point — confirm the Today screen with the owner before continuing to
-the rest, rather than redesigning all 5 screens before any feedback.

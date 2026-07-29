@@ -1284,3 +1284,74 @@ that access request. Left as a local-only commit, one ahead of `origin/main` —
 owner to push (via GitHub Desktop or by supplying command-line credentials) whenever
 convenient. Did not spend further batch time on auth troubleshooting, per the standing
 instruction to log the blocker rather than chase it.
+
+---
+
+### Batch 023 — 2026-07-29 — "Sunrise Planner" redesign, Batch E: Workspace screen (final screen)
+
+**Compute:** high. **Model shape:** single sufficient — mechanical re-skin following the
+`DS` pattern already established and proven across Batches A–D; no new design judgment calls.
+
+**Goal.** Re-skin the Workspace tab — the last of the app's 5 screens still on the original
+stock-SwiftUI look — completing the full "Sunrise Planner" visual redesign.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Re-oriented: confirmed local `main` still 2 commits ahead of `origin/main` (unchanged since Batch 022), working tree clean | No new upstream changes to reconcile |
+| 2 | Read the approved plan (`~/.claude/plans/snuggly-brewing-elephant.md`) | Confirmed Batches B-D (This Week, Planning Preview, Document Intake) already done and owner-reviewed per Batch 012-014/016 log entries; only Workspace remained |
+| 3 | Read `ConfigurationSummaryView` in full (~457 lines) | The screen has grown far past the original design handoff's simple "document library" concept — it's now a dense settings/admin screen: local profiles, progress safety (save/reload/clear), workspace paths, PowerPoint export preference, weekly prompt config, a full course-pacing unit/module/lesson editor, source folders, templates, presentation-template readiness, local workflow QA, release readiness, and generated-output history |
+| 4 | Scoping decision | Apply the `DS` visual language to the screen's structure and primary controls (converting the native `Form`/`Section` layout to the same `ScrollView` + `DSCard` pattern used by the other 4 screens), but leave native controls without a `DS` equivalent (Picker, Stepper, DatePicker, the destructive-clear `confirmationDialog`) untouched, and leave the screen's existing small subcomponent views (`CoursePacingReadinessView`, `LocalWorkflowQAView`, `OutputReviewRow`, etc.) in their native styling rather than touching ~10 additional structs in the same batch |
+| 5 | Rewrote `ConfigurationSummaryView.body`: `Form`/`Section` → `ScrollView` + `VStack` of `DSCard`-wrapped sections, each with a `sectionHeader` helper; restyled buttons to `.dsPrimary`/`.dsSecondary`, text fields to `.ds`, added a `workspaceRow` label/value helper for the many `LabeledContent`-style rows | Done, in `WorkspaceView.swift` — all business-logic helper functions (`chooseOutputFolder`, pacing-unit editing, etc.) left untouched |
+| 6 | `swift build -Xswiftc -gnone` | Compiled clean on the first attempt |
+| 7 | `swift test -Xswiftc -gnone` | 112/112 tests passed, unaffected — pure View-layer change, as expected |
+| 8 | Real `xcodebuild` | BUILD SUCCEEDED (no new files, no pbxproj edit needed — only an existing, already-registered file changed) |
+| 9 | Launched on the Workspace tab, `activate` + window-ID `screencapture`, saved `Design Screenshots/2026-07-29/10-workspace-sunrise-redesign.png` | Confirmed nav/profile band/cards/typography all correctly match the established style |
+| 10 | Caught and fixed a naming collision myself before showing the owner: the page title and the first section header were both literally "Workspace," reading as a duplicate | Renamed the section header to "Workspace location" |
+| 11 | Rebuilt, relaunched, used `computer-use` to scroll through the rest of the screen for a full visual check | The active profile ("Nick") turned out to have real, large-scale imported curriculum data (315 units, 869 source filenames referencing what is clearly a licensed math curriculum) — safe to view live for my own verification, but I did not save any screenshot of that state, since project boundaries prohibit proprietary curriculum references in any tracked screenshot |
+| 12 | Created a throwaway local test profile ("QA Preview") to get a clean, generic-only view of every remaining section without real curriculum data | Confirmed via the app's own "Local testing profiles" feature, which exists exactly for this |
+| 13 | The new profile's workspace-folder picker defaulted into the real curriculum's folder tree; navigated to the home folder and created a fresh, empty `LessonPlanner QA Preview` folder instead, rather than selecting anything under the existing curriculum folder | Kept the QA workspace folder pointed at genuinely empty, generic content |
+| 14 | Scrolled through the entire screen with the clean profile: Local testing profiles, Progress safety, Workspace location, PowerPoint export, Weekly planning prompt, Course pacing setup (empty state), Registered source folders (empty state), Registered templates (empty state), Presentation template readiness, Local workflow QA, Release readiness, Generated output history (empty state) | All 11 cards render correctly and consistently with the established design language; native subcomponents (status icons, checklists) read fine inside the new card chrome |
+| 15 | Owner needed screen control back mid-verification; stopped computer-use immediately and continued the rest of the batch (logging, docs, build/test, commit) without it — none of the remaining steps needed screen control | Confirmed no computer-use calls after this point |
+| 16 | Cleaned up: quit the launched app instance, deleted the empty `LessonPlanner QA Preview` folder from disk (created this session, safe to remove) | Done. Left the "QA Preview" local test profile itself in the app — harmless local test-profile data, same as any other test profile |
+| 17 | Final `swift test -Xswiftc -gnone` | 112/112 tests passed |
+| 18 | Updated `BUILD_LOG.md`, `MODEL_HANDOFF.txt`, `CLAUDE.md` (flagged stale in Batch 022 — natural point to refresh since the redesign it describes as "in progress" is now complete), `CONTINUITY_LOG.md` (this entry) | See below |
+| 19 | Confirmed all doc edits landed on disk, committed | See below |
+| 20 | Report to the owner and stop for visual approval — this is the redesign's final screen; per the standing rule, do not consider the whole initiative "done" until the owner has looked at it | This message |
+
+**Outcome.** The "Sunrise Planner" visual redesign is now complete across all 5 screens
+(Today, This Week, Planning Preview, Document Intake, Workspace). Every screen shares the
+same design-system foundation (`DesignSystem.swift`, unchanged since Batch 007) and the same
+custom top nav/profile band. 112/112 tests unaffected throughout the entire redesign
+initiative — it was a View-layer-only effort from Batch 007 through this batch, exactly as
+the original plan scoped it.
+
+**Dead ends / notes.**
+
+- `computer-use` scroll actions occasionally landed on desktop icons behind the app window
+  ("would land on zoom.us, not in allowlist") after the window appeared to shift position
+  between actions. Re-running `osascript -e 'tell application "LessonPlanner" to activate'`
+  before the next action reliably fixed it. Not investigated further since it was an
+  intermittent capture/targeting quirk, not an app bug — scrolling at a coordinate safely
+  inside the card content (not near the window edge) also seemed to help.
+- When a real local test profile has meaningful production-scale data, don't rely on it for
+  screenshots meant to be saved to the repo — create a throwaway empty test profile instead.
+  The app's own "Local testing profiles" feature (already built for isolating test workspaces)
+  is the right tool for this, not a special case.
+- Owner can reclaim screen/computer-use control mid-task at any point; the rest of a batch
+  (docs, build, test, git) rarely depends on it once visual verification is done — plan
+  computer-use-dependent steps early in a batch, not interleaved throughout, so a mid-batch
+  interruption doesn't block finishing the rest.
+
+**Still open.**
+
+1. **Needs the owner's visual approval** — this is the last screen of the redesign; stop here
+   per the standing rule rather than declaring the whole initiative done unilaterally.
+2. GitHub sync — still 2 commits ahead of `origin/main` from Batch 022, plus whatever this
+   batch adds; push still needs the owner (see Batch 022's sync-status note above).
+3. The "Sources" field in "Course pacing setup" renders as one long comma-joined string of
+   every source filename — pre-existing behavior (identical under the old `Form`/
+   `LabeledContent` layout), not introduced by this redesign, but genuinely hard to read once
+   a course pacing plan has hundreds of sources. Worth a future polish pass (e.g. a collapsed
+   count + expandable list) — not done here to keep this batch scoped to the visual redesign.
+4. Output-enrichment roadmap (`OUTPUT_ENRICHMENT_PLAN.md`) — still the next substantive
+   product-work track once the redesign is signed off.

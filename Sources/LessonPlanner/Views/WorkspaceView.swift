@@ -3121,42 +3121,97 @@ struct ConfigurationSummaryView: View {
     @State private var progressActionMessage: String?
 
     var body: some View {
-        Form {
-            Text("Workspace configuration").font(.largeTitle.bold())
-            Section("Local testing profiles") {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Workspace")
+                    .font(DS.font(28, weight: .semibold))
+                    .foregroundStyle(DS.text)
+
+                localProfilesCard
+                progressSafetyCard
+
+                if let configuration = store.configuration {
+                    workspaceLocationsCard(configuration)
+                    powerPointExportCard
+                    weeklyPromptCard
+                    coursePacingCard(configuration)
+                    sourceFoldersCard(configuration)
+                    templatesCard(configuration)
+                    presentationTemplateCard
+                    localWorkflowQACard
+                    releaseReadinessCard
+                    generatedOutputCard
+                }
+            }
+            .padding(28)
+        }
+        .background(DS.bg)
+        .confirmationDialog(
+            "Clear all documents and entries?",
+            isPresented: $isShowingClearConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear documents, lessons, and planners", role: .destructive) {
+                store.clearCurrentDocumentsAndEntries()
+                progressActionMessage = "Documents, lessons, and planner entries cleared."
+                selectedPacingUnitID = nil
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will wipe the current profile's imported documents, lessons, generated-output history, daily plan, weekly planner, registered source folders, and pacing model. Save current progress first if you may need to reload it.")
+        }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(DS.font(16, weight: .semibold))
+            .foregroundStyle(DS.text)
+    }
+
+    private var localProfilesCard: some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Local testing profiles")
                 if let activeProfile = store.activeTeacherProfile {
-                    LabeledContent("Active profile", value: activeProfile.displayName)
-                    LabeledContent("Role", value: activeProfile.role)
-                    LabeledContent("Grade or subject", value: activeProfile.gradeOrSubject.isEmpty ? "Not set" : activeProfile.gradeOrSubject)
+                    workspaceRow("Active profile", activeProfile.displayName)
+                    workspaceRow("Role", activeProfile.role)
+                    workspaceRow("Grade or subject", activeProfile.gradeOrSubject.isEmpty ? "Not set" : activeProfile.gradeOrSubject)
                     Text("This is a local testing profile. Its documents, pacing, lessons, weekly plans, and generated-output history are stored separately on this Mac.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.neutral600)
                 } else {
                     Text("Use unprofiled local data for the current single-user workflow, or create local test teachers to simulate account separation without a real login system.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.neutral600)
                 }
                 Text("Use the profile button at the top of the app to create or switch local test teachers.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(DS.font(12))
+                    .foregroundStyle(DS.neutral600)
             }
-            Section("Progress safety") {
+        }
+    }
+
+    private var progressSafetyCard: some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionHeader("Progress safety")
                 Text("Save a restorable local copy before clearing imported documents, lesson records, and planner entries.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                HStack {
-                    TextField("Snapshot name", text: $snapshotName)
+                    .font(DS.font(12))
+                    .foregroundStyle(DS.neutral600)
+                HStack(spacing: 8) {
+                    TextField("Snapshot name", text: $snapshotName).textFieldStyle(.ds)
                     Button("Save current progress") {
                         store.saveCurrentProgressSnapshot(named: snapshotName)
                         snapshotName = ""
                         selectedSnapshotID = store.progressSnapshots.first?.id
                         progressActionMessage = "Current progress saved."
                     }
+                    .buttonStyle(.dsPrimary)
                 }
                 if store.progressSnapshots.isEmpty {
                     Text("No saved progress yet.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.neutral600)
                 } else {
                     Picker("Saved progress", selection: Binding(
                         get: { selectedSnapshotID ?? store.progressSnapshots.first?.id },
@@ -3173,307 +3228,389 @@ struct ConfigurationSummaryView: View {
                         selectedSnapshotID = selectedSnapshot.id
                         progressActionMessage = "Saved progress reloaded."
                     }
+                    .buttonStyle(.dsSecondary)
                     .disabled(selectedSnapshot == nil)
                 }
                 Button("Clear documents and entries", role: .destructive) {
                     isShowingClearConfirmation = true
                 }
+                .buttonStyle(.dsSecondary)
                 Text("Clearing keeps the local profile and workspace shell, but removes imported documents, lessons, generated-output history, current daily plan, current weekly planner, registered source folders, and course pacing.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(DS.font(12))
+                    .foregroundStyle(DS.neutral600)
                 if let progressActionMessage {
                     Label(progressActionMessage, systemImage: "checkmark.circle.fill")
-                        .font(.footnote)
-                        .foregroundStyle(Color.green)
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.accent700)
                 }
             }
-            .confirmationDialog(
-                "Clear all documents and entries?",
-                isPresented: $isShowingClearConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Clear documents, lessons, and planners", role: .destructive) {
-                    store.clearCurrentDocumentsAndEntries()
-                    progressActionMessage = "Documents, lessons, and planner entries cleared."
-                    selectedPacingUnitID = nil
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will wipe the current profile's imported documents, lessons, generated-output history, daily plan, weekly planner, registered source folders, and pacing model. Save current progress first if you may need to reload it.")
+        }
+    }
+
+    private func workspaceLocationsCard(_ configuration: AppConfiguration) -> some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Workspace location")
+                workspaceRow("Workspace", configuration.workspaceName)
+                workspaceRow("Location", configuration.workspaceReference.path)
+                workspaceRow("Output folder", configuration.outputFolderReference?.path ?? "Not selected")
+                Button("Choose output folder…") { chooseOutputFolder() }
+                    .buttonStyle(.dsSecondary)
+                Text("Phase 1 registers these locations only. It does not read or modify their contents.")
+                    .font(DS.font(12))
+                    .foregroundStyle(DS.neutral600)
             }
-            if let configuration = store.configuration {
-                LabeledContent("Workspace", value: configuration.workspaceName)
-                LabeledContent("Location", value: configuration.workspaceReference.path)
-                LabeledContent("Output folder", value: configuration.outputFolderReference?.path ?? "Not selected")
-                Section("PowerPoint export") {
-                    Picker("Exporter", selection: Binding(
-                        get: { store.slideDeckExporterPreference },
-                        set: { store.setSlideDeckExporter($0) }
-                    )) {
-                        ForEach(SlideDeckExporterPreference.allCases) { exporter in
-                            Text(exporter.displayName).tag(exporter)
-                        }
-                    }
-                    Text(store.slideDeckExporterPreference.detail)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    Label(store.slideDeckAvailability.title, systemImage: store.slideDeckAvailability.isAvailable ? "checkmark.circle" : "exclamationmark.triangle")
-                        .font(.footnote)
-                        .foregroundStyle(store.slideDeckAvailability.isAvailable ? Color.secondary : Color.orange)
-                    Text(store.slideDeckAvailability.detail)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                Section("Weekly planning prompt") {
-                    Toggle("Prompt each week", isOn: Binding(
-                        get: { store.weeklyPlanningPromptPreference.isEnabled },
-                        set: {
-                            var preference = store.weeklyPlanningPromptPreference
-                            preference.isEnabled = $0
-                            store.setWeeklyPlanningPrompt(preference)
-                        }
-                    ))
-                    Picker("Day", selection: Binding(
-                        get: { store.weeklyPlanningPromptPreference.day },
-                        set: {
-                            var preference = store.weeklyPlanningPromptPreference
-                            preference.day = $0
-                            store.setWeeklyPlanningPrompt(preference)
-                        }
-                    )) {
-                        ForEach(WeeklyPlanningPromptDay.allCases) { day in
-                            Text(day.displayName).tag(day)
-                        }
-                    }
-                    DatePicker("Time", selection: Binding(
-                        get: { promptTimeDate(for: store.weeklyPlanningPromptPreference) },
-                        set: { date in
-                            var preference = store.weeklyPlanningPromptPreference
-                            let components = Calendar.current.dateComponents([.hour, .minute], from: date)
-                            preference.hour = components.hour ?? preference.hour
-                            preference.minute = components.minute ?? preference.minute
-                            store.setWeeklyPlanningPrompt(preference)
-                        }
-                    ), displayedComponents: .hourAndMinute)
-                    if let nextPromptDate = store.weeklyPlanningPromptPreference.nextPromptDate(after: .now) {
-                        Text("Next prompt target: \(nextPromptDate, format: .dateTime.weekday(.wide).month().day().hour().minute()). Reminder delivery will be connected after the app workflow is finalized.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Prompt delivery is off. Reminder delivery will be connected after the app workflow is finalized.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func workspaceRow(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label)
+                .font(DS.font(11, weight: .semibold))
+                .foregroundStyle(DS.neutral600)
+            Text(value)
+                .font(DS.font(13))
+                .foregroundStyle(DS.text)
+        }
+    }
+
+    private var powerPointExportCard: some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("PowerPoint export")
+                Picker("Exporter", selection: Binding(
+                    get: { store.slideDeckExporterPreference },
+                    set: { store.setSlideDeckExporter($0) }
+                )) {
+                    ForEach(SlideDeckExporterPreference.allCases) { exporter in
+                        Text(exporter.displayName).tag(exporter)
                     }
                 }
-                Section("Course pacing setup") {
-                    CoursePacingReadinessView(report: store.coursePacingReadinessReport)
-                    if let plan = configuration.coursePacingPlan {
-                        LabeledContent("Status", value: plan.reviewStatus.displayName)
-                        LabeledContent("Sources", value: plan.sourceReferenceNames.isEmpty ? "No readable setup documents linked" : plan.sourceReferenceNames.joined(separator: ", "))
-                        LabeledContent("Structure", value: "\(plan.unitCount) units, \(plan.moduleCount) modules, \(plan.lessonCount) lessons")
-                        ForEach(plan.units) { unit in
-                            CoursePacingUnitSummaryRow(
-                                unit: unit,
-                                isSelected: selectedPacingUnitID == unit.id
-                            ) {
-                                loadPacingUnitEditor(unit)
-                            }
+                .labelsHidden()
+                Text(store.slideDeckExporterPreference.detail)
+                    .font(DS.font(12))
+                    .foregroundStyle(DS.neutral600)
+                Label(store.slideDeckAvailability.title, systemImage: store.slideDeckAvailability.isAvailable ? "checkmark.circle" : "exclamationmark.triangle")
+                    .font(DS.font(12))
+                    .foregroundStyle(store.slideDeckAvailability.isAvailable ? DS.neutral600 : DS.accent2_700)
+                Text(store.slideDeckAvailability.detail)
+                    .font(DS.font(12))
+                    .foregroundStyle(DS.neutral600)
+            }
+        }
+    }
+
+    private var weeklyPromptCard: some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Weekly planning prompt")
+                Toggle("Prompt each week", isOn: Binding(
+                    get: { store.weeklyPlanningPromptPreference.isEnabled },
+                    set: {
+                        var preference = store.weeklyPlanningPromptPreference
+                        preference.isEnabled = $0
+                        store.setWeeklyPlanningPrompt(preference)
+                    }
+                ))
+                .font(DS.font(13))
+                Picker("Day", selection: Binding(
+                    get: { store.weeklyPlanningPromptPreference.day },
+                    set: {
+                        var preference = store.weeklyPlanningPromptPreference
+                        preference.day = $0
+                        store.setWeeklyPlanningPrompt(preference)
+                    }
+                )) {
+                    ForEach(WeeklyPlanningPromptDay.allCases) { day in
+                        Text(day.displayName).tag(day)
+                    }
+                }
+                DatePicker("Time", selection: Binding(
+                    get: { promptTimeDate(for: store.weeklyPlanningPromptPreference) },
+                    set: { date in
+                        var preference = store.weeklyPlanningPromptPreference
+                        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+                        preference.hour = components.hour ?? preference.hour
+                        preference.minute = components.minute ?? preference.minute
+                        store.setWeeklyPlanningPrompt(preference)
+                    }
+                ), displayedComponents: .hourAndMinute)
+                if let nextPromptDate = store.weeklyPlanningPromptPreference.nextPromptDate(after: .now) {
+                    Text("Next prompt target: \(nextPromptDate, format: .dateTime.weekday(.wide).month().day().hour().minute()). Reminder delivery will be connected after the app workflow is finalized.")
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.neutral600)
+                } else {
+                    Text("Prompt delivery is off. Reminder delivery will be connected after the app workflow is finalized.")
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.neutral600)
+                }
+            }
+        }
+    }
+
+    private func coursePacingCard(_ configuration: AppConfiguration) -> some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Course pacing setup")
+                CoursePacingReadinessView(report: store.coursePacingReadinessReport)
+                if let plan = configuration.coursePacingPlan {
+                    workspaceRow("Status", plan.reviewStatus.displayName)
+                    workspaceRow("Sources", plan.sourceReferenceNames.isEmpty ? "No readable setup documents linked" : plan.sourceReferenceNames.joined(separator: ", "))
+                    workspaceRow("Structure", "\(plan.unitCount) units, \(plan.moduleCount) modules, \(plan.lessonCount) lessons")
+                    ForEach(plan.units) { unit in
+                        CoursePacingUnitSummaryRow(
+                            unit: unit,
+                            isSelected: selectedPacingUnitID == unit.id
+                        ) {
+                            loadPacingUnitEditor(unit)
                         }
-                        if let selectedUnit {
-                            GroupBox("Edit pacing unit") {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    SelectedCoursePacingUnitHeader(unit: selectedUnit)
-                                    TextField("Unit title", text: $unitTitle)
-                                    Toggle("Has start date", isOn: $unitHasStartDate)
-                                    if unitHasStartDate {
-                                        DatePicker("Start date", selection: $unitStartDate, displayedComponents: .date)
-                                    }
-                                    Toggle("Has end date", isOn: $unitHasEndDate)
-                                    if unitHasEndDate {
-                                        DatePicker("End date", selection: $unitEndDate, displayedComponents: .date)
-                                    }
-                                    Stepper("Estimated instructional days: \(unitEstimatedDays)", value: $unitEstimatedDays, in: 1...250)
-                                    TextField("Assessment windows, one per line", text: $unitAssessmentWindowsText, axis: .vertical)
-                                        .lineLimit(2...5)
-                                    TextField("Unit pacing notes", text: $unitNotes, axis: .vertical)
-                                        .lineLimit(2...4)
-                                    if unitDateRangeInvalid {
-                                        Label("End date must be on or after start date.", systemImage: "exclamationmark.triangle")
-                                            .font(.footnote)
-                                            .foregroundStyle(.orange)
-                                    }
-                                    HStack {
-                                        Button("Save unit pacing") {
-                                            store.updateCoursePacingUnit(
-                                                unitID: selectedUnit.id,
-                                                title: unitTitle,
-                                                startDate: unitHasStartDate ? unitStartDate : nil,
-                                                endDate: unitHasEndDate ? unitEndDate : nil,
-                                                estimatedInstructionalDays: unitEstimatedDays,
-                                                assessmentWindows: unitAssessmentWindowsText.components(separatedBy: .newlines),
-                                                notes: unitNotes
-                                            )
-                                            reloadSelectedPacingUnit()
-                                        }
-                                        .disabled(unitDateRangeInvalid)
-                                        Button("Close") { selectedPacingUnitID = nil }
-                                    }
-                                    Divider()
-                                    DatePicker("Skipped day", selection: $skippedDayDate, displayedComponents: .date)
-                                    Button("Add skipped day") {
-                                        store.addSkippedDayToCoursePacingUnit(unitID: selectedUnit.id, date: skippedDayDate)
+                    }
+                    if let selectedUnit {
+                        GroupBox("Edit pacing unit") {
+                            VStack(alignment: .leading, spacing: 8) {
+                                SelectedCoursePacingUnitHeader(unit: selectedUnit)
+                                TextField("Unit title", text: $unitTitle)
+                                Toggle("Has start date", isOn: $unitHasStartDate)
+                                if unitHasStartDate {
+                                    DatePicker("Start date", selection: $unitStartDate, displayedComponents: .date)
+                                }
+                                Toggle("Has end date", isOn: $unitHasEndDate)
+                                if unitHasEndDate {
+                                    DatePicker("End date", selection: $unitEndDate, displayedComponents: .date)
+                                }
+                                Stepper("Estimated instructional days: \(unitEstimatedDays)", value: $unitEstimatedDays, in: 1...250)
+                                TextField("Assessment windows, one per line", text: $unitAssessmentWindowsText, axis: .vertical)
+                                    .lineLimit(2...5)
+                                TextField("Unit pacing notes", text: $unitNotes, axis: .vertical)
+                                    .lineLimit(2...4)
+                                if unitDateRangeInvalid {
+                                    Label("End date must be on or after start date.", systemImage: "exclamationmark.triangle")
+                                        .font(.footnote)
+                                        .foregroundStyle(.orange)
+                                }
+                                HStack {
+                                    Button("Save unit pacing") {
+                                        store.updateCoursePacingUnit(
+                                            unitID: selectedUnit.id,
+                                            title: unitTitle,
+                                            startDate: unitHasStartDate ? unitStartDate : nil,
+                                            endDate: unitHasEndDate ? unitEndDate : nil,
+                                            estimatedInstructionalDays: unitEstimatedDays,
+                                            assessmentWindows: unitAssessmentWindowsText.components(separatedBy: .newlines),
+                                            notes: unitNotes
+                                        )
                                         reloadSelectedPacingUnit()
                                     }
-                                    ForEach(selectedUnit.skippedDays, id: \.self) { date in
-                                        HStack {
-                                            Text(date, format: .dateTime.weekday(.wide).month().day().year())
-                                                .font(.footnote)
-                                            Spacer()
-                                            Button("Remove") {
-                                                store.removeSkippedDayFromCoursePacingUnit(unitID: selectedUnit.id, date: date)
+                                    .disabled(unitDateRangeInvalid)
+                                    Button("Close") { selectedPacingUnitID = nil }
+                                }
+                                Divider()
+                                DatePicker("Skipped day", selection: $skippedDayDate, displayedComponents: .date)
+                                Button("Add skipped day") {
+                                    store.addSkippedDayToCoursePacingUnit(unitID: selectedUnit.id, date: skippedDayDate)
+                                    reloadSelectedPacingUnit()
+                                }
+                                ForEach(selectedUnit.skippedDays, id: \.self) { date in
+                                    HStack {
+                                        Text(date, format: .dateTime.weekday(.wide).month().day().year())
+                                            .font(.footnote)
+                                        Spacer()
+                                        Button("Remove") {
+                                            store.removeSkippedDayFromCoursePacingUnit(unitID: selectedUnit.id, date: date)
+                                            reloadSelectedPacingUnit()
+                                        }
+                                    }
+                                }
+                                if !selectedUnit.modules.isEmpty {
+                                    Divider()
+                                    Text("Modules and lessons")
+                                        .font(.footnote.weight(.semibold))
+                                    ForEach(selectedUnit.modules) { module in
+                                        CoursePacingModuleEditorRow(
+                                            unitID: selectedUnit.id,
+                                            module: module,
+                                            save: { unitID, moduleID, title, startDate, endDate, estimatedDays, notes in
+                                                store.updateCoursePacingModule(
+                                                    unitID: unitID,
+                                                    moduleID: moduleID,
+                                                    title: title,
+                                                    startDate: startDate,
+                                                    endDate: endDate,
+                                                    estimatedInstructionalDays: estimatedDays,
+                                                    notes: notes
+                                                )
+                                                reloadSelectedPacingUnit()
+                                            },
+                                            saveLesson: { unitID, moduleID, lessonID, title, startDate, endDate, estimatedDays, dependencyNotes, sourceNotes in
+                                                store.updateCoursePacingLesson(
+                                                    unitID: unitID,
+                                                    moduleID: moduleID,
+                                                    lessonID: lessonID,
+                                                    title: title,
+                                                    startDate: startDate,
+                                                    endDate: endDate,
+                                                    estimatedInstructionalDays: estimatedDays,
+                                                    dependencyNotes: dependencyNotes,
+                                                    sourceNotes: sourceNotes
+                                                )
                                                 reloadSelectedPacingUnit()
                                             }
-                                        }
-                                    }
-                                    if !selectedUnit.modules.isEmpty {
-                                        Divider()
-                                        Text("Modules and lessons")
-                                            .font(.footnote.weight(.semibold))
-                                        ForEach(selectedUnit.modules) { module in
-                                            CoursePacingModuleEditorRow(
-                                                unitID: selectedUnit.id,
-                                                module: module,
-                                                save: { unitID, moduleID, title, startDate, endDate, estimatedDays, notes in
-                                                    store.updateCoursePacingModule(
-                                                        unitID: unitID,
-                                                        moduleID: moduleID,
-                                                        title: title,
-                                                        startDate: startDate,
-                                                        endDate: endDate,
-                                                        estimatedInstructionalDays: estimatedDays,
-                                                        notes: notes
-                                                    )
-                                                    reloadSelectedPacingUnit()
-                                                },
-                                                saveLesson: { unitID, moduleID, lessonID, title, startDate, endDate, estimatedDays, dependencyNotes, sourceNotes in
-                                                    store.updateCoursePacingLesson(
-                                                        unitID: unitID,
-                                                        moduleID: moduleID,
-                                                        lessonID: lessonID,
-                                                        title: title,
-                                                        startDate: startDate,
-                                                        endDate: endDate,
-                                                        estimatedInstructionalDays: estimatedDays,
-                                                        dependencyNotes: dependencyNotes,
-                                                        sourceNotes: sourceNotes
-                                                    )
-                                                    reloadSelectedPacingUnit()
-                                                }
-                                            )
-                                        }
+                                        )
                                     }
                                 }
                             }
                         }
-                        TextField("Teacher refinement notes for pacing changes", text: Binding(
-                            get: { store.configuration?.coursePacingPlan?.teacherRefinementNotes ?? "" },
-                            set: { store.updateCoursePacingRefinementNotes($0) }
-                        ), axis: .vertical)
-                        .lineLimit(2...4)
-                        HStack {
-                            Button("Approve pacing") { store.approveCoursePacingPlan() }
-                                .disabled(plan.reviewStatus == .approved)
-                            Button("Rebuild starter pacing from readable sources") {
-                                store.createStarterCoursePacingPlanFromReviewedSources()
-                            }
-                        }
-                    } else {
-                        Text("Import readable setup documents first. Then create a draft pacing model from the readable text.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        Button("Create starter pacing from readable sources") {
+                    }
+                    TextField("Teacher refinement notes for pacing changes", text: Binding(
+                        get: { store.configuration?.coursePacingPlan?.teacherRefinementNotes ?? "" },
+                        set: { store.updateCoursePacingRefinementNotes($0) }
+                    ), axis: .vertical)
+                    .textFieldStyle(.ds)
+                    .lineLimit(2...4)
+                    HStack(spacing: 8) {
+                        Button("Approve pacing") { store.approveCoursePacingPlan() }
+                            .buttonStyle(.dsPrimary)
+                            .disabled(plan.reviewStatus == .approved)
+                        Button("Rebuild starter pacing from readable sources") {
                             store.createStarterCoursePacingPlanFromReviewedSources()
                         }
+                        .buttonStyle(.dsSecondary)
+                    }
+                } else {
+                    Text("Import readable setup documents first. Then create a draft pacing model from the readable text.")
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.neutral600)
+                    Button("Create starter pacing from readable sources") {
+                        store.createStarterCoursePacingPlanFromReviewedSources()
+                    }
+                    .buttonStyle(.dsSecondary)
+                }
+            }
+        }
+    }
+
+    private func sourceFoldersCard(_ configuration: AppConfiguration) -> some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Registered source folders")
+                if configuration.sourceRegistrations.isEmpty {
+                    Text("No source folders registered yet.")
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.neutral600)
+                }
+                ForEach(configuration.sourceRegistrations) { source in
+                    HStack {
+                        workspaceRow(source.displayName, source.reference.path)
+                        Spacer()
+                        Button("Remove") { store.removeSourceRegistration(source.id) }
+                            .buttonStyle(.dsSecondary)
                     }
                 }
-                Section("Registered source folders") {
-                    if configuration.sourceRegistrations.isEmpty {
-                        Text("No source folders registered yet.").foregroundStyle(.secondary)
-                    }
-                    ForEach(configuration.sourceRegistrations) { source in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(source.displayName)
-                                Text(source.reference.path).font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func templatesCard(_ configuration: AppConfiguration) -> some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Registered templates")
+                if configuration.outputTemplates.isEmpty {
+                    Text("No templates registered yet.")
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.neutral600)
+                }
+                ForEach(configuration.outputTemplates) { template in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(template.displayName)
+                                .font(DS.font(13, weight: .semibold))
+                                .foregroundStyle(DS.text)
+                            Text(template.kind.rawValue)
+                                .font(DS.font(12))
+                                .foregroundStyle(DS.neutral600)
+                            if let mappings = template.slotMappings, !mappings.isEmpty {
+                                Text("\(mappings.count) mapped lesson fields")
+                                    .font(DS.font(11))
+                                    .foregroundStyle(DS.neutral600)
                             }
-                            Spacer()
-                            Button("Remove") { store.removeSourceRegistration(source.id) }
                         }
+                        Spacer()
+                        Button("Remove") { store.removeOutputTemplate(template.id) }
+                            .buttonStyle(.dsSecondary)
                     }
                 }
-                Section("Registered templates") {
-                    if configuration.outputTemplates.isEmpty {
-                        Text("No templates registered yet.").foregroundStyle(.secondary)
-                    }
-                    ForEach(configuration.outputTemplates) { template in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(template.displayName)
-                                Text(template.kind.rawValue).foregroundStyle(.secondary)
-                                if let mappings = template.slotMappings, !mappings.isEmpty {
-                                    Text("\(mappings.count) mapped lesson fields")
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            Button("Remove") { store.removeOutputTemplate(template.id) }
-                        }
-                    }
+                HStack(spacing: 8) {
                     Button("Add weekly-plan template…") { chooseTemplate() }
+                        .buttonStyle(.dsSecondary)
                     Button("Add presentation template…") { choosePresentationTemplate() }
+                        .buttonStyle(.dsSecondary)
                 }
-                Section("Presentation template readiness") {
-                    PresentationTemplateReadinessView(report: store.presentationTemplateReadinessReport)
-                    if let template = store.activePresentationTemplate {
-                        Button("Inspect presentation template") {
-                            store.inspectPresentationTemplateLayout(templateID: template.id)
+            }
+        }
+    }
+
+    private var presentationTemplateCard: some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Presentation template readiness")
+                PresentationTemplateReadinessView(report: store.presentationTemplateReadinessReport)
+                if let template = store.activePresentationTemplate {
+                    Button("Inspect presentation template") {
+                        store.inspectPresentationTemplateLayout(templateID: template.id)
+                    }
+                    .buttonStyle(.dsSecondary)
+                }
+                if !store.lastPresentationTemplatePlaceholderResolution.isEmpty {
+                    PlaceholderInheritanceView(resolutions: store.lastPresentationTemplatePlaceholderResolution)
+                }
+            }
+        }
+    }
+
+    private var localWorkflowQACard: some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Local workflow QA")
+                LocalWorkflowQAView(report: store.localWorkflowQAReport)
+            }
+        }
+    }
+
+    private var releaseReadinessCard: some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Release readiness")
+                ForEach(store.releaseReadinessReport.items) { item in
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title)
+                                .font(DS.font(13, weight: .semibold))
+                                .foregroundStyle(DS.text)
+                            Text(item.detail)
+                                .font(DS.font(12))
+                                .foregroundStyle(DS.neutral600)
                         }
-                    }
-                    if !store.lastPresentationTemplatePlaceholderResolution.isEmpty {
-                        PlaceholderInheritanceView(resolutions: store.lastPresentationTemplatePlaceholderResolution)
-                    }
-                }
-                Section("Local workflow QA") {
-                    LocalWorkflowQAView(report: store.localWorkflowQAReport)
-                }
-                Section("Release readiness") {
-                    ForEach(store.releaseReadinessReport.items) { item in
-                        Label {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.title)
-                                    .font(.footnote.weight(.semibold))
-                                Text(item.detail)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            }
-                        } icon: {
-                            Image(systemName: releaseIcon(for: item.status))
-                                .foregroundStyle(releaseColor(for: item.status))
-                        }
+                    } icon: {
+                        Image(systemName: releaseIcon(for: item.status))
+                            .foregroundStyle(releaseColor(for: item.status))
                     }
                 }
-                Section("Generated output history") {
-                    if store.generatedOutputs.isEmpty {
-                        Text("No generated outputs yet.").foregroundStyle(.secondary)
-                    }
-                    ForEach(Array(store.generatedOutputs.prefix(12))) { output in
-                        OutputReviewRow(output: output)
-                    }
+            }
+        }
+    }
+
+    private var generatedOutputCard: some View {
+        DSCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Generated output history")
+                if store.generatedOutputs.isEmpty {
+                    Text("No generated outputs yet.")
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.neutral600)
                 }
-                Button("Choose output folder…") { chooseOutputFolder() }
-                Text("Phase 1 registers these locations only. It does not read or modify their contents.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                ForEach(Array(store.generatedOutputs.prefix(12))) { output in
+                    OutputReviewRow(output: output)
+                }
             }
         }
     }

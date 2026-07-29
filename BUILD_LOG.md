@@ -998,3 +998,33 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   the pre-review, first-match-wins implementation.
 - Verification: full Swift test suite passed 112 tests with 0 failures (108 baseline + 4
   new); real Xcode build succeeded after the rewrite.
+
+### 2026-07-29 — "Sunrise Planner" redesign complete: Workspace screen (final screen)
+
+- Re-skinned the Workspace tab (`ConfigurationSummaryView`), the last of the app's 5 screens
+  still on the original stock-SwiftUI look, completing the full visual redesign started in
+  Batch 007.
+- The screen had grown well past the original design handoff's simple "document library"
+  concept into a dense settings/admin screen (local profiles, progress safety, workspace
+  paths, PowerPoint export preference, weekly prompt config, a full course-pacing unit/
+  module/lesson editor, source folders, templates, presentation-template readiness, local
+  workflow QA, release readiness, generated-output history). Converted its layout from
+  native `Form`/`Section` to the same `ScrollView` + `DSCard` pattern used by the other 4
+  screens, with buttons/text fields restyled to match — while deliberately leaving native
+  controls without a `DS` equivalent (Picker, Stepper, DatePicker, the destructive-clear
+  confirmation dialog) and the screen's existing small subcomponent views untouched.
+- Caught and fixed a naming collision before showing the owner: the page title and the first
+  section header were both literally "Workspace" — renamed the section to "Workspace
+  location."
+- Visually verified the full screen, including all empty-state cards, using a throwaway
+  local test profile created specifically to avoid capturing any screenshot of the real
+  local test profile's large-scale, licensed-curriculum-derived data (315 units, 869 source
+  filenames) that happened to be present.
+- The "Sunrise Planner" redesign is now complete across all 5 screens (Today, This Week,
+  Planning Preview, Document Intake, Workspace), sharing one design-system foundation
+  (`DesignSystem.swift`) and one custom top nav/profile band. The entire initiative,
+  Batch 007 through this batch, was View-layer-only — 112/112 tests unaffected throughout.
+- Verification: `swift build`/`swift test -Xswiftc -gnone` — 112 tests passed, 0 failures
+  (no new tests needed; pure View-layer change). Real Xcode build succeeded (no new files).
+- Awaiting the owner's visual sign-off on this final screen before considering the redesign
+  initiative fully closed.
