@@ -133,10 +133,9 @@ Main files:
 
 Version control:
 
-THIS PROJECT IS NOT UNDER GIT. There is no repository in the project folder, so
-there is no commit history, no diff review, and no rollback path other than
-manual copies. Initializing a local git repository is recommended before the
-next substantial change.
+Initialized 2026-07-29 (Batch 004). Root commit 1c38146. .gitignore excludes .build/,
+DerivedData/, xcuserdata/, .DS_Store, and generated .pptx files; Design Screenshots/ is
+tracked as the visual QA record.
 
 Design screenshot folder:
 
@@ -373,17 +372,23 @@ Problem: scripted app executable launch sometimes did not appear in the window l
 
 8. VERIFICATION STATUS
 
-Last verified 2026-07-29, after the weekly planner intrinsic-row-height change:
+Last verified 2026-07-29 (Batch 004, in Claude Code with a real shell):
 
-- `swift test`: 85 tests passed, 0 failures.
-- No compile errors introduced by the change.
-- NOT YET DONE: visual confirmation of the new grid. An automated screenshot capture was
-  attempted and did not complete. Before considering this change finished, capture a fresh
-  "This Week" screenshot and compare it against
-  Design Screenshots/2026-07-28/07-this-week-cell-flow-compact.png, confirming that
-  (a) cards in crowded cells are fully visible rather than clipped,
-  (b) sparse and empty rows have collapsed instead of holding a tall blank band,
+- `swift test -Xswiftc -gnone`: 93 tests passed, 0 failures.
+- Real `xcodebuild` (not just SwiftPM): BUILD SUCCEEDED, confirming the hand-edited
+  project.pbxproj entries for WeeklyGridLayout.swift actually register with the Xcode target.
+  Binary timestamp checked against wall clock to rule out a stale-build false positive.
+- Visual confirmation of the intrinsic-row-height grid: DONE. Captured
+  Design Screenshots/2026-07-29/08-this-week-intrinsic-height.png and compared against
+  Design Screenshots/2026-07-28/07-this-week-cell-flow-compact.png:
+  (a) cards in crowded cells (2 stacked cards) are fully visible, Plan/Deck/Guide controls intact;
+  (b) the old fixed-height totally-blank "9:00-9:45" row is gone; the new single-card row is
+      visibly shorter than the two-card rows around it, confirming rows size to content;
   (c) row borders still align across the Time column and all day columns.
+- Window-capture note for future sessions: `screencapture -l <windowID>` fails with "could not
+  create image from window" unless the target window is frontmost. Run
+  `osascript -e 'tell application "LessonPlanner" to activate'` first (a plain Apple Event,
+  no Accessibility permission required) before capturing by window ID.
 
 Previously verified 2026-07-28, after the weekly planner cell-flow cleanup:
 

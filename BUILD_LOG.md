@@ -621,3 +621,23 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   note that the project is not under version control.
 - Added a standing reminder not to log a documentation change without confirming the file
   actually saved.
+
+### 2026-07-29 — Version control, pbxproj validation, first successful visual confirmation
+
+- Moved into Claude Code with a real shell; closed all three items left open at the end of
+  Batch 003.
+- Initialized git and made the root commit (1c38146, 41 files) — the project now has a
+  rollback path for the first time.
+- Ran a real `xcodebuild` (not just `swift test`) and confirmed the hand-edited
+  `project.pbxproj` entries for `WeeklyGridLayout.swift` build correctly in the Xcode target.
+  Checked the built binary's timestamp against the wall clock to rule out a stale-binary
+  false positive (per the Batch 003 trap).
+- Got the first-ever successful screenshot capture of the app: `screencapture -l <windowID>`
+  was failing because the window was not yet frontmost/on-screen; calling
+  `osascript -e 'tell application "LessonPlanner" to activate'` first (a plain Apple Event,
+  no Accessibility permission needed) fixed it. Captured
+  `Design Screenshots/2026-07-29/08-this-week-intrinsic-height.png` and confirmed the
+  intrinsic-row-height fix against the 2026-07-28 baseline: crowded cells no longer clip,
+  sparse rows no longer hold a fixed-height blank band, and grid lines still align across
+  columns.
+- `swift test -Xswiftc -gnone`: 93 tests passed, 0 failures.

@@ -236,3 +236,67 @@ tested type instead of three copies. Project is ready to pick up in Claude Code.
 3. **Visual confirmation** of Batch 001 and Batch 003 grid changes — never succeeded.
 4. Template layout/master inheritance in `PowerPointTemplateInspector` — largest remaining
    gap before the exporter meets its release gates.
+
+---
+
+### Batch 004 — 2026-07-29 — Claude Code migration: version control, pbxproj validation, visual confirmation
+
+**Compute:** low. **Model shape:** single — Claude Code has a real shell on the owner's Mac
+and could build, test, launch, and capture directly; no second model was needed.
+
+**Goal.** Close the three items left open at the end of Batch 003: get the project under
+version control, validate the hand-edited `project.pbxproj` with a real `xcodebuild`, and get
+the first-ever successful visual confirmation of the weekly grid intrinsic-height fix.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Check for an existing `.git` before acting | Found one, dated today, zero commits, no remote — safe to use as-is, no need for `rm -rf` |
+| 2 | Check for a live git process before touching `index.lock` | `ps aux` showed none; the lock was a stale empty file from a prior failed attempt |
+| 3 | Remove the stale lock, `git add -A` | 41 files staged; `.gitignore` correctly excluded `.build/`, `Design Screenshots/` generated `.pptx`, etc. |
+| 4 | Review staged file list before committing | Clean — source, docs, screenshots only, no build artifacts |
+| 5 | `git commit` | `1c38146` — root commit, 41 files, 12181 insertions |
+| 6 | `git log` / `git status` | Confirmed: 1 commit, clean working tree |
+| 7 | `swift test -Xswiftc -gnone` as a pre-check | 93 tests passed, 0 failures — matches documented baseline |
+| 8 | Clear `/private/tmp/LessonPlannerDerivedData`, run real `xcodebuild` | **BUILD SUCCEEDED**; log shows `Compiling WeeklyGridLayout.swift` — the pbxproj edit is confirmed working |
+| 9 | Check the built binary's timestamp against wall clock (per the Batch 003 stale-binary trap) | Binary timestamped the same minute as the build — not stale |
+| 10 | Launch app via `open -n --env LESSONPLANNER_DESIGN_CAPTURE=1 --env LESSONPLANNER_INITIAL_TAB=week` | Process started (pid confirmed via `ps`) |
+| 11 | Try `osascript ... System Events` to check window list | **Failed** — `osascript is not allowed assistive access (-1728)`. Accessibility permission not granted, as before |
+| 12 | List on-screen windows via a small Swift/CoreGraphics script instead (`CGWindowListCopyWindowInfo`, no Accessibility needed) | LessonPlanner's main window existed with the correct design-capture bounds (1500×1002) but `onscreen=false` |
+| 13 | Attempt `screencapture -l <windowID>` anyway | **Failed** — "could not create image from window". This is the same failure mode as Batch 002 step 10 |
+| 14 | Sanity-check that `screencapture` and the console session work at all | Full-screen capture succeeded (3420×2214); `CGSessionCopyCurrentDictionary` showed an active, unlocked console session — so the failure was specific to this window, not the environment |
+| 15 | Try `osascript -e 'tell application "LessonPlanner" to activate'` (Apple Events, not Accessibility) before recapturing the window list | Window now reported `onscreen=true` with its real title `"LessonPlanner"` |
+| 16 | Retry `screencapture -l <windowID>` | **Succeeded** — window-only PNG saved to `Design Screenshots/2026-07-29/08-this-week-intrinsic-height.png` |
+| 17 | Visually compare against `Design Screenshots/2026-07-28/07-this-week-cell-flow-compact.png` | Crowded cells (2 stacked cards) fully visible, Plan/Deck/Guide controls intact; the old fixed-height totally-blank "9:00–9:45" row is gone — the new single-card row is visibly shorter than the two-card rows around it; grid lines still align across Time and all day columns |
+| 18 | Quit the launched app instance (`kill`) | Confirmed no longer running |
+| 19 | Delete scratch Swift window-listing scripts and the full-screen sanity-check PNG (never viewed, deleted immediately — could have contained unrelated desktop content) | Done |
+| 20 | Stage and commit the new screenshot | Pending as final step of this batch |
+
+**Outcome.** All three items closed. Version control is live with a clean baseline commit.
+The `project.pbxproj` edit is now proven correct by a real Xcode build, not just `swift test`.
+The weekly grid intrinsic-height fix has its first successful visual confirmation, and it
+does what Batch 001/003 intended.
+
+**Dead ends resolved (not dead ends after all).**
+
+- The window-capture failure recorded as a dead end in Batch 002 ("window did not register...
+  environment-dependent") had a real cause: the window was not frontmost/on-screen yet.
+  `tell application "LessonPlanner" to activate` (a plain Apple Event, not Accessibility)
+  brings it forward, after which `CGWindowListCopyWindowInfo` reports `onscreen=true` and
+  `screencapture -l <id>` succeeds. **Future sessions: always `activate` the app before
+  attempting a window-ID screenshot capture.**
+
+**Dead ends confirmed still valid.**
+
+- `osascript ... tell application "System Events"` for window enumeration still fails with
+  `-1728` (assistive access not granted). Use the Apple-Events-only `activate` command plus a
+  small Swift/CoreGraphics script instead — neither needs Accessibility permission.
+
+**Still open.**
+
+1. Template layout/master inheritance in `PowerPointTemplateInspector` — largest remaining
+   gap before the exporter meets its release gates (owner priority #1, high compute, dual
+   model recommended).
+2. Source-readiness screen (embedded/OCR/uncertain/diagram/handwriting/math classification)
+   — owner priority #2, medium-to-high compute, dual helpful.
+3. Document Intake polish — owner priority #3, low-to-medium compute, single sufficient.
+4. PowerPoint/Google Slides round-trip review of a generated deck — needs the owner directly.

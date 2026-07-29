@@ -126,21 +126,23 @@ open -n /private/tmp/LessonPlannerDerivedData/Build/Products/Debug/LessonPlanner
 Screenshots go in `Design Screenshots/<date>/`. **Capture the window only, never the full
 screen** — full-screen capture can pick up unrelated sensitive content.
 
-## State as of 2026-07-29
+## State as of 2026-07-29 (Batch 004)
 
-**Done and test-verified:** weekly grid rows size to their tallest cell (no clipping, no blank
-bands); nearby start times cluster into one row instead of one row per exact minute.
+**Done and verified:** weekly grid rows size to their tallest cell (no clipping, no blank
+bands); nearby start times cluster into one row instead of one row per exact minute; project
+is under git (`1c38146` root commit); `project.pbxproj` edit confirmed by a real `xcodebuild`
+build; weekly grid intrinsic-height fix confirmed by eye against the 2026-07-28 baseline
+(`Design Screenshots/2026-07-29/08-this-week-intrinsic-height.png`).
 
-**Open — needs the owner or a real terminal:**
+**Window-capture trick, worth keeping:** `screencapture -l <windowID>` fails with "could not
+create image from window" unless the window is frontmost/on-screen. `osascript -e 'tell
+application "LessonPlanner" to activate'` (a plain Apple Event — no Accessibility permission
+needed) brings it forward first; `System Events` window enumeration still fails with
+`-1728` (assistive access not granted) — use `CGWindowListCopyWindowInfo` via a small Swift
+script instead.
 
-1. `git init` was never completed. A partial `.git/` may still exist and may need
-   `rm -rf .git` before `git init && git add -A && git commit`. **Do this first** — there is
-   currently no rollback path for anything.
-2. The `project.pbxproj` edit registering `WeeklyGridLayout.swift` is **unverified**. Run
-   `xcodebuild` and confirm it compiles before trusting it.
-3. Visual confirmation of the weekly grid changes has never succeeded. Launch the app, open
-   **This Week**, and compare against
-   `Design Screenshots/2026-07-28/07-this-week-cell-flow-compact.png`.
-4. PowerPoint and Google Slides round-trip review of a generated deck.
-5. Template layout/master inheritance in `PowerPointTemplateInspector` — the largest remaining
+**Open — needs the owner:**
+
+1. PowerPoint and Google Slides round-trip review of a generated deck (needs a human account/eyes).
+2. Template layout/master inheritance in `PowerPointTemplateInspector` — the largest remaining
    gap before the exporter meets its release gates.
