@@ -32,6 +32,11 @@ final class AppStore: ObservableObject {
     @Published private(set) var activeTeacherProfileID: UUID?
     @Published private(set) var slideDeckAvailability: SlideDeckAvailability
     @Published var lastError: String?
+    /// Placeholder inheritance resolution from the most recent template inspection.
+    /// Transient UI state only, deliberately not part of `AppConfiguration` — recomputed
+    /// each time a template is inspected rather than persisted, so it carries none of the
+    /// migration risk a saved schema change would.
+    @Published private(set) var lastPresentationTemplatePlaceholderResolution: [PresentationTemplatePlaceholderResolution] = []
 
     private let repository: any LocalRepositoryProtocol
     private let slideDeckGeneratorOverride: (any SlideDeckGenerating.Type)?
@@ -1216,14 +1221,19 @@ final class AppStore: ObservableObject {
 
     func inspectPresentationTemplateLayout(templateID: UUID) {
         guard let template = configuration?.outputTemplates.first(where: { $0.id == templateID && $0.kind == .presentation }) else { return }
+        let url = URL(fileURLWithPath: template.reference.path)
         do {
-            let result = try PowerPointTemplateInspector.inspect(url: URL(fileURLWithPath: template.reference.path))
+            let result = try PowerPointTemplateInspector.inspect(url: url)
             updatePresentationTemplateLayoutPlan(
                 templateID: templateID,
                 slideInventory: result.slideInventory,
                 frameMap: result.frameMap,
                 fidelityReviewCompleted: false
             )
+            // Best-effort enrichment: a template that fails placeholder resolution (no
+            // discoverable layouts/masters) still has a usable slide inventory above, so
+            // this degrades to an empty result rather than failing the whole inspection.
+            lastPresentationTemplatePlaceholderResolution = (try? PowerPointTemplateInspector.resolvePlaceholders(url: url)) ?? []
             lastError = nil
         } catch {
             lastError = error.localizedDescription

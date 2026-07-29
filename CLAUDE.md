@@ -144,10 +144,17 @@ script instead.
 **Done and verified (Batch 005):** `PowerPointTemplateInspector.resolvePlaceholders(url:)`
 resolves placeholder type/idx/geometry across slide -> layout -> master inheritance for
 arbitrary imported `.pptx` templates, per ECMA-376 rules. Codex-reviewed for correctness
-(clean). Not yet wired into `inspect()`'s output, the persisted layout plan, or any UI.
+(clean).
+
+**Done and test-verified, NOT yet visually confirmed (Batch 006):** the resolution above is
+now wired into the Workspace tab's "Presentation template readiness" section as a
+"Placeholder inheritance" list, driven by transient `AppStore` state (not persisted). Needs
+the owner to register a real `.pptx` template and click "Inspect presentation template" to
+see it — this project's own generated decks have no placeholders to show.
 
 **Open — needs the owner:**
 
 1. PowerPoint and Google Slides round-trip review of a generated deck (needs a human account/eyes).
-2. Wire the new placeholder resolution into a user-visible surface and, eventually, a
-   layout-preserving exporter path.
+2. Visual confirmation of the new "Placeholder inheritance" list against a real template.
+3. A layout-preserving exporter path that actually uses the resolved placeholder frames —
+   not started.

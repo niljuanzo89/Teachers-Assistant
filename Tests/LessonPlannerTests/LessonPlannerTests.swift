@@ -1606,6 +1606,90 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertEqual(savedTemplate.layoutPlan?.fidelityReviewCompleted, false)
         XCTAssertEqual(savedTemplate.layoutPlan?.slideInventory.count, 3)
         XCTAssertEqual(savedTemplate.layoutPlan?.frameMap.count, 3)
+
+        // NativePowerPointExporter's own decks never use placeholders, so inspecting one
+        // should populate one resolution per slide, each with no placeholders — proving the
+        // wiring runs cleanly on the no-placeholders case rather than crashing or omitting slides.
+        XCTAssertEqual(store.lastPresentationTemplatePlaceholderResolution.count, 3)
+        XCTAssertTrue(store.lastPresentationTemplatePlaceholderResolution.allSatisfy { $0.placeholders.isEmpty })
+    }
+
+    @MainActor
+    func testAppStoreInspectPresentationTemplateLayoutResolvesPlaceholderInheritance() throws {
+        let repository = try makeRepository()
+        let workspace = repository.rootURL.appending(path: "workspace")
+        let packageRoot = repository.rootURL.appending(path: "template-package")
+        let slidesFolder = packageRoot.appending(path: "ppt/slides")
+        let slideRelsFolder = packageRoot.appending(path: "ppt/slides/_rels")
+        let layoutsFolder = packageRoot.appending(path: "ppt/slideLayouts")
+        let layoutRelsFolder = packageRoot.appending(path: "ppt/slideLayouts/_rels")
+        let mastersFolder = packageRoot.appending(path: "ppt/slideMasters")
+        for folder in [slidesFolder, slideRelsFolder, layoutsFolder, layoutRelsFolder, mastersFolder] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+
+        // A slide with a title placeholder and no geometry of its own. Its layout (as
+        // every real slide has — a slide never references a master directly) doesn't
+        // redefine title either, so resolution must fall all the way through to the master.
+        try """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+          <p:cSld><p:spTree>
+            <p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr/><p:nvPr><p:ph type="title" idx="0"/></p:nvPr></p:nvSpPr><p:spPr/></p:sp>
+          </p:spTree></p:cSld>
+        </p:sld>
+        """.write(to: slidesFolder.appending(path: "slide1.xml"), atomically: true, encoding: .utf8)
+
+        try """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+        </Relationships>
+        """.write(to: slideRelsFolder.appending(path: "slide1.xml.rels"), atomically: true, encoding: .utf8)
+
+        try """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+          <p:cSld><p:spTree/></p:cSld>
+        </p:sldLayout>
+        """.write(to: layoutsFolder.appending(path: "slideLayout1.xml"), atomically: true, encoding: .utf8)
+
+        try """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>
+        </Relationships>
+        """.write(to: layoutRelsFolder.appending(path: "slideLayout1.xml.rels"), atomically: true, encoding: .utf8)
+
+        try """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+          <p:cSld><p:spTree>
+            <p:sp><p:nvSpPr><p:cNvPr id="2" name="Title Placeholder"/><p:cNvSpPr/><p:nvPr><p:ph type="title" idx="0"/></p:nvPr></p:nvSpPr>
+              <p:spPr><a:xfrm><a:off x="1000000" y="1000000"/><a:ext cx="8000000" cy="1200000"/></a:xfrm></p:spPr>
+            </p:sp>
+          </p:spTree></p:cSld>
+        </p:sldMaster>
+        """.write(to: mastersFolder.appending(path: "slideMaster1.xml"), atomically: true, encoding: .utf8)
+
+        let templateURL = repository.rootURL.appending(path: "real-template.pptx")
+        try runZip(cwd: packageRoot, destination: templateURL)
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Generic QA Workspace",
+            workspaceReference: FileReference(url: workspace)
+        ))
+        let store = AppStore(repository: repository)
+        store.registerPresentationTemplate(templateURL)
+        let templateID = try XCTUnwrap(store.activePresentationTemplate?.id)
+
+        store.inspectPresentationTemplateLayout(templateID: templateID)
+
+        XCTAssertEqual(store.lastPresentationTemplatePlaceholderResolution.count, 1)
+        let placeholders = try XCTUnwrap(store.lastPresentationTemplatePlaceholderResolution.first).placeholders
+        let title = try XCTUnwrap(placeholders.first)
+        XCTAssertEqual(title.effectiveType, "title")
+        XCTAssertEqual(title.frameSource, .master)
+        XCTAssertEqual(title.effectiveFrame, OOXMLFrame(x: 1_000_000, y: 1_000_000, cx: 8_000_000, cy: 1_200_000))
     }
 
     func testReleaseReadinessReportFlagsConfiguredNativeWorkspaceWithoutReviewedDeckAsAttention() {

@@ -365,3 +365,63 @@ natural next increment once the owner wants to see it surfaced.
 3. Source-readiness screen — owner priority #2, medium-to-high compute, dual helpful.
 4. Document Intake polish — owner priority #3, low-to-medium compute, single sufficient.
 5. PowerPoint/Google Slides round-trip review of a generated deck — needs the owner directly.
+
+---
+
+### Batch 006 — 2026-07-29 — Wire placeholder inheritance into the Workspace UI
+
+**Compute:** medium. **Model shape:** single sufficient — plumbing/UI work on an
+already-designed, already-Codex-reviewed algorithm; no new correctness-critical design
+decisions, so no second model needed.
+
+**Goal.** Owner asked for a recommendation on next steps; recommended surfacing Batch 005's
+`resolvePlaceholders(url:)` output somewhere visible rather than leaving it as unused
+infrastructure, and the owner agreed. Wire it into the existing "Presentation template
+readiness" section of the Workspace tab, without touching the persisted `AppConfiguration`
+schema.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Read `AppStore.swift`'s `inspectPresentationTemplateLayout`/`updatePresentationTemplateLayoutPlan` and `WorkspaceView.swift`'s "Presentation template readiness" section | Found the existing "Inspect presentation template" button and its wiring — the natural attachment point |
+| 2 | Design decision: add `lastPresentationTemplatePlaceholderResolution` as `@Published private(set)` transient state on `AppStore`, not a field on the persisted `PresentationTemplateLayoutPlan` | Zero migration risk to saved local app state — recomputed on each inspection, never written to disk |
+| 3 | Extend `inspectPresentationTemplateLayout` to also call `resolvePlaceholders(url:)` and populate the new property, `try?`-wrapped so a resolution failure doesn't block the existing inventory/frame-map inspection | Done |
+| 4 | Add `PlaceholderInheritanceView` to `WorkspaceView.swift` — per-slide list of resolved placeholders with type/idx and where the geometry came from (slide/layout/master/none); hides entirely when there's nothing to show | Done |
+| 5 | Wire the view into the "Presentation template readiness" section, below the existing inspect button | Done |
+| 6 | `swift build -Xswiftc -gnone` | Compiled clean |
+| 7 | Extend `testAppStoreInspectsPresentationTemplateLayoutPlan` with assertions that inspecting a placeholder-free `NativePowerPointExporter` deck populates one empty resolution per slide (proves the wiring doesn't crash on the common "our own decks" case) | Passed |
+| 8 | Add `testAppStoreInspectPresentationTemplateLayoutResolvesPlaceholderInheritance`, a real placeholder-bearing fixture built the same way as Batch 005's integration test | First attempt failed — the fixture had the slide reference its master directly, skipping the layout hop |
+| 9 | Diagnose the failure | Not an implementation bug — a real slide never references a master directly, only a layout; the layout always references the master. The test fixture was unrealistic, not the algorithm |
+| 10 | Fix the fixture to include the slide -> layout -> master hop (layout defines no title placeholder itself, so resolution still must fall through to the master) | Passed |
+| 11 | `swift test -Xswiftc -gnone` | 101 tests passed (100 baseline + 1 new test), 0 failures |
+| 12 | Real `xcodebuild` | BUILD SUCCEEDED |
+| 13 | Launch the app on the Workspace tab (`activate` + window-ID `screencapture`, per the Batch 004 technique) as a regression smoke test — no template is registered, so the new section should stay hidden | Confirmed: tab renders with no crash, "Presentation template readiness" shows the pre-existing "Template setup incomplete" state, new section correctly absent |
+| 14 | Discard the regression screenshot rather than committing it | It only proves no regression, not the actual new feature — committing it as a "design screenshot" would misrepresent what it shows |
+| 15 | Quit the launched app instance, clean scratch files | Done |
+| 16 | Update `CONTINUITY_LOG.md`, `CLAUDE.md`, `MODEL_HANDOFF.txt`, `BUILD_LOG.md` | This entry |
+| 17 | Confirm all doc edits landed on disk before logging | Done |
+| 18 | Commit | Pending |
+
+**Outcome.** Placeholder inheritance resolution is now visible in the app: registering a real
+customer-owned `.pptx` template and clicking "Inspect presentation template" shows, per slide,
+each placeholder's type/idx and whether its geometry came from the slide, the layout, or the
+master. Still not wired into a layout-preserving exporter path — that's a separate, larger
+piece of work.
+
+**What still needs the owner.** The actual new UI content (the placeholder list itself) has
+not been visually confirmed, because it requires registering a real customer-owned `.pptx`
+template through the interactive "Add presentation template…" file picker — not something
+safely automatable without Accessibility permission, and this project's own generated decks
+never populate the view (no placeholders in them). If you register a real template and click
+"Inspect presentation template," the new "Placeholder inheritance" list should appear under
+"Presentation template readiness." Let me know if it doesn't look right.
+
+**Still open.**
+
+1. Layout-preserving exporter path that uses resolved placeholder frames to place lesson
+   content into a customer-owned template — the natural next increment on this work, not
+   started.
+2. Extend resolution to `<p:pic>`/`<p:graphicFrame>` placeholders if a real customer template
+   needs it (currently out of scope by design).
+3. Source-readiness screen — owner priority #2, medium-to-high compute, dual helpful.
+4. Document Intake polish — owner priority #3, low-to-medium compute, single sufficient.
+5. PowerPoint/Google Slides round-trip review of a generated deck — needs the owner directly.

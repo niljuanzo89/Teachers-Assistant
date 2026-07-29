@@ -369,10 +369,18 @@ Problem: scripted app executable launch sometimes did not appear in the window l
   005), `PowerPointTemplateInspector.resolvePlaceholders(url:)` can additionally resolve each
   slide placeholder's effective type/idx/geometry by walking slide -> slideLayout ->
   slideMaster (ECMA-376 inheritance rules; idx-first matching with type fallback; title/
-  ctrTitle treated as the same slot). This is a new, tested, additive capability — it is not
-  yet wired into `inspect()`'s output, the persisted `PresentationTemplateLayoutPlan`, or any
-  UI, and it does not yet perform visual fidelity QA. Scoped to `<p:sp>` text placeholders;
-  picture/graphicFrame placeholders are not resolved (documented, not a bug).
+  ctrTitle treated as the same slot). Scoped to `<p:sp>` text placeholders; picture/
+  graphicFrame placeholders are not resolved (documented, not a bug). It does not yet perform
+  visual fidelity QA.
+- As of 2026-07-29 (Batch 006), this resolution is wired into the Workspace tab: registering a
+  presentation template and clicking "Inspect presentation template" now shows a "Placeholder
+  inheritance" list (per slide, per placeholder: type, idx, and whether geometry came from the
+  slide/layout/master). Stored as transient `AppStore` state
+  (`lastPresentationTemplatePlaceholderResolution`), not persisted to `AppConfiguration` — no
+  migration risk. Not yet wired into any layout-preserving export path. The actual on-screen
+  list has not been visually confirmed by a human — it needs a real customer-owned `.pptx`
+  registered through the interactive file picker; this project's own generated decks never
+  populate it since they don't use placeholders.
 - Google Slides is supported through PowerPoint upload/conversion testing, not a native Google Slides API integration.
 - No school curriculum, student data, or proprietary templates should be embedded in product code or tests.
 

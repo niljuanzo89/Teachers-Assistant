@@ -1617,6 +1617,52 @@ private struct PresentationTemplateReadinessView: View {
     }
 }
 
+/// Shows the most recent template inspection's resolved placeholder inheritance — for each
+/// slide, each placeholder's effective type/idx and where its geometry came from (the slide
+/// itself, its layout, or its master). Slides with no recognized placeholders are omitted;
+/// `NativePowerPointExporter`'s own generated decks never populate this view since they don't
+/// use placeholders at all — it's only meaningful for an imported customer-owned template.
+private struct PlaceholderInheritanceView: View {
+    var resolutions: [PresentationTemplatePlaceholderResolution]
+
+    var body: some View {
+        let nonEmpty = resolutions.filter { !$0.placeholders.isEmpty }
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Placeholder inheritance")
+                .font(.footnote.weight(.semibold))
+            if nonEmpty.isEmpty {
+                Text("No text placeholders were found on this template's slides.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(nonEmpty, id: \.sourceSlideNumber) { resolution in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Slide \(resolution.sourceSlideNumber)")
+                            .font(.caption.weight(.semibold))
+                        ForEach(Array(resolution.placeholders.enumerated()), id: \.offset) { _, placeholder in
+                            Text(summary(for: placeholder))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func summary(for placeholder: ResolvedPlaceholder) -> String {
+        let name = placeholder.shapeName ?? "Unnamed shape"
+        let geometry: String
+        switch placeholder.frameSource {
+        case .slide: geometry = "geometry from the slide itself"
+        case .layout: geometry = "geometry inherited from the layout"
+        case .master: geometry = "geometry inherited from the master"
+        case .none: geometry = "no geometry found on slide, layout, or master"
+        }
+        return "\(name) — \(placeholder.effectiveType), idx \(placeholder.effectiveIdx) — \(geometry)"
+    }
+}
+
 private struct CoursePacingReadinessView: View {
     var report: CoursePacingReadinessReport
 
@@ -2231,6 +2277,9 @@ struct ConfigurationSummaryView: View {
                         Button("Inspect presentation template") {
                             store.inspectPresentationTemplateLayout(templateID: template.id)
                         }
+                    }
+                    if !store.lastPresentationTemplatePlaceholderResolution.isEmpty {
+                        PlaceholderInheritanceView(resolutions: store.lastPresentationTemplatePlaceholderResolution)
                     }
                 }
                 Section("Local workflow QA") {

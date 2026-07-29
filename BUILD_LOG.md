@@ -665,3 +665,22 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
 - 7 new tests (6 pure-algorithm, 1 full ZIP-package integration test exercising the actual
   relationship/path-resolution plumbing end-to-end). `swift test -Xswiftc -gnone`: 100 tests
   passed, 0 failures. Real `xcodebuild`: BUILD SUCCEEDED.
+
+### 2026-07-29 — Wire placeholder inheritance into the Workspace UI
+
+- `AppStore` now calls `resolvePlaceholders(url:)` alongside the existing `inspect()` call in
+  `inspectPresentationTemplateLayout`, populating a new transient (not persisted)
+  `lastPresentationTemplatePlaceholderResolution` property.
+- Added `PlaceholderInheritanceView` to the Workspace tab's "Presentation template readiness"
+  section: per slide, each resolved placeholder's type/idx and whether its geometry came from
+  the slide, layout, or master. Hidden entirely when there's nothing to show.
+- Deliberately kept out of the persisted `AppConfiguration`/`PresentationTemplateLayoutPlan`
+  schema to avoid any migration risk to already-saved local app state.
+- 1 new test (`testAppStoreInspectPresentationTemplateLayoutResolvesPlaceholderInheritance`);
+  the existing template-inspection test was extended to confirm the wiring degrades cleanly
+  (one empty resolution per slide) on `NativePowerPointExporter`'s own placeholder-free decks.
+  `swift test -Xswiftc -gnone`: 101 tests passed, 0 failures. Real `xcodebuild`: BUILD SUCCEEDED.
+- Regression-checked by launching the app on the Workspace tab: renders with no crash, new
+  section correctly absent when no template is registered. The actual placeholder-inheritance
+  list has not been visually confirmed — it needs a real customer-owned `.pptx` registered
+  through the interactive file picker, which the owner needs to do.
