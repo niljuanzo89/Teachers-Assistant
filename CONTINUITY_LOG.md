@@ -1275,3 +1275,12 @@ incidental word from a different subject's vocabulary alongside a much stronger 
    template expansion, per Batch 015/016's next-steps list.
 4. `CLAUDE.md` is stale (still describes Batch 007 state) — should be refreshed in a
    documentation-focused batch; not done here to keep this batch scoped to the actual bug fix.
+
+**GitHub sync status.** Committed locally at `0f53ad5`. `git push origin main` failed —
+"could not read Username for 'https://github.com': Device not configured" (no command-line
+credentials in this environment, matching earlier-documented state). Requested computer-use
+access to GitHub Desktop to push through the documented working sync path; the owner denied
+that access request. Left as a local-only commit, one ahead of `origin/main` — needs the
+owner to push (via GitHub Desktop or by supplying command-line credentials) whenever
+convenient. Did not spend further batch time on auth troubleshooting, per the standing
+instruction to log the blocker rather than chase it.
