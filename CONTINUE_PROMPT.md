@@ -40,10 +40,11 @@ dependency.
 
 - Work in batches of **up to 20 numbered steps**. Log every step to `CONTINUITY_LOG.md` as a
   new batch entry when the batch ends.
-- Continue working locally even when GitHub sync is blocked. As an efficiency rule, after
-  every **50 logged development steps** since the last GitHub sync/checkpoint, commit the
-  current local work if appropriate and attempt to sync to GitHub. If the connector or git
-  credentials are still blocked, log the blocker and keep the local repo clean.
+- Continue working locally even when GitHub sync is blocked. Commit each completed,
+  verified batch locally. Push to GitHub every **2-3 committed batches**, before risky work,
+  before a handoff to another model, or whenever the owner explicitly asks for a sync. If
+  command-line GitHub credentials are blocked, use GitHub Desktop as the working sync path
+  and log the blocker rather than spending the batch on authentication.
 - **Before starting a batch, tell me the compute level** (low / medium / high) **and the model
   shape** (single sufficient / dual helpful / dual recommended).
 - **Stop and notify me** — do not push through — when a judgment call is mine, when
@@ -69,12 +70,12 @@ xcodebuild -project LessonPlanner.xcodeproj -scheme LessonPlanner \
 ```
 
 Baseline is **103 tests passing**. The project is under git — `git log --oneline` for the
-current commit history. As of this handoff, local work through Batch 013 is committed at
-`e07f5b8` (`Batch 013: redesign Document Intake`). GitHub remote is configured as
+current commit history. As of this handoff, local work through Batch 015 is committed at
+`e13b351` (`Batch 015: add weekly output key`). GitHub remote is configured as
 `https://github.com/niljuanzo89/Teachers-Assistant.git`; GitHub Desktop has been pointed at
-the real project folder and successfully published `main`, so the local branch now tracks
-`origin/main`. Continue local work and sync GitHub after each 50-step checkpoint or material
-handoff commit.
+the real project folder and successfully published `main`, so the local branch tracks
+`origin/main`. Continue local work, commit each verified batch, and sync GitHub every 2-3
+committed batches or before risky/handoff work.
 
 Use a second model (Codex, via the `codex-bridge` skill) only when an independent opinion is
 genuinely valuable — e.g. an unfamiliar file format's exact rules, or a correctness review of
@@ -113,7 +114,7 @@ a finished diff — not as a routine step.
 
 ## Where things stand
 
-**Recently completed and verified (through Batch 013):**
+**Recently completed and verified (through Batch 015):**
 
 - Weekly planning grid: rows size to their tallest cell (88pt floor), nearby start times
   cluster into one row via the tested `WeeklyGridLayout` type. Visually confirmed.
@@ -132,16 +133,16 @@ a finished diff — not as a routine step.
   with me up front rather than assumed. Screenshot:
   `Design Screenshots/2026-07-29/09-today-sunrise-redesign.png`. Design reference preserved
   at `Design Reference/warm-morning-2026-07-29/`.
-- **"Sunrise Planner" visual redesign, Batch B (This Week) — implemented, verified, and
-  captured after reboot; awaiting owner visual approval.** The stale PID 23296 blocker is no
+- **"Sunrise Planner" visual redesign, Batch B (This Week) — implemented, verified,
+  captured after reboot, and owner-reviewed.** The stale PID 23296 blocker is no
   longer active after reboot. A first real capture exposed horizontal clipping, so
   `WorkspaceView.swift` was corrected to make the weekly board the full-width primary surface
   and move weekly tools below it. Re-verified afterward: `swift build` passed, `swift test
   --disable-sandbox --scratch-path /private/tmp/lessonplanner-build -Xswiftc -gnone` passed
   101 tests and real `xcodebuild` succeeded. Corrected screenshot:
   `Design Screenshots/2026-07-29/10-this-week-sunrise-redesign.png`.
-- **Batch B polish (This Week output buttons) — implemented and visually captured; awaiting
-  owner approval.** Owner said the Plan/Deck/Guide text wrapping was visually problematic and
+- **Batch B polish (This Week output buttons) — implemented, visually captured, and
+  owner-reviewed.** Owner said the Plan/Deck/Guide text wrapping was visually problematic and
   generated outputs stayed orange after click. `WeeklyAssignmentOutputControlsView` now uses
   compact fixed-size icon + letter chips (`P`, `D`, `G`), with green check styling for
   generated/openable outputs and light outlined orange styling for pending outputs. Full
@@ -168,7 +169,7 @@ a finished diff — not as a routine step.
   succeeded. Screenshot:
   `Design Screenshots/2026-07-29/12-planning-preview-sunrise-redesign.png`.
 - **"Sunrise Planner" visual redesign, Batch D part 1 (Document Intake) — implemented,
-  verified, and captured; awaiting owner visual approval.** Document Intake now has the warm
+  verified, captured, and owner-reviewed.** Document Intake now has the warm
   import panel, automatic sorting summary, guarded Clear and start over action, custom
   imported-document rows, an "All set for this week" ready panel, and styled source detail /
   readiness / text-review / optional draft areas. Existing behavior is preserved: multi-file
@@ -176,25 +177,33 @@ a finished diff — not as a routine step.
   creation, and optional Codex CLI draft workflow. Verification: Swift build with temp caches
   passed, 103 tests passed, and real Xcode build succeeded. Screenshot:
   `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`.
+- **Weekly planner row-flow polish — implemented, verified, and committed.** The This Week
+  grid now treats each time label and its day cards as a single row, so cards no longer drift
+  into the visual gap between time blocks. Long source paths preview as filenames instead of
+  consuming card width. Verification: Swift build, 103 tests, and real Xcode build all
+  succeeded.
+- **Weekly output key — implemented, verified, captured, and committed.** The This Week
+  header now includes a top-right key explaining `P` = Planner, `D` = Slide deck, and `G` =
+  Differentiation guide. Verification: Swift build, 103 tests, and real Xcode build all
+  succeeded. Screenshot:
+  `Design Screenshots/2026-07-29/15-this-week-output-key.png`.
 
-**This is a deliberate pause point, not a finished feature.** Planning Preview and Document
-Intake now have the Sunrise look, but most of Workspace still uses the *original*
-stock-SwiftUI look. The owner has since asked Codex to continue because Claude is down; treat
-the latest visible weekly-planner cell-flow feedback as the active next issue before broader
-Workspace reskinning.
+**This is a deliberate pause point, not a finished feature.** Planning Preview, Document
+Intake, and much of This Week now have the Sunrise look, but parts of Workspace still use the
+original stock-SwiftUI look. The owner has also flagged a product-quality concern: lesson
+plans, slide decks, and differentiation guides are currently too bare. Treat the next phase
+as two tracks: finish remaining Workspace polish, then improve lesson enrichment plus native
+Plan/Deck/Guide output templates.
 
 ## Start here
 
-1. **If this is a fresh model session, ask me to visually approve the latest Document Intake
-   screenshot and the new Workspace Progress safety section** before making broad Workspace
-   redesign changes:
+1. **If this is a fresh model session, review the latest This Week screenshot before making
+   broad Workspace redesign changes:**
 
-   `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`
+   `Design Screenshots/2026-07-29/15-this-week-output-key.png`
 
-   Mention that Document Intake now has the Sunrise import panel, automatic sorting summary,
-   ready-state panel, source detail cards, and guarded clear/start-over action. Also mention
-   that the new Progress safety controls are functionally verified but have not yet had owner
-   visual QA.
+   Mention that the weekly row-flow issue and P/D/G output-key request have both been
+   implemented and verified.
 
 2. **If I approve or give feedback that doesn't change the approach**: continue with weekly
    planner visual polish and the Workspace redesign following

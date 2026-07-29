@@ -93,6 +93,9 @@ mistake here.
 Defined in full in `CONTINUITY_LOG.md`. In short:
 
 - Work in batches of **up to 20 numbered steps**; log every step.
+- Commit each completed, verified batch locally. Push to GitHub every 2-3 committed batches,
+  before risky work, or before a handoff. If command-line auth is blocked, use GitHub
+  Desktop and log the blocker.
 - **Stop and notify** when human judgment, human eyes, a credential, or an OS permission is
   needed — and when the same approach has failed twice.
 - **Declare compute (low/medium/high) and model shape (single / dual helpful / dual recommended)

@@ -73,6 +73,10 @@ Before starting a new turn of work, state:
   retried by the next model.
 - Update `MODEL_HANDOFF.txt` when project state or a standing decision changes.
 - Update `BUILD_LOG.md` at material milestones.
+- Commit each completed, verified batch locally. Push to GitHub every 2-3 committed batches,
+  before risky work, before a handoff to another model, or whenever the owner explicitly asks
+  for a sync. If command-line GitHub authentication is blocked, use GitHub Desktop and log
+  the blocker instead of letting auth troubleshooting consume the batch.
 - **Confirm a file actually landed on disk before logging that it was written.** A prior
   session logged a handoff rewrite that was never saved, leaving the docs out of sync for
   a day.
@@ -698,9 +702,10 @@ active profile's current planning data after an explicit destructive confirmatio
 
 ### GitHub Sync Policy — 2026-07-29
 
-Owner requested continued local-drive development while using GitHub as a periodic sync
-checkpoint. New operating rule: after every **50 logged development steps** since the last
-GitHub sync/checkpoint, commit appropriate local work and attempt to sync to GitHub.
+Owner requested continued local-drive development while using GitHub as a regular sync
+checkpoint. Current operating rule: commit each completed, verified batch locally. Push to
+GitHub every **2-3 committed batches**, before risky work, before a handoff to another model,
+or whenever the owner explicitly asks for a sync.
 
 Current GitHub state:
 
@@ -720,9 +725,9 @@ Current GitHub state:
   `## main...origin/main`; `git branch -vv` showed
   `* main e07f5b8 [origin/main] Batch 013: redesign Document Intake`.
 
-Continue local work; use GitHub as the periodic 50-step checkpoint sync path. If
-command-line git auth remains unavailable, use GitHub Desktop again rather than spending
-more time on connector authentication.
+Continue local work; use GitHub as the periodic batch sync path. If command-line git auth
+remains unavailable, use GitHub Desktop again rather than spending more time on connector
+authentication.
 
 ---
 
@@ -954,3 +959,43 @@ native exporter, while improving document-to-lesson enrichment in parallel.
    classroom artifacts from the same enriched lesson record.
 5. Add output QA fixtures for a representative enriched lesson and compare Plan/Deck/Guide
    together before calling the output layer ready.
+
+---
+
+### Batch 016 — 2026-07-29 — Approved GitHub workflow and output-enrichment kickoff
+
+**Compute:** medium. **Model shape:** single sufficient — workflow documentation plus a
+focused roadmap for the next output-quality phase.
+
+**Goal.** Make the approved GitHub workflow official, remove stale handoff instructions, and
+start the richer-output phase in a concrete way.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Received owner approval for workflow alterations | Proceeded with the revised GitHub cadence |
+| 2 | Checked git state | Local `main` was clean and two commits ahead of GitHub: Batches 014 and 015 |
+| 3 | Searched handoff docs for stale sync instructions | Found the old "50 logged development steps" rule in `CONTINUE_PROMPT.md`, `MODEL_HANDOFF.txt`, and `CONTINUITY_LOG.md` |
+| 4 | Updated `CONTINUE_PROMPT.md` workflow | Now says to commit every verified batch and push every 2-3 committed batches, before risky work, or before handoff |
+| 5 | Updated `MODEL_HANDOFF.txt` workflow | Same cadence now recorded for future models, with GitHub Desktop as the known working sync path |
+| 6 | Updated `CONTINUITY_LOG.md` operating protocol | Logging rules now include the approved commit/push cadence |
+| 7 | Updated `CLAUDE.md` working agreement | Fast-orientation file now points future models to the same GitHub cadence |
+| 8 | Refreshed current handoff state | `CONTINUE_PROMPT.md` and `MODEL_HANDOFF.txt` now reflect Batch 015 instead of stopping at Batch 013 |
+| 9 | Removed stale visual-approval language | This Week, Planning Preview, and Document Intake are now documented as owner-reviewed |
+| 10 | Checked for stale workflow references | Only historical Batch 014 log language remains, which is intentionally preserved as history |
+| 11 | Inspected output pipeline files | Compared `LessonPlanRenderer`, `NativePowerPointExporter`, and the older `Resources/SlideDeckGenerator.mjs` bridge |
+| 12 | Identified output-quality path | The richer early slide sequence exists in the bridge, while the supported path is the simpler native exporter |
+| 13 | Added `OUTPUT_ENRICHMENT_PLAN.md` | New working plan separates deterministic lesson enrichment from renderer/exporter improvements |
+| 14 | Linked the new plan into `MODEL_HANDOFF.txt` | Future models now read it before implementing output-quality work |
+| 15 | Ran documentation verification | `git diff --check` passed; stale-reference search found no active old 50-step workflow rule |
+| 16 | Prepared local commit and GitHub sync | This batch should be committed, then synced through GitHub Desktop if command-line auth still fails |
+
+**Outcome.** The project workflow is now batch-based instead of step-counter-based. The next
+development phase is also concretely defined: improve a shared lesson-output content layer,
+port the stronger early slide arc into `NativePowerPointExporter`, and then expand the lesson
+plan and differentiation guide from the same enriched content.
+
+**Verification.**
+
+- Documentation diff check passed.
+- Active stale-reference search found no remaining 50-step workflow rule.
+- No Swift build/test run was needed because this batch changed docs only.
