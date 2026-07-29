@@ -69,13 +69,12 @@ xcodebuild -project LessonPlanner.xcodeproj -scheme LessonPlanner \
 ```
 
 Baseline is **103 tests passing**. The project is under git — `git log --oneline` for the
-current commit history. As of this handoff, local work through Batch 011 is committed at
-`e1c9b86` (`Batch 008-011: redesign This Week and add progress safety`). GitHub remote is
-configured as `https://github.com/niljuanzo89/Teachers-Assistant.git`, but command-line push
-is currently blocked by missing local GitHub credentials and the Codex GitHub connector
-currently reports zero visible accounts/repositories from tool calls despite showing
-connected in settings. Continue local work and retry GitHub sync after every 50 logged steps
-or when credentials/access are fixed.
+current commit history. As of this handoff, local work through Batch 013 is committed at
+`e07f5b8` (`Batch 013: redesign Document Intake`). GitHub remote is configured as
+`https://github.com/niljuanzo89/Teachers-Assistant.git`; GitHub Desktop has been pointed at
+the real project folder and successfully published `main`, so the local branch now tracks
+`origin/main`. Continue local work and sync GitHub after each 50-step checkpoint or material
+handoff commit.
 
 Use a second model (Codex, via the `codex-bridge` skill) only when an independent opinion is
 genuinely valuable — e.g. an unfamiliar file format's exact rules, or a correctness review of
@@ -180,12 +179,15 @@ a finished diff — not as a routine step.
 
 **This is a deliberate pause point, not a finished feature.** Planning Preview and Document
 Intake now have the Sunrise look, but most of Workspace still uses the *original*
-stock-SwiftUI look. Do not move to Workspace until Document Intake has owner visual approval.
+stock-SwiftUI look. The owner has since asked Codex to continue because Claude is down; treat
+the latest visible weekly-planner cell-flow feedback as the active next issue before broader
+Workspace reskinning.
 
 ## Start here
 
-1. **Ask me to visually approve the latest Document Intake screenshot and the new Workspace
-   Progress safety section** before making more UI redesign changes:
+1. **If this is a fresh model session, ask me to visually approve the latest Document Intake
+   screenshot and the new Workspace Progress safety section** before making broad Workspace
+   redesign changes:
 
    `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`
 
@@ -194,8 +196,8 @@ stock-SwiftUI look. Do not move to Workspace until Document Intake has owner vis
    that the new Progress safety controls are functionally verified but have not yet had owner
    visual QA.
 
-2. **If I approve or give feedback that doesn't change the approach**: continue with the
-   Workspace redesign following
+2. **If I approve or give feedback that doesn't change the approach**: continue with weekly
+   planner visual polish and the Workspace redesign following
    `/Users/nils/.claude/plans/snuggly-brewing-elephant.md`'s described rollout (foundation is
    already built; each remaining batch re-skins one/two screens onto it). Declare compute
    level and model shape first, as always.

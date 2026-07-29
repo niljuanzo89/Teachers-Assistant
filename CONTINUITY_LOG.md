@@ -708,15 +708,21 @@ Current GitHub state:
   (`Merge GitHub repository seed`).
 - Remote `origin` is configured as
   `https://github.com/niljuanzo89/Teachers-Assistant.git`.
-- `git push` is blocked because command-line git has no GitHub credentials on this Mac:
+- Earlier command-line `git push` attempts were blocked because command-line git had no
+  GitHub credentials on this Mac:
   `fatal: could not read Username for 'https://github.com': Device not configured`.
-- After the owner made the repository public, the GitHub connector could see
-  `niljuanzo89/Teachers-Assistant` and reported push/admin permissions. However, the
-  available connector tools did not expose a whole-repo branch-ref push path, so command-line
-  git authentication is still required for syncing the local project history.
+- Codex discovered GitHub Desktop was tracking the wrong local clone:
+  `/Users/nils/Documents/GitHub/Teachers-Assistant`, which only contained the initial GitHub
+  seed commit. Codex added the real local repository
+  `/Users/nils/Documents/Program Development Folder/LessonPlanner` to GitHub Desktop and
+  published `main` from there.
+- After the GitHub Desktop publish, local status was clean and tracking the remote:
+  `## main...origin/main`; `git branch -vv` showed
+  `* main e07f5b8 [origin/main] Batch 013: redesign Document Intake`.
 
-Continue local work; retry connector visibility and/or git push at the next 50-step sync
-checkpoint or when the owner adjusts GitHub access.
+Continue local work; use GitHub as the periodic 50-step checkpoint sync path. If
+command-line git auth remains unavailable, use GitHub Desktop again rather than spending
+more time on connector authentication.
 
 ---
 
@@ -772,7 +778,8 @@ generate-output paths remain unchanged.
 
 1. Owner visual approval of the Planning Preview redesign.
 2. Continue the Sunrise redesign with Document Intake and Workspace after visual approval.
-3. GitHub push remains blocked by command-line authentication; keep working locally.
+3. GitHub push was later resolved through GitHub Desktop after correcting the tracked local
+   folder.
 
 ---
 
@@ -830,4 +837,59 @@ are available, and keep source inspection/editing available without making it fe
 
 1. Owner visual approval of the Document Intake redesign.
 2. Continue the Sunrise redesign with Workspace after Intake approval.
-3. GitHub push remains blocked by command-line authentication; continue local work.
+3. GitHub push was later resolved through GitHub Desktop after correcting the tracked local
+   folder.
+
+---
+
+### Batch 014 — 2026-07-29 — Handoff status repair and This Week row-alignment polish
+
+**Compute:** medium. **Model shape:** single sufficient — contained documentation repair plus
+View-layer weekly-card layout polish.
+
+**Goal.** Continue locally after Claude went down: remove stale GitHub-blocker language from
+the handoff docs and improve the visible weekly-planner cell/card flow problem.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Checked local git state and recent commits | Confirmed clean `main...origin/main` at Batch 013 before starting |
+| 2 | Searched handoff docs for stale GitHub/Batch 011 language | Found stale blocked-push text in `CONTINUE_PROMPT.md`, `MODEL_HANDOFF.txt`, and the sync-policy section |
+| 3 | Updated `CONTINUE_PROMPT.md` | Now states Batch 013 / `e07f5b8` is current and GitHub Desktop successfully published `main` |
+| 4 | Updated `MODEL_HANDOFF.txt` | Header now says through Batch 013, GitHub synced; current stopping point reflects resolved GitHub state |
+| 5 | Updated `CONTINUITY_LOG.md` sync policy | Records the empty-clone mismatch and the working GitHub Desktop publish path |
+| 6 | Inspected current weekly planner views | Found each day column used separate vertical stacks for time labels and cards, which can make labels drift visually when cards differ in height |
+| 7 | Reworked `WeeklyDayColumnView` assignment rendering | Replaced separate time/card stacks with one `WeeklyDayAssignmentRow` per lesson |
+| 8 | Added `WeeklyDayAssignmentRow` | Each row now keeps the time rail and lesson card together, so alignment is tied to the card's actual height |
+| 9 | Tightened source preview text | Long source paths now display as a one-line filename-style preview with middle truncation |
+| 10 | First Swift build attempt | Hit known user-cache permission failure, not a code failure |
+| 11 | Temp-cache Swift build attempt | Hit SwiftPM `sandbox_apply` issue |
+| 12 | Documented workaround build | `swift build --disable-sandbox --scratch-path /private/tmp/lessonplanner-build -Xswiftc -gnone` passed |
+| 13 | Full Swift test suite | 103 tests passed, 0 failures |
+| 14 | Real Xcode build | `xcodebuild` succeeded |
+| 15 | Launched app for visual QA | Initial `LESSONPLANNER_INITIAL_TAB=thisWeek` was wrong; app enum expects `week` |
+| 16 | Relaunched with correct weekly tab key | Fresh `/private/tmp/LessonPlannerDerivedData/.../LessonPlanner` binary opened on This Week |
+| 17 | Visual inspection | Correct weekly screen showed improved time/card alignment and compact output chips |
+| 18 | Screenshot capture attempts | Full-screen captures were unreliable: Codex notifications and foreground app changes overwrote the intended artifact |
+| 19 | Removed bad screenshot artifact | Deleted `Design Screenshots/2026-07-29/14-this-week-row-alignment-polish.png` so it is not mistaken for valid proof |
+| 20 | Stopped before broader Workspace redesign | Weekly alignment code is verified; clean owner-facing visual confirmation still needs either live eyes or a cleaner capture path |
+
+**Outcome.** The weekly planner's day-column rows now keep each time label physically tied to
+its lesson card, reducing the floating/misaligned feel when lesson cards have different
+heights. Long source paths are less visually noisy. GitHub status in handoff docs now matches
+reality: GitHub Desktop sync works and `main` tracks `origin/main`.
+
+**Verification.**
+
+- Swift build passed with the documented temp-cache / no-SwiftPM-sandbox workaround.
+- Full Swift test suite passed: 103 tests, 0 failures.
+- Real Xcode build succeeded.
+- Visual inspection of the fresh weekly-tab build showed the alignment improvement, but no
+  clean screenshot artifact was retained because capture attempts grabbed overlays or Codex.
+
+**Dead ends / notes.**
+
+- `LESSONPLANNER_INITIAL_TAB=thisWeek` is wrong; the tab enum value is `week`.
+- Do not retain full-screen captures that show Codex or notification overlays as proof of UI
+  state.
+- `CGWindowListCopyWindowInfo` returned no usable window list in this environment even though
+  `screencapture` works; do not spend a third attempt on that path without a new reason.

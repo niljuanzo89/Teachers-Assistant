@@ -822,3 +822,19 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   truncation, fixed before the final capture.
 - Visual QA screenshot saved at
   `Design Screenshots/2026-07-29/13-document-intake-sunrise-redesign.png`.
+
+### 2026-07-29 — Handoff status repair and This Week row alignment
+
+- Corrected stale handoff language that still described GitHub as blocked through Batch 011.
+  The current state is Batch 013 at `e07f5b8`, with GitHub Desktop successfully publishing
+  the real LessonPlanner project and local `main` tracking `origin/main`.
+- Reworked the This Week day-column lesson layout so each time label and lesson card render
+  as a single row instead of separate vertical stacks. This keeps time rails aligned to their
+  own cards when card heights vary.
+- Shortened long source-path previews in weekly lesson cards to a one-line filename-style
+  display with middle truncation.
+- Verification: Swift build passed with the documented temp-cache/no-sandbox workaround; full
+  Swift test suite passed 103 tests with 0 failures; real Xcode build succeeded.
+- Visual inspection of the fresh weekly-tab build showed improved alignment. No screenshot was
+  retained because the capture attempts included Codex overlays or the foreground Codex
+  window, and false visual artifacts should not be kept as proof.

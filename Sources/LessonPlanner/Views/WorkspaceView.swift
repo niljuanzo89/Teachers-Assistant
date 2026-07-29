@@ -1608,37 +1608,19 @@ private struct WeeklyDayColumnView: View {
                 }
 
                 ScrollView {
-                    HStack(alignment: .top, spacing: 10) {
-                        VStack(alignment: .trailing, spacing: 10) {
-                            ForEach(assignments) { assignment in
-                                Text(timeLabel(for: assignment))
-                                    .font(DS.font(11))
-                                    .foregroundStyle(DS.neutral600)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.trailing)
-                                    .frame(width: 56, alignment: .topTrailing)
-                                    .frame(minHeight: 92, alignment: .topTrailing)
-                                    .padding(.trailing, 8)
-                                    .overlay(alignment: .trailing) {
-                                        Rectangle().fill(DS.accent200).frame(width: 2)
-                                    }
-                            }
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(assignments) { assignment in
+                            WeeklyDayAssignmentRow(
+                                assignment: assignment,
+                                isSelected: selectedAssignmentID == assignment.id,
+                                lesson: lesson(assignment),
+                                links: outputLinks(assignment),
+                                isGeneratingOutput: { kind in isGeneratingOutput(assignment, kind) },
+                                outputAction: { kind in outputAction(assignment, kind) },
+                                editAssignment: { editAssignment(assignment) },
+                                removeAssignment: { removeAssignment(assignment) }
+                            )
                         }
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(assignments) { assignment in
-                                WeeklyAssignmentCompactCard(
-                                    assignment: assignment,
-                                    isSelected: selectedAssignmentID == assignment.id,
-                                    lesson: lesson(assignment),
-                                    links: outputLinks(assignment),
-                                    isGeneratingOutput: { kind in isGeneratingOutput(assignment, kind) },
-                                    outputAction: { kind in outputAction(assignment, kind) },
-                                    editAssignment: { editAssignment(assignment) },
-                                    removeAssignment: { removeAssignment(assignment) }
-                                )
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
                     .padding(14)
                 }
@@ -1647,7 +1629,48 @@ private struct WeeklyDayColumnView: View {
         .frame(minWidth: 230, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    private func timeLabel(for assignment: WeeklyLessonAssignment) -> String {
+}
+
+private struct WeeklyDayAssignmentRow: View {
+    var assignment: WeeklyLessonAssignment
+    var isSelected: Bool
+    var lesson: LessonRecord?
+    var links: LessonOutputLinkSet
+    var isGeneratingOutput: (GeneratedOutputKind) -> Bool
+    var outputAction: (GeneratedOutputKind) -> Void
+    var editAssignment: () -> Void
+    var removeAssignment: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(timeLabel)
+                .font(DS.font(10.5, weight: .semibold))
+                .foregroundStyle(DS.accent800)
+                .lineLimit(2)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 52, alignment: .topTrailing)
+                .padding(.top, 10)
+                .padding(.trailing, 8)
+                .overlay(alignment: .trailing) {
+                    Rectangle().fill(DS.accent200).frame(width: 2)
+                }
+
+            WeeklyAssignmentCompactCard(
+                assignment: assignment,
+                isSelected: isSelected,
+                lesson: lesson,
+                links: links,
+                isGeneratingOutput: isGeneratingOutput,
+                outputAction: outputAction,
+                editAssignment: editAssignment,
+                removeAssignment: removeAssignment
+            )
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private var timeLabel: String {
         "\(assignment.start.formatted(.dateTime.hour().minute()))\n\(assignment.end.formatted(.dateTime.hour().minute()))"
     }
 }
@@ -1682,11 +1705,12 @@ private struct WeeklyAssignmentCompactCard: View {
                             .font(DS.font(11))
                             .foregroundStyle(DS.neutral600)
                             .lineLimit(2)
-                    } else if let source = lesson?.sourceReferences.first?.trimmingCharacters(in: .whitespacesAndNewlines), !source.isEmpty {
-                        Text(source)
+                    } else if let sourcePreview {
+                        Text(sourcePreview)
                             .font(DS.font(11))
                             .foregroundStyle(DS.neutral600)
-                            .lineLimit(2)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
 
                     if assignment.end <= assignment.start {
@@ -1734,6 +1758,20 @@ private struct WeeklyAssignmentCompactCard: View {
                 .stroke(isSelected ? DS.accent : DS.divider, lineWidth: isSelected ? 1.5 : 1)
         }
         .dsLiftOnHover()
+    }
+
+    private var sourcePreview: String? {
+        guard let source = lesson?.sourceReferences.first?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !source.isEmpty else {
+            return nil
+        }
+
+        if source.contains("/") {
+            let name = URL(fileURLWithPath: source).lastPathComponent
+            return name.isEmpty ? source : name
+        }
+
+        return source
     }
 }
 
