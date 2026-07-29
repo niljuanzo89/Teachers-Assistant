@@ -506,3 +506,190 @@ during implementation, not a new scope decision requiring a stop.
 the redesign pause point, the new traps/gotchas from Batches 004–007, and an explicit
 first-step instruction for the next session to ask the owner about the Today screen before
 assuming approval and continuing). Both confirmed on disk before this log entry.
+
+---
+
+### Batch 008 — 2026-07-29 — "Sunrise Planner" redesign, Batch B: This Week screen, code/test pass; visual blocked
+
+**Compute:** medium. **Model shape:** single sufficient — owner approved continuing past
+the Today-screen checkpoint; this batch stayed inside `WorkspaceView.swift` and did not
+need a second-model correctness review.
+
+**Goal.** Continue the approved staged visual redesign onto the This Week screen, then stop
+for visual confirmation before touching Planning Preview.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Read `CONTINUE_PROMPT.md` | Confirmed the exact pause point: ask for Today approval, then Batch B = This Week only |
+| 2 | Owner said "proceed with next 20 steps" | Treated as approval of the Today direction and authorization to start Batch B |
+| 3 | Re-read `CLAUDE.md`, `CONTINUITY_LOG.md`, `MODEL_HANDOFF.txt`, `BUILD_LOG.md`, and `/Users/nils/.claude/plans/snuggly-brewing-elephant.md` | Confirmed current baseline: 101 tests, git live, Today redesign committed, This Week not started |
+| 4 | Read `DesignSystem.swift` | Reused existing DS tokens/components; no new file or pbxproj edit needed |
+| 5 | Read `WorkspaceView.swift`'s `WeeklyPlannerView` and weekly grid/card components | Found the old side-control-panel + table grid still in stock SwiftUI style |
+| 6 | Read the design reference README and `02-this-week.png`/HTML snippet | Target: five warm day cards, accent header band, mini time rail, neutral lesson cards, small Plan/Deck/Guide pills |
+| 7 | Design decision: preserve real controls while changing the main visual structure | Kept weekly prompt, readiness, pacing suggestions, check-in, planning brief, manual scheduling, edit panel, and weekly package generation; moved them into warm side cards rather than deleting functionality to match the simplified reference |
+| 8 | Rewrote `WeeklyPlannerView.body` | Left side is now a scrollable warm control stack; right side is the redesigned weekly board |
+| 9 | Added `WeeklySideSection` | Reusable DS-styled sidebar card for weekly controls |
+| 10 | Added `WeeklyPacingProposalCard` | DS-styled rendering of draft/accepted pacing refinements |
+| 11 | Re-skinned `WeeklyPackageReadinessView`, `WeeklyPacingSuggestionView`, and `WeeklyOutputSummaryView` | Removed stock `GroupBox` look from the visible weekly control surface |
+| 12 | Replaced the old table-like `WeeklyPlanningGridView` rendering | New layout uses one `WeeklyDayColumnView` per weekday, matching the design reference's five-card board |
+| 13 | Reworked `WeeklyAssignmentCompactCard` | Warm neutral lesson cards, DS serif typography, selected accent state, hover-lift, and real output/open actions |
+| 14 | Ran `swift build -Xswiftc -gnone` | First attempt failed before code compile due the known home-cache permission issue |
+| 15 | Retried with the documented temp cache workaround | Compiler found two small code issues: invalid `.frame(width:minHeight:)` overload and wrong field name (`sourceProvenance`) |
+| 16 | Fixed compile issues | Split the frame call and changed lesson source display to `lesson.sourceReferences.first` |
+| 17 | `swift build` with temp caches | Build complete |
+| 18 | `swift test --disable-sandbox --scratch-path /private/tmp/lessonplanner-build -Xswiftc -gnone` | 101 tests passed, 0 failures |
+| 19 | Real `xcodebuild` | BUILD SUCCEEDED |
+| 20 | Attempted visual capture | Blocked: the visible LessonPlanner window belongs to the old stuck PID 23296 from Batch 007. Fresh executable launch exits immediately with no window while that same-bundle instance is present. `kill -9 23296` did not remove it. A capture named `10-this-week-sunrise-redesign.png` initially caught the old Today screen; renamed to `10-capture-failed-old-stuck-instance.png` so it is not mistaken for proof of Batch B |
+
+**Outcome.** This Week redesign code compiles, passes all tests, and passes Xcode build, but
+is **not visually confirmed**. Stop here; do not continue to Planning Preview until the owner
+reboots/quits the old stuck LessonPlanner instance and the updated This Week screen is
+captured/reviewed.
+
+**Dead ends / gotchas worth keeping.**
+
+- The old stuck LessonPlanner PID 23296 can still survive `kill -9`. It owns the only visible
+  app window and shows stale UI. Do not use it for screenshots.
+- Capturing by app name/window ID without checking `kCGWindowOwnerPID` can produce a false
+  screenshot from the stale process. Always list `kCGWindowOwnerPID` first when duplicate
+  same-bundle instances are suspected.
+- Directly launching the freshly built executable while PID 23296 is present exited
+  immediately with no log and no visible window. This appears to be a same-bundle single-app
+  instance problem, not a code failure.
+- `10-capture-failed-old-stuck-instance.png` is intentionally a failed-capture artifact, not
+  a design screenshot.
+
+**Still open.**
+
+1. Reboot or otherwise clear the stuck old LessonPlanner process, then launch the current
+   build on `LESSONPLANNER_INITIAL_TAB=week`.
+2. Capture and visually confirm the redesigned This Week screen.
+3. Only after owner confirmation, continue with Batch C: Planning Preview.
+
+---
+
+### Batch 009 — 2026-07-29 — Post-reboot This Week capture and board-first correction
+
+**Compute:** medium. **Model shape:** single sufficient — this was a visual/layout recovery
+batch after reboot, scoped to the already-implemented This Week redesign and handoff docs.
+
+**Goal.** Clear the stale-window blocker from Batch 008, capture the real current-build This
+Week redesign, fix any obvious first-pass layout defect, and stop for owner visual approval
+before moving to Planning Preview.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Re-entered from `CONTINUE_PROMPT.md` after computer restart | Confirmed the next required action was Batch B visual confirmation, not a new feature |
+| 2 | Checked git working tree | Found expected uncommitted Batch B files plus the failed stale-window screenshot artifact |
+| 3 | Inspected post-reboot LessonPlanner windows with Quartz metadata | Found only a restored old app instance, PID 651, not the previous stuck PID 23296 |
+| 4 | Quit the restored old app instance | Cleared same-bundle window confusion before trusting any screenshot |
+| 5 | Ran `swift test --disable-sandbox --scratch-path /private/tmp/lessonplanner-build -Xswiftc -gnone` | 101 tests passed, 0 failures |
+| 6 | Ran real Xcode build | BUILD SUCCEEDED |
+| 7 | Launched the current build with `LESSONPLANNER_DESIGN_CAPTURE=1` and `LESSONPLANNER_INITIAL_TAB=week` | Fresh visible app instance, PID 1992 |
+| 8 | Captured the first real Batch B screenshot | Saved `Design Screenshots/2026-07-29/10-this-week-sunrise-redesign.png` |
+| 9 | Inspected the screenshot | Found a genuine layout defect: the left side and five-column board clipped horizontally in the capture window |
+| 10 | Reworked `WeeklyPlannerView` from side-panel + board into a board-first vertical layout | The weekly board now receives the full content width; controls sit below it instead of stealing horizontal space |
+| 11 | Added `WeeklyPlannerHeader` | Keeps title, week, lesson count, and week picker visible above the board |
+| 12 | Added `WeeklyPlannerToolbox` | Preserves readiness, pacing suggestions, check-in, planning brief, manual scheduling, selected-assignment editing, and package generation below the board |
+| 13 | Ran `swift build` with the temp-cache workaround | Build complete |
+| 14 | Re-ran the full Swift test suite | 101 tests passed, 0 failures |
+| 15 | Re-ran real Xcode build | BUILD SUCCEEDED |
+| 16 | Quit/relaunched the corrected current build | Fresh visible app instance, PID 2409 |
+| 17 | Captured the corrected This Week screenshot | Replaced `10-this-week-sunrise-redesign.png` with the corrected board-first capture |
+| 18 | Visually inspected the corrected screenshot | Major clipping is resolved; lesson cards/actions are visible. Some narrow output labels wrap vertically in tight cards, so owner visual judgment is still needed before continuing |
+| 19 | Updated continuity/build/handoff docs | Current state now records the post-reboot success and the remaining owner-approval pause |
+| 20 | Stop point | Do not continue to Planning Preview until the owner approves the corrected This Week screen or gives edits |
+
+**Outcome.** Batch B is now build/test verified **and captured from the real current build**.
+The corrected screenshot is:
+
+`Design Screenshots/2026-07-29/10-this-week-sunrise-redesign.png`
+
+**Still open.**
+
+1. Owner visual approval of the corrected This Week screen.
+2. If approved, continue with Batch C: Planning Preview.
+3. If the owner wants changes, address those before touching the next screen.
+
+---
+
+### Batch 010 — 2026-07-29 — This Week output button wrap/state fix
+
+**Compute:** medium. **Model shape:** single sufficient — scoped visual/interaction polish
+inside the already-redesigned This Week lesson cards.
+
+**Goal.** Fix the visually awkward Plan/Deck/Guide word wrapping and make clicked/generated
+outputs read as completed/openable rather than stuck in the orange action state.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Owner reported output button wrapping and persistent orange post-click state | Treated as direct feedback on Batch B before moving to the next screen |
+| 2 | Inspected weekly card/output-control code in `WorkspaceView.swift` | Found full text labels inside a compressed row beside edit/remove controls |
+| 3 | Patched `WeeklyAssignmentOutputControlsView` | Replaced full `Plan`/`Deck`/`Guide` labels with compact fixed-size `P`/`D`/`G` chips plus SF Symbol icons |
+| 4 | Preserved meaning/accessibility | Added full hover help and accessibility labels: Generate/Open Plan, Deck, Guide |
+| 5 | Changed ready-state color | Generated/openable outputs now use a green check state; pending outputs use a light outlined orange state |
+| 6 | Ran `swift build` | Hit the known SwiftPM manifest sandbox issue before compile; not treated as a code failure |
+| 7 | Ran full Swift test suite with the documented temp scratch/cache workaround | 101 tests passed, 0 failures |
+| 8 | Ran real Xcode build | BUILD SUCCEEDED |
+| 9 | Relaunched the app for visual QA | Initial launches produced running processes without Quartz-listed windows; System Events could still see one app window |
+| 10 | Raised/positioned the app window through System Events | Got LessonPlanner visible again despite the Quartz window-ID issue |
+| 11 | Needed populated lessons for visual QA | App opened to an empty current week; found active profile's populated 2026-07-27 weekly plan |
+| 12 | Created a temporary screenshot-only copy of the 2026-07-27 weekly plan under the app's current-week key | This let the visible week show populated lesson cards without manually fighting the date picker |
+| 13 | Captured visual proof | Saved `Design Screenshots/2026-07-29/11-this-week-output-button-fix.png`; chips no longer wrap, and ready outputs appear green |
+| 14 | Removed temporary QA week copy | Confirmed the temporary current-week local file is gone; testing data is back to its previous state |
+| 15 | Removed throwaway focus-check screenshot | Avoided leaving a misleading Codex-window capture in the design folder |
+| 16 | Updated logs/handoff | Current docs now describe the button fix and remaining approval pause |
+
+**Outcome.** The output buttons no longer word-wrap. Pending outputs display as compact
+outlined action chips; generated outputs display as compact green check chips. The actions
+still call the same generate/open logic.
+
+**Screenshot.**
+
+`Design Screenshots/2026-07-29/11-this-week-output-button-fix.png`
+
+**Still open.**
+
+1. Owner visual approval of the revised This Week card controls.
+2. If approved, proceed to Batch C: Planning Preview.
+
+---
+
+### Batch 011 — 2026-07-29 — Save/reload progress and guarded clear action
+
+**Compute:** medium. **Model shape:** single sufficient — local persistence and one
+Workspace control section, covered by focused tests.
+
+**Goal.** Add a teacher-facing safety system: save current progress, reload saved progress,
+and clear all documents/entries only after a strong confirmation warning.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Owner requested clear-all plus save/reload progress | Treated as a safety feature for local testing and future reset workflows |
+| 2 | Chose scope for clearing | Clears active profile's imported documents, lessons, generated-output history, current daily plan, current weekly plan, registered source folders, and course pacing; keeps profile/workspace/output folder shell intact |
+| 3 | Added `PlanningProgressSnapshot` model | Snapshot captures configuration, daily plan, weekly plan, lessons, imported sources, and generated outputs |
+| 4 | Extended `LocalRepositoryProtocol` | Added load/save progress snapshot methods |
+| 5 | Implemented local snapshot persistence | Snapshots save as JSON under the active profile's `progress-snapshots/` folder |
+| 6 | Added `AppStore.progressSnapshots` state | Loaded on app reload/profile switch |
+| 7 | Added `saveCurrentProgressSnapshot(named:)` | Saves current local progress and refreshes available snapshots |
+| 8 | Added `restoreProgressSnapshot(_:)` | Restores saved configuration/plans/lessons/imports/outputs |
+| 9 | Added exact-restore reload path | Restore skips the normal readable-document auto-sync so reloading a snapshot does not duplicate weekly assignments |
+| 10 | Added `clearCurrentDocumentsAndEntries()` | Clears local planning records while preserving workspace/profile shell |
+| 11 | Added Workspace "Progress safety" UI | Snapshot name field, save button, saved-progress picker, reload button, destructive clear button, and explanatory copy |
+| 12 | Added confirmation dialog | User must explicitly confirm "Clear documents, lessons, and planners"; dialog warns that current lessons and planners will be wiped |
+| 13 | Added snapshot restore test | Verifies saved progress can be cleared and then fully reloaded |
+| 14 | Added clear-action test | Verifies clear wipes the planning data and leaves workspace/output shell intact |
+| 15 | First test run | 102/103 tests passed; snapshot restore test exposed duplicate assignment from startup auto-sync |
+| 16 | Fixed restore behavior | `reload(syncReadableDocuments: false)` prevents snapshot restore from reinterpreting imported documents |
+| 17 | Reran Swift tests | 103 tests passed, 0 failures |
+| 18 | Ran real Xcode build | BUILD SUCCEEDED |
+| 19 | Updated project logs/handoff | Current feature state and remaining visual review are documented |
+
+**Outcome.** Teachers can now save a local progress snapshot, reload it later, and clear the
+active profile's current planning data after an explicit destructive confirmation.
+
+**Still open.**
+
+1. Visual confirmation of the new Workspace "Progress safety" section.
+2. Owner decision later on whether clearing should also delete generated files from disk or
+   only remove their app history records. Current implementation keeps files on disk.

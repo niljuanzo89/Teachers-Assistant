@@ -720,3 +720,69 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   `project.pbxproj`).
 - This Week, Planning Preview, Document Intake, and Workspace are not yet re-skinned — a
   deliberate stop point to confirm the approach with the owner before continuing.
+
+### 2026-07-29 — "Sunrise Planner" redesign, Batch B: This Week code pass, visual blocked
+
+- Continued the redesign onto the This Week screen after owner approval of the Today-screen
+  direction.
+- Re-skinned the weekly control surface with DS cards and replaced the old table-like weekly
+  grid with a five-day board: warm day cards, accent header bands, mini time rails, neutral
+  lesson cards, and Plan/Deck/Guide pills wired to the real output actions.
+- Preserved existing weekly functionality: prompt settings, readiness, pacing suggestions,
+  weekly check-in, planning brief, manual scheduling, selected-assignment editing, and weekly
+  package generation.
+- `swift build` with temp caches: passed. `swift test -Xswiftc -gnone`: 101 tests passed,
+  0 failures. Real `xcodebuild`: BUILD SUCCEEDED.
+- Visual confirmation is blocked by the stale unkillable LessonPlanner process from Batch 007
+  (PID 23296). The attempted screenshot caught that old Today screen, so it was renamed to
+  `Design Screenshots/2026-07-29/10-capture-failed-old-stuck-instance.png` and must not be
+  treated as visual proof.
+
+### 2026-07-29 — "Sunrise Planner" redesign, Batch B follow-up: real This Week capture after reboot
+
+- After the computer restart, cleared the restored old LessonPlanner instance and launched
+  the current Xcode-built app directly on the This Week tab.
+- Captured the first real Batch B screenshot, found an obvious horizontal clipping issue, and
+  corrected the layout by making the weekly board the primary full-width surface with weekly
+  tools beneath it instead of in a left side panel.
+- Added `WeeklyPlannerHeader` and `WeeklyPlannerToolbox` in `WorkspaceView.swift` to preserve
+  all existing weekly functions while giving the five-day board enough room to breathe.
+- Re-verified after the correction: `swift build` passed, `swift test --disable-sandbox
+  --scratch-path /private/tmp/lessonplanner-build -Xswiftc -gnone` passed 101 tests with
+  0 failures, and real `xcodebuild` succeeded.
+- Corrected screenshot saved at
+  `Design Screenshots/2026-07-29/10-this-week-sunrise-redesign.png`. This is now the real
+  current-build capture awaiting owner visual approval before Batch C (Planning Preview).
+
+### 2026-07-29 — "Sunrise Planner" redesign, Batch B polish: compact output chips
+
+- Addressed owner feedback that the lesson-card output actions wrapped vertically and that
+  post-click orange state looked visually stuck.
+- Replaced text-heavy Plan/Deck/Guide controls with fixed-size icon + letter chips (`P`,
+  `D`, `G`) with full hover help and accessibility labels.
+- Pending outputs now use a light outlined orange action state; generated/openable outputs
+  use a green check state instead of the orange fill.
+- Verification: full Swift test suite passed 101 tests with 0 failures, and real Xcode build
+  succeeded. A plain `swift build` attempt hit the known SwiftPM manifest sandbox issue before
+  compiling and was superseded by the passing test/build runs.
+- Visual QA screenshot saved at
+  `Design Screenshots/2026-07-29/11-this-week-output-button-fix.png`. A temporary local
+  current-week plan copy was created only to repopulate the visible week for the screenshot
+  and was removed afterward.
+
+### 2026-07-29 — Progress safety: save/reload snapshots and guarded clear
+
+- Added `PlanningProgressSnapshot`, a local JSON snapshot of the active profile's
+  configuration, daily plan, weekly plan, lesson records, imported sources, and generated
+  output history.
+- Added repository/AppStore support for saving current progress and restoring a saved
+  snapshot. Restore deliberately skips readable-document auto-sync so a snapshot reload is
+  exact and does not duplicate weekly planner assignments.
+- Added a Workspace "Progress safety" section with a snapshot name field, save button,
+  saved-progress picker, reload button, and destructive "Clear documents and entries" action.
+- Clear action requires a confirmation dialog warning that imported documents, lessons,
+  generated-output history, daily plan, weekly planner, registered source folders, and pacing
+  will be wiped. It keeps the local profile, workspace name/location, and output folder.
+- Added 2 tests for snapshot save/restore and clear behavior. First run exposed an exactness
+  issue in restore caused by startup auto-sync; fixed with `reload(syncReadableDocuments:)`.
+  Final verification: 103 tests passed, 0 failures; real Xcode build succeeded.

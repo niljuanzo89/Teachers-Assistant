@@ -794,206 +794,35 @@ struct WeeklyPlannerView: View {
     private var readiness: WeeklyPackageReadinessReport { store.weeklyPackageReadinessReport }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 24) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("This week").font(.largeTitle.bold())
-                Text("Week of \(store.weeklyPlan.weekOf, format: .dateTime.month().day().year())")
-                    .foregroundStyle(.secondary)
-                Text("Imported planning documents can populate this week automatically. Use this page to adjust lesson timing, notes, and the weekly package.")
-                    .foregroundStyle(.secondary)
-                Label("Weekly prompt: \(store.weeklyPlanningPromptPreference.summary)", systemImage: store.weeklyPlanningPromptPreference.isEnabled ? "bell" : "bell.slash")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                if let nextPromptDate = store.weeklyPlanningPromptPreference.nextPromptDate(after: .now) {
-                    Text("Next prompt target: \(nextPromptDate, format: .dateTime.weekday(.wide).month().day().hour().minute()).")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                WeeklyPlannerHeader(
+                    weekOf: store.weeklyPlan.weekOf,
+                    assignmentCount: store.weeklyPlan.assignments.count,
+                    planningWeekDate: $planningWeekDate
+                ) { date in
+                    store.setWeeklyPlanWeek(of: date)
+                    lessonDate = store.weeklyPlan.weekOf
+                    loadPlanningBrief()
+                    loadWeeklyPacingRefinement()
                 }
 
-                DatePicker("Planning week", selection: $planningWeekDate, displayedComponents: .date)
-                    .onChange(of: planningWeekDate) { _, date in
-                        store.setWeeklyPlanWeek(of: date)
-                        lessonDate = store.weeklyPlan.weekOf
-                        loadPlanningBrief()
-                        loadWeeklyPacingRefinement()
-                    }
-                WeeklyPackageReadinessView(report: readiness)
-                WeeklyPacingSuggestionView(report: store.weeklyPacingSuggestionReport) { suggestion in
-                    applyPacingSuggestion(suggestion)
-                } createDraft: { suggestion in
-                    store.createDraftLesson(from: suggestion)
-                    pacingActionMessage = "Draft lesson created from pacing. Review and approve it before scheduling."
-                }
-                if let pacingActionMessage {
-                    Label(pacingActionMessage, systemImage: "checkmark.circle.fill")
-                        .font(.footnote)
-                        .foregroundStyle(.green)
-                }
-
-                GroupBox("Weekly pacing check-in") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        TextField("What changed this week?", text: $weeklyCheckInNote, axis: .vertical)
-                            .lineLimit(2...4)
-                        Button("Draft pacing refinement") {
-                            store.proposeWeeklyPacingRefinement(from: weeklyCheckInNote)
-                            loadWeeklyPacingRefinement()
-                        }
-                        .disabled(weeklyCheckInNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        if let proposal = store.weeklyPlan.pacingRefinementProposal {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Label(proposal.status.displayName, systemImage: proposal.status == .accepted ? "checkmark.circle" : "pencil.and.list.clipboard")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(proposal.status == .accepted ? Color.green : Color.secondary)
-                                Text(proposal.proposedAdjustmentSummary)
-                                    .font(.footnote.weight(.semibold))
-                                if let affectedPacingArea = proposal.affectedPacingArea {
-                                    Text("Area: \(affectedPacingArea)")
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                                if let suggestedDateShiftDays = proposal.suggestedDateShiftDays {
-                                    Text("Suggested shift: \(suggestedDateShiftDays) instructional day(s)")
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Text(proposal.pacingImpactNotes)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                if proposal.status == .draft {
-                                    Button("Accept pacing refinement") {
-                                        store.acceptWeeklyPacingRefinement()
-                                        loadWeeklyPacingRefinement()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(4)
-                }
-
-                GroupBox("Weekly planning brief") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        TextField("Teacher focus for the week", text: $teacherFocus, axis: .vertical)
-                        TextField("Preparation notes", text: $preparationNotes, axis: .vertical)
-                        TextField("Student support notes", text: $studentSupportNotes, axis: .vertical)
-                        Button("Save weekly brief") {
-                            store.updateWeeklyPlanningBrief(
-                                teacherFocus: teacherFocus,
-                                preparationNotes: preparationNotes,
-                                studentSupportNotes: studentSupportNotes
-                            )
-                        }
-                    }
-                    .padding(4)
-                }
-
-                GroupBox("Schedule an approved lesson") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Picker("Lesson", selection: $selectedLessonID) {
-                            Text("Choose an approved lesson").tag(UUID?.none)
-                            ForEach(approvedLessons) { lesson in
-                                Text(lesson.title).tag(Optional(lesson.id))
-                            }
-                        }
-                        DatePicker("Lesson day", selection: $lessonDate, displayedComponents: .date)
-                        HStack {
-                            DatePicker("Start", selection: $start, displayedComponents: .hourAndMinute)
-                            DatePicker("End", selection: $end, displayedComponents: .hourAndMinute)
-                        }
-                        TextField("Weekly note for this lesson", text: $assignmentPlanningNotes, axis: .vertical)
-                        if end <= start {
-                            Label("End time must be after start time.", systemImage: "exclamationmark.triangle")
-                                .font(.footnote)
-                                .foregroundStyle(.orange)
-                        }
-                        Button("Add to weekly plan") {
-                            guard let selectedLessonID else { return }
-                            store.addWeeklyAssignment(
-                                lessonID: selectedLessonID,
-                                date: lessonDate,
-                                start: start,
-                                end: end,
-                                planningNotes: assignmentPlanningNotes
-                            )
-                            assignmentPlanningNotes = ""
-                        }
-                        .disabled(selectedLessonID == nil || end <= start)
-                    }
-                    .padding(4)
-                }
-
-                if let selectedAssignment {
-                    GroupBox("Edit scheduled lesson") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(lessonTitle(for: selectedAssignment))
-                                .font(.footnote.weight(.semibold))
-                            DatePicker("Lesson day", selection: $editLessonDate, displayedComponents: .date)
-                            HStack {
-                                DatePicker("Start", selection: $editStart, displayedComponents: .hourAndMinute)
-                                DatePicker("End", selection: $editEnd, displayedComponents: .hourAndMinute)
-                            }
-                            TextField("Weekly note for this lesson", text: $editAssignmentPlanningNotes, axis: .vertical)
-                            if editEnd <= editStart {
-                                Label("End time must be after start time.", systemImage: "exclamationmark.triangle")
-                                    .font(.footnote)
-                                    .foregroundStyle(.orange)
-                            }
-                            HStack {
-                                Button("Save scheduled lesson") {
-                                    store.updateWeeklyAssignment(
-                                        selectedAssignment,
-                                        date: editLessonDate,
-                                        start: editStart,
-                                        end: editEnd,
-                                        planningNotes: editAssignmentPlanningNotes
-                                    )
-                                    loadSelectedAssignment()
-                                }
-                                .disabled(editEnd <= editStart)
-                                Button("Cancel") { selectedAssignmentID = nil }
-                            }
-                        }
-                        .padding(4)
-                    }
-                }
-
-                HStack {
-                    Button("Generate weekly package") {
-                        isGeneratingWeeklyPackage = true
-                        Task {
-                            latestOutput = await store.generateWeeklyPackageHTML()
-                            isGeneratingWeeklyPackage = false
-                        }
-                    }
-                    .disabled(isGeneratingWeeklyPackage || !readiness.canGenerate)
-                    if isGeneratingWeeklyPackage { ProgressView().controlSize(.small) }
-                    if let latestOutput {
-                        Label("Created \(latestOutput.displayName)", systemImage: "checkmark.circle.fill")
-                            .font(.footnote)
-                            .foregroundStyle(.green)
-                        Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: latestOutput.filePath)]) }
-                    }
-                }
-            }
-            .frame(width: 420, alignment: .leading)
-
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Weekly plan").font(.title2.bold())
-                    Spacer()
-                    Text("\(store.weeklyPlan.assignments.count) lesson(s)")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
                 if store.weeklyPlan.assignments.isEmpty {
-                    ContentUnavailableView("No lessons scheduled", systemImage: "calendar.badge.plus", description: Text("Add planning documents in Document Intake; readable files can populate this week automatically."))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    DSCard {
+                        ContentUnavailableView(
+                            "No lessons scheduled",
+                            systemImage: "calendar.badge.plus",
+                            description: Text("Add planning documents in Document Intake; readable files can populate this week automatically.")
+                        )
+                        .foregroundStyle(DS.neutral700)
+                        .frame(maxWidth: .infinity, minHeight: 360)
+                    }
                 } else {
                     WeeklyPlanningGridView(
                         days: weekDays,
                         assignments: store.weeklyPlan.assignments,
                         selectedAssignmentID: selectedAssignmentID,
-                        lessonTitle: lessonTitle(for:),
+                        lesson: lesson(for:),
                         outputLinks: outputLinks(for:),
                         isGeneratingOutput: isGeneratingWeeklyOutput(assignment:kind:),
                         outputAction: handleWeeklyOutputAction(assignment:kind:),
@@ -1005,7 +834,86 @@ struct WeeklyPlannerView: View {
                             store.removeWeeklyAssignment(assignment)
                         }
                     )
+                    .frame(minHeight: 560)
                 }
+
+                WeeklyPlannerToolbox(
+                    readiness: readiness,
+                    pacingSuggestionReport: store.weeklyPacingSuggestionReport,
+                    pacingActionMessage: pacingActionMessage,
+                    weeklyPromptSummary: store.weeklyPlanningPromptPreference.summary,
+                    nextPromptDate: store.weeklyPlanningPromptPreference.nextPromptDate(after: .now),
+                    isWeeklyPromptEnabled: store.weeklyPlanningPromptPreference.isEnabled,
+                    weeklyCheckInNote: $weeklyCheckInNote,
+                    teacherFocus: $teacherFocus,
+                    preparationNotes: $preparationNotes,
+                    studentSupportNotes: $studentSupportNotes,
+                    selectedLessonID: $selectedLessonID,
+                    lessonDate: $lessonDate,
+                    start: $start,
+                    end: $end,
+                    assignmentPlanningNotes: $assignmentPlanningNotes,
+                    editLessonDate: $editLessonDate,
+                    editStart: $editStart,
+                    editEnd: $editEnd,
+                    editAssignmentPlanningNotes: $editAssignmentPlanningNotes,
+                    approvedLessons: approvedLessons,
+                    selectedAssignment: selectedAssignment,
+                    selectedAssignmentTitle: selectedAssignment.map { lessonTitle(for: $0) },
+                    proposal: store.weeklyPlan.pacingRefinementProposal,
+                    latestOutput: latestOutput,
+                    isGeneratingWeeklyPackage: isGeneratingWeeklyPackage,
+                    useSuggestion: applyPacingSuggestion(_:),
+                    createDraft: { suggestion in
+                        store.createDraftLesson(from: suggestion)
+                        pacingActionMessage = "Draft lesson created from pacing. Review and approve it before scheduling."
+                    },
+                    draftPacingRefinement: {
+                        store.proposeWeeklyPacingRefinement(from: weeklyCheckInNote)
+                        loadWeeklyPacingRefinement()
+                    },
+                    acceptPacingRefinement: {
+                        store.acceptWeeklyPacingRefinement()
+                        loadWeeklyPacingRefinement()
+                    },
+                    saveWeeklyBrief: {
+                        store.updateWeeklyPlanningBrief(
+                            teacherFocus: teacherFocus,
+                            preparationNotes: preparationNotes,
+                            studentSupportNotes: studentSupportNotes
+                        )
+                    },
+                    addWeeklyAssignment: {
+                        guard let selectedLessonID else { return }
+                        store.addWeeklyAssignment(
+                            lessonID: selectedLessonID,
+                            date: lessonDate,
+                            start: start,
+                            end: end,
+                            planningNotes: assignmentPlanningNotes
+                        )
+                        assignmentPlanningNotes = ""
+                    },
+                    saveSelectedAssignment: {
+                        guard let selectedAssignment else { return }
+                        store.updateWeeklyAssignment(
+                            selectedAssignment,
+                            date: editLessonDate,
+                            start: editStart,
+                            end: editEnd,
+                            planningNotes: editAssignmentPlanningNotes
+                        )
+                        loadSelectedAssignment()
+                    },
+                    cancelSelectedAssignment: { selectedAssignmentID = nil },
+                    generateWeeklyPackage: {
+                        isGeneratingWeeklyPackage = true
+                        Task {
+                            latestOutput = await store.generateWeeklyPackageHTML()
+                            isGeneratingWeeklyPackage = false
+                        }
+                    }
+                )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
@@ -1105,25 +1013,204 @@ struct WeeklyPlannerView: View {
     }
 }
 
+private struct WeeklyPlannerHeader: View {
+    var weekOf: Date
+    var assignmentCount: Int
+    @Binding var planningWeekDate: Date
+    var weekChanged: (Date) -> Void
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 18) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("This week")
+                    .font(DS.font(28, weight: .semibold))
+                    .foregroundStyle(DS.text)
+                Text("Week of \(weekOf, format: .dateTime.month().day().year())")
+                    .font(DS.font(13))
+                    .foregroundStyle(DS.neutral600)
+                Text("Auto-created from readable planning documents. Fill any blank or incorrect fields as needed.")
+                    .font(DS.font(13))
+                    .foregroundStyle(DS.neutral700)
+            }
+            Spacer()
+            DSTag(text: "\(assignmentCount) lesson(s)", variant: .neutral)
+            DatePicker("Planning week", selection: $planningWeekDate, displayedComponents: .date)
+                .onChange(of: planningWeekDate) { _, date in weekChanged(date) }
+        }
+    }
+}
+
+private struct WeeklyPlannerToolbox: View {
+    var readiness: WeeklyPackageReadinessReport
+    var pacingSuggestionReport: WeeklyPacingSuggestionReport
+    var pacingActionMessage: String?
+    var weeklyPromptSummary: String
+    var nextPromptDate: Date?
+    var isWeeklyPromptEnabled: Bool
+    @Binding var weeklyCheckInNote: String
+    @Binding var teacherFocus: String
+    @Binding var preparationNotes: String
+    @Binding var studentSupportNotes: String
+    @Binding var selectedLessonID: UUID?
+    @Binding var lessonDate: Date
+    @Binding var start: Date
+    @Binding var end: Date
+    @Binding var assignmentPlanningNotes: String
+    @Binding var editLessonDate: Date
+    @Binding var editStart: Date
+    @Binding var editEnd: Date
+    @Binding var editAssignmentPlanningNotes: String
+    var approvedLessons: [LessonRecord]
+    var selectedAssignment: WeeklyLessonAssignment?
+    var selectedAssignmentTitle: String?
+    var proposal: WeeklyPacingRefinementProposal?
+    var latestOutput: GeneratedOutputRecord?
+    var isGeneratingWeeklyPackage: Bool
+    var useSuggestion: (WeeklyPacingSuggestion) -> Void
+    var createDraft: (WeeklyPacingSuggestion) -> Void
+    var draftPacingRefinement: () -> Void
+    var acceptPacingRefinement: () -> Void
+    var saveWeeklyBrief: () -> Void
+    var addWeeklyAssignment: () -> Void
+    var saveSelectedAssignment: () -> Void
+    var cancelSelectedAssignment: () -> Void
+    var generateWeeklyPackage: () -> Void
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 14)], alignment: .leading, spacing: 14) {
+            WeeklySideSection(title: "Weekly prompt", systemImage: isWeeklyPromptEnabled ? "bell" : "bell.slash") {
+                Text(weeklyPromptSummary)
+                    .font(DS.font(13))
+                    .foregroundStyle(DS.neutral700)
+                if let nextPromptDate {
+                    Text("Next: \(nextPromptDate, format: .dateTime.weekday(.wide).month().day().hour().minute())")
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.accent800)
+                }
+            }
+
+            WeeklyPackageReadinessView(report: readiness)
+
+            WeeklyPacingSuggestionView(report: pacingSuggestionReport, useSuggestion: useSuggestion, createDraft: createDraft)
+
+            WeeklySideSection(title: "Weekly pacing check-in", systemImage: "sparkles") {
+                TextField("What changed this week?", text: $weeklyCheckInNote, axis: .vertical)
+                    .textFieldStyle(.ds)
+                    .lineLimit(2...4)
+                Button("Draft pacing refinement", action: draftPacingRefinement)
+                    .buttonStyle(.dsSecondary)
+                    .disabled(weeklyCheckInNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if let proposal {
+                    WeeklyPacingProposalCard(proposal: proposal, accept: acceptPacingRefinement)
+                }
+                if let pacingActionMessage {
+                    DSTag(text: pacingActionMessage, variant: .accent)
+                }
+            }
+
+            WeeklySideSection(title: "Weekly planning brief", systemImage: "note.text") {
+                TextField("Teacher focus for the week", text: $teacherFocus, axis: .vertical)
+                    .textFieldStyle(.ds)
+                TextField("Preparation notes", text: $preparationNotes, axis: .vertical)
+                    .textFieldStyle(.ds)
+                TextField("Student support notes", text: $studentSupportNotes, axis: .vertical)
+                    .textFieldStyle(.ds)
+                Button("Save weekly brief", action: saveWeeklyBrief)
+                    .buttonStyle(.dsPrimary)
+            }
+
+            WeeklySideSection(title: "Schedule an approved lesson", systemImage: "calendar.badge.plus") {
+                Picker("Lesson", selection: $selectedLessonID) {
+                    Text("Choose an approved lesson").tag(UUID?.none)
+                    ForEach(approvedLessons) { lesson in
+                        Text(lesson.title).tag(Optional(lesson.id))
+                    }
+                }
+                DatePicker("Lesson day", selection: $lessonDate, displayedComponents: .date)
+                HStack {
+                    DatePicker("Start", selection: $start, displayedComponents: .hourAndMinute)
+                    DatePicker("End", selection: $end, displayedComponents: .hourAndMinute)
+                }
+                TextField("Weekly note for this lesson", text: $assignmentPlanningNotes, axis: .vertical)
+                    .textFieldStyle(.ds)
+                if end <= start {
+                    Label("End time must be after start time.", systemImage: "exclamationmark.triangle")
+                        .font(DS.font(12, weight: .semibold))
+                        .foregroundStyle(DS.accent2)
+                }
+                Button("Add to weekly plan", action: addWeeklyAssignment)
+                    .buttonStyle(.dsPrimary)
+                    .disabled(selectedLessonID == nil || end <= start)
+            }
+
+            if selectedAssignment != nil {
+                WeeklySideSection(title: "Edit scheduled lesson", systemImage: "pencil") {
+                    Text(selectedAssignmentTitle ?? "Lesson no longer available")
+                        .font(DS.font(13, weight: .semibold))
+                        .foregroundStyle(DS.text)
+                    DatePicker("Lesson day", selection: $editLessonDate, displayedComponents: .date)
+                    HStack {
+                        DatePicker("Start", selection: $editStart, displayedComponents: .hourAndMinute)
+                        DatePicker("End", selection: $editEnd, displayedComponents: .hourAndMinute)
+                    }
+                    TextField("Weekly note for this lesson", text: $editAssignmentPlanningNotes, axis: .vertical)
+                        .textFieldStyle(.ds)
+                    if editEnd <= editStart {
+                        Label("End time must be after start time.", systemImage: "exclamationmark.triangle")
+                            .font(DS.font(12, weight: .semibold))
+                            .foregroundStyle(DS.accent2)
+                    }
+                    HStack {
+                        Button("Save", action: saveSelectedAssignment)
+                            .buttonStyle(.dsPrimary)
+                            .disabled(editEnd <= editStart)
+                        Button("Cancel", action: cancelSelectedAssignment)
+                            .buttonStyle(.dsSecondary)
+                    }
+                }
+            }
+
+            WeeklySideSection(title: "Weekly package", systemImage: "shippingbox") {
+                Button("Generate weekly package", action: generateWeeklyPackage)
+                    .buttonStyle(.dsPrimary)
+                    .disabled(isGeneratingWeeklyPackage || !readiness.canGenerate)
+                if isGeneratingWeeklyPackage {
+                    ProgressView().controlSize(.small)
+                }
+                if let latestOutput {
+                    Label("Created \(latestOutput.displayName)", systemImage: "checkmark.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .font(DS.font(12, weight: .semibold))
+                        .foregroundStyle(DS.accent700)
+                    Button("Reveal in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: latestOutput.filePath)])
+                    }
+                    .buttonStyle(.dsSecondary)
+                }
+            }
+        }
+    }
+}
+
 private struct WeeklyPackageReadinessView: View {
     var report: WeeklyPackageReadinessReport
 
     var body: some View {
-        GroupBox("Weekly package readiness") {
+        WeeklySideSection(title: "Weekly package readiness", systemImage: report.canGenerate ? "checkmark.circle" : "exclamationmark.triangle") {
             VStack(alignment: .leading, spacing: 6) {
-                Label(report.title, systemImage: report.canGenerate ? "checkmark.circle" : "exclamationmark.triangle")
-                    .foregroundStyle(report.canGenerate ? Color.green : Color.orange)
+                DSTag(text: report.title, variant: report.canGenerate ? .accent : .accent2)
                 Text("\(report.completeOutputLessonCount) of \(report.scheduledLessonCount) scheduled lessons already have all three outputs.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(DS.font(12))
+                    .foregroundStyle(DS.neutral700)
                 WeeklyOutputSummaryView(summary: report.outputSummary)
                 ForEach(report.issues) { issue in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(issue.title)
-                            .font(.footnote.weight(.semibold))
+                            .font(DS.font(12, weight: .semibold))
+                            .foregroundStyle(DS.text)
                         Text(issue.instruction)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .font(DS.font(12))
+                            .foregroundStyle(DS.neutral700)
                     }
                 }
             }
@@ -1138,35 +1225,37 @@ private struct WeeklyPacingSuggestionView: View {
     var createDraft: (WeeklyPacingSuggestion) -> Void
 
     var body: some View {
-        GroupBox("Pacing suggestions") {
+        WeeklySideSection(title: "Pacing suggestions", systemImage: "point.topleft.down.curvedto.point.bottomright.up") {
             VStack(alignment: .leading, spacing: 8) {
-                Label(report.title, systemImage: report.canSuggestFromPacing ? "point.topleft.down.curvedto.point.bottomright.up" : "calendar.badge.exclamationmark")
-                    .foregroundStyle(report.canSuggestFromPacing ? Color.secondary : Color.orange)
+                DSTag(text: report.title, variant: report.canSuggestFromPacing ? .outline : .accent2)
                 Text(report.detail)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(DS.font(12))
+                    .foregroundStyle(DS.neutral700)
                 ForEach(report.suggestions) { suggestion in
                     HStack(alignment: .top, spacing: 10) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(suggestion.pacingLessonTitle)
-                                .font(.footnote.weight(.semibold))
+                                .font(DS.font(12, weight: .semibold))
+                                .foregroundStyle(DS.text)
                             Text("\(suggestion.unitTitle) / \(suggestion.moduleTitle)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(DS.font(11))
+                                .foregroundStyle(DS.neutral600)
                             Text("\(suggestion.suggestedDate, format: .dateTime.weekday(.wide).month().day()) • \(suggestion.status.displayName)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(DS.font(11))
+                                .foregroundStyle(DS.neutral600)
                             if let lessonRecordTitle = suggestion.lessonRecordTitle {
                                 Text("Matches approved lesson: \(lessonRecordTitle)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .font(DS.font(11))
+                                    .foregroundStyle(DS.neutral600)
                             }
                         }
                         Spacer()
                         if suggestion.status == .readyToSchedule {
                             Button("Use") { useSuggestion(suggestion) }
+                                .buttonStyle(.dsSecondary)
                         } else if suggestion.status == .needsApprovedLesson {
                             Button("Create draft") { createDraft(suggestion) }
+                                .buttonStyle(.dsSecondary)
                         }
                     }
                 }
@@ -1176,15 +1265,68 @@ private struct WeeklyPacingSuggestionView: View {
     }
 }
 
+private struct WeeklySideSection<Content: View>: View {
+    var title: String
+    var systemImage: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        DSCard(radius: DS.radiusMD, padding: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(title, systemImage: systemImage)
+                    .symbolRenderingMode(.hierarchical)
+                    .font(DS.font(14, weight: .semibold))
+                    .foregroundStyle(DS.text)
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct WeeklyPacingProposalCard: View {
+    var proposal: WeeklyPacingRefinementProposal
+    var accept: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            DSTag(text: proposal.status.displayName, variant: proposal.status == .accepted ? .accent : .neutral)
+            Text(proposal.proposedAdjustmentSummary)
+                .font(DS.font(12, weight: .semibold))
+                .foregroundStyle(DS.text)
+            if let affectedPacingArea = proposal.affectedPacingArea {
+                Text("Area: \(affectedPacingArea)")
+                    .font(DS.font(11))
+                    .foregroundStyle(DS.neutral600)
+            }
+            if let suggestedDateShiftDays = proposal.suggestedDateShiftDays {
+                Text("Suggested shift: \(suggestedDateShiftDays) instructional day(s)")
+                    .font(DS.font(11))
+                    .foregroundStyle(DS.neutral600)
+            }
+            Text(proposal.pacingImpactNotes)
+                .font(DS.font(12))
+                .foregroundStyle(DS.neutral700)
+            if proposal.status == .draft {
+                Button("Accept pacing refinement", action: accept)
+                    .buttonStyle(.dsSecondary)
+            }
+        }
+        .padding(10)
+        .background(DS.accent100.opacity(0.65))
+        .clipShape(RoundedRectangle(cornerRadius: DS.radiusSM))
+    }
+}
+
 private struct WeeklyOutputSummaryView: View {
     var summary: WeeklyOutputSummary
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(summary.generationLine)
-                .font(.footnote)
-                .foregroundStyle(summary.missingOutputCount == 0 ? Color.secondary : Color.orange)
-            HStack(spacing: 10) {
+                .font(DS.font(12))
+                .foregroundStyle(summary.missingOutputCount == 0 ? DS.neutral700 : DS.accent2)
+            HStack(spacing: 6) {
                 summaryPill("Plan", count: summary.lessonPlanCount)
                 summaryPill("Deck", count: summary.slideDeckCount)
                 summaryPill("Guide", count: summary.differentiationGuideCount)
@@ -1194,28 +1336,19 @@ private struct WeeklyOutputSummaryView: View {
 
     private func summaryPill(_ title: String, count: Int) -> some View {
         Text("\(title) \(count)/\(summary.scheduledLessonCount)")
-            .font(.caption)
+            .font(DS.font(11, weight: .semibold))
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color.secondary.opacity(0.12), in: Capsule())
-            .foregroundStyle(.secondary)
+            .background(DS.neutral200, in: Capsule())
+            .foregroundStyle(DS.neutral700)
     }
 }
 
 private struct WeeklyPlanningGridView: View {
-    private enum Metrics {
-        static let timeColumnWidth: CGFloat = 104
-        static let dayColumnWidth: CGFloat = 260
-        static let headerHeight: CGFloat = 64
-        /// Rows size themselves to their tallest cell. This is only the floor for a
-        /// sparse or empty row so the grid keeps a readable rhythm.
-        static let minRowHeight: CGFloat = 88
-    }
-
     var days: [Date]
     var assignments: [WeeklyLessonAssignment]
     var selectedAssignmentID: UUID?
-    var lessonTitle: (WeeklyLessonAssignment) -> String
+    var lesson: (WeeklyLessonAssignment) -> LessonRecord?
     var outputLinks: (WeeklyLessonAssignment) -> LessonOutputLinkSet
     var isGeneratingOutput: (WeeklyLessonAssignment, GeneratedOutputKind) -> Bool
     var outputAction: (WeeklyLessonAssignment, GeneratedOutputKind) -> Void
@@ -1223,137 +1356,41 @@ private struct WeeklyPlanningGridView: View {
     var removeAssignment: (WeeklyLessonAssignment) -> Void
 
     var body: some View {
-        // Built once per redraw and passed down. Rebuilding it per cell would re-cluster
-        // every assignment for every day column.
-        let layout = WeeklyGridLayout(assignments: assignments)
-
-        ScrollView([.horizontal, .vertical]) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 0) {
-                    WeeklyPlanningHeaderCell(title: "Time", width: Metrics.timeColumnWidth, height: Metrics.headerHeight)
-                    ForEach(days, id: \.self) { day in
-                        WeeklyPlanningHeaderCell(
-                            title: day.formatted(.dateTime.weekday(.wide)),
-                            subtitle: day.formatted(.dateTime.month().day()),
-                            width: Metrics.dayColumnWidth,
-                            height: Metrics.headerHeight
-                        )
-                    }
-                }
-
-                if layout.slots.isEmpty {
-                    HStack(spacing: 0) {
-                        WeeklyPlanningTimeCell(text: "", width: Metrics.timeColumnWidth, minHeight: Metrics.minRowHeight)
-                        Text("No lessons have been scheduled for this week.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .frame(width: Metrics.dayColumnWidth * CGFloat(days.count), alignment: .center)
-                            .frame(minHeight: Metrics.minRowHeight, alignment: .center)
-                            .border(Color.secondary.opacity(0.28), width: 0.5)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    ForEach(layout.slots) { slot in
-                        HStack(alignment: .top, spacing: 0) {
-                            WeeklyPlanningTimeCell(
-                                text: slot.label,
-                                width: Metrics.timeColumnWidth,
-                                minHeight: Metrics.minRowHeight
-                            )
-                            ForEach(days, id: \.self) { day in
-                                WeeklyPlanningTableCell(
-                                    assignments: layout.assignments(
-                                        from: assignments,
-                                        forDay: day,
-                                        slot: slot,
-                                        titleForSorting: lessonTitle
-                                    ),
-                                    width: Metrics.dayColumnWidth,
-                                    minHeight: Metrics.minRowHeight,
-                                    selectedAssignmentID: selectedAssignmentID,
-                                    lessonTitle: lessonTitle,
-                                    outputLinks: outputLinks,
-                                    isGeneratingOutput: isGeneratingOutput,
-                                    outputAction: outputAction,
-                                    editAssignment: editAssignment,
-                                    removeAssignment: removeAssignment
-                                )
-                            }
-                        }
-                        // Let the row take the intrinsic height of its tallest cell instead of a
-                        // fixed height that clipped crowded cells and padded sparse ones.
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
+        HStack(alignment: .top, spacing: 16) {
+            ForEach(days, id: \.self) { day in
+                WeeklyDayColumnView(
+                    day: day,
+                    assignments: assignments(for: day),
+                    selectedAssignmentID: selectedAssignmentID,
+                    lesson: lesson,
+                    outputLinks: outputLinks,
+                    isGeneratingOutput: isGeneratingOutput,
+                    outputAction: outputAction,
+                    editAssignment: editAssignment,
+                    removeAssignment: removeAssignment
+                )
             }
-            .overlay {
-                Rectangle()
-                    .stroke(Color.secondary.opacity(0.35), lineWidth: 1)
-            }
-            .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-}
-
-private struct WeeklyPlanningHeaderCell: View {
-    var title: String
-    var subtitle: String?
-    var width: CGFloat
-    var height: CGFloat
-
-    init(title: String, subtitle: String? = nil, width: CGFloat, height: CGFloat) {
-        self.title = title
-        self.subtitle = subtitle
-        self.width = width
-        self.height = height
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.title3.weight(.semibold))
-            if let subtitle {
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    private func assignments(for day: Date) -> [WeeklyLessonAssignment] {
+        assignments
+            .filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
+            .sorted {
+                if $0.start == $1.start {
+                    return (lesson($0)?.title ?? "") < (lesson($1)?.title ?? "")
+                }
+                return $0.start < $1.start
             }
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 9)
-        .frame(width: width, alignment: .topLeading)
-        .frame(height: height, alignment: .topLeading)
-        .background(Color(red: 0.92, green: 0.95, blue: 0.96))
-        .border(Color.secondary.opacity(0.35), width: 0.5)
     }
 }
 
-private struct WeeklyPlanningTimeCell: View {
-    var text: String
-    var width: CGFloat
-    var minHeight: CGFloat
-
-    var body: some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(Color(red: 0.0, green: 0.41, blue: 0.53))
-            .multilineTextAlignment(.leading)
-            .padding(9)
-            .frame(width: width, alignment: .topLeading)
-            // minHeight keeps sparse rows readable; maxHeight lets the border stretch to
-            // match the tallest cell in the row.
-            .frame(minHeight: minHeight, maxHeight: .infinity, alignment: .topLeading)
-            .border(Color.secondary.opacity(0.35), width: 0.5)
-    }
-}
-
-private struct WeeklyPlanningTableCell: View {
+private struct WeeklyDayColumnView: View {
+    var day: Date
     var assignments: [WeeklyLessonAssignment]
-    var width: CGFloat
-    var minHeight: CGFloat
     var selectedAssignmentID: UUID?
-    var lessonTitle: (WeeklyLessonAssignment) -> String
+    var lesson: (WeeklyLessonAssignment) -> LessonRecord?
     var outputLinks: (WeeklyLessonAssignment) -> LessonOutputLinkSet
     var isGeneratingOutput: (WeeklyLessonAssignment, GeneratedOutputKind) -> Bool
     var outputAction: (WeeklyLessonAssignment, GeneratedOutputKind) -> Void
@@ -1361,41 +1398,73 @@ private struct WeeklyPlanningTableCell: View {
     var removeAssignment: (WeeklyLessonAssignment) -> Void
 
     var body: some View {
-        Group {
-            if assignments.isEmpty {
-                Color.clear
-            } else {
-                // A plain VStack, not a nested ScrollView: the cell now grows to fit its
-                // cards, so nothing is clipped and the scroll wheel keeps reaching the
-                // surrounding grid instead of being captured per cell.
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(assignments) { assignment in
-                        WeeklyAssignmentCompactCard(
-                            assignment: assignment,
-                            isSelected: selectedAssignmentID == assignment.id,
-                            title: lessonTitle(assignment),
-                            links: outputLinks(assignment),
-                            isGeneratingOutput: { kind in isGeneratingOutput(assignment, kind) },
-                            outputAction: { kind in outputAction(assignment, kind) },
-                            editAssignment: { editAssignment(assignment) },
-                            removeAssignment: { removeAssignment(assignment) }
-                        )
-                    }
+        DSCard(padding: 0) {
+            VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(day.formatted(.dateTime.weekday(.wide)))
+                        .font(DS.font(16, weight: .semibold))
+                        .foregroundStyle(DS.text)
+                    Text(day.formatted(.dateTime.month().day()))
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.accent800.opacity(0.85))
                 }
-                .padding(8)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(DS.accent100)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(DS.divider).frame(height: 1)
+                }
+
+                ScrollView {
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .trailing, spacing: 10) {
+                            ForEach(assignments) { assignment in
+                                Text(timeLabel(for: assignment))
+                                    .font(DS.font(11))
+                                    .foregroundStyle(DS.neutral600)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 56, alignment: .topTrailing)
+                                    .frame(minHeight: 92, alignment: .topTrailing)
+                                    .padding(.trailing, 8)
+                                    .overlay(alignment: .trailing) {
+                                        Rectangle().fill(DS.accent200).frame(width: 2)
+                                    }
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(assignments) { assignment in
+                                WeeklyAssignmentCompactCard(
+                                    assignment: assignment,
+                                    isSelected: selectedAssignmentID == assignment.id,
+                                    lesson: lesson(assignment),
+                                    links: outputLinks(assignment),
+                                    isGeneratingOutput: { kind in isGeneratingOutput(assignment, kind) },
+                                    outputAction: { kind in outputAction(assignment, kind) },
+                                    editAssignment: { editAssignment(assignment) },
+                                    removeAssignment: { removeAssignment(assignment) }
+                                )
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+                    .padding(14)
+                }
             }
         }
-        .frame(width: width, alignment: .topLeading)
-        .frame(minHeight: minHeight, maxHeight: .infinity, alignment: .topLeading)
-        .border(Color.secondary.opacity(0.35), width: 0.5)
+        .frame(minWidth: 230, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private func timeLabel(for assignment: WeeklyLessonAssignment) -> String {
+        "\(assignment.start.formatted(.dateTime.hour().minute()))\n\(assignment.end.formatted(.dateTime.hour().minute()))"
     }
 }
 
 private struct WeeklyAssignmentCompactCard: View {
     var assignment: WeeklyLessonAssignment
     var isSelected: Bool
-    var title: String
+    var lesson: LessonRecord?
     var links: LessonOutputLinkSet
     var isGeneratingOutput: (GeneratedOutputKind) -> Bool
     var outputAction: (GeneratedOutputKind) -> Void
@@ -1407,27 +1476,32 @@ private struct WeeklyAssignmentCompactCard: View {
             Button(action: editAssignment) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .top, spacing: 6) {
-                        Text(title)
-                            .font(.subheadline.weight(.semibold))
+                        Text(lesson?.title ?? "Lesson no longer available")
+                            .font(DS.font(13.5, weight: .semibold))
                             .lineLimit(2)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(DS.text)
                         Spacer(minLength: 4)
                         Image(systemName: "pencil")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.neutral500)
                     }
 
                     if let notes = assignment.planningNotes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
                         Text(notes)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(DS.font(11))
+                            .foregroundStyle(DS.neutral600)
+                            .lineLimit(2)
+                    } else if let source = lesson?.sourceReferences.first?.trimmingCharacters(in: .whitespacesAndNewlines), !source.isEmpty {
+                        Text(source)
+                            .font(DS.font(11))
+                            .foregroundStyle(DS.neutral600)
                             .lineLimit(2)
                     }
 
                     if assignment.end <= assignment.start {
                         Label("Invalid time", systemImage: "exclamationmark.triangle")
                             .font(.caption2)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(DS.accent2)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -1456,17 +1530,19 @@ private struct WeeklyAssignmentCompactCard: View {
                     .help("Remove from week")
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.neutral500)
             }
             .accessibilityElement(children: .contain)
         }
-        .padding(7)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(isSelected ? Color.accentColor.opacity(0.12) : Color.white.opacity(0.001))
+        .background(isSelected ? DS.accent100 : DS.neutral100)
+        .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
         .overlay {
-            RoundedRectangle(cornerRadius: 4)
-                .stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.18), lineWidth: isSelected ? 1.5 : 0.5)
+            RoundedRectangle(cornerRadius: DS.radiusMD)
+                .stroke(isSelected ? DS.accent : DS.divider, lineWidth: isSelected ? 1.5 : 1)
         }
+        .dsLiftOnHover()
     }
 }
 
@@ -1477,26 +1553,49 @@ private struct WeeklyAssignmentOutputControlsView: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            outputButton("Plan", kind: .lessonPlanHTML, isReady: links.lessonPlanHTML != nil)
-            outputButton("Deck", kind: .slideDeckPPTX, isReady: links.slideDeckPPTX != nil)
-            outputButton("Guide", kind: .differentiationGuideHTML, isReady: links.differentiationGuideHTML != nil)
+            outputButton("P", fullTitle: "Plan", systemImage: "doc.text", kind: .lessonPlanHTML, isReady: links.lessonPlanHTML != nil)
+            outputButton("D", fullTitle: "Deck", systemImage: "rectangle.stack", kind: .slideDeckPPTX, isReady: links.slideDeckPPTX != nil)
+            outputButton("G", fullTitle: "Guide", systemImage: "person.2", kind: .differentiationGuideHTML, isReady: links.differentiationGuideHTML != nil)
         }
-        .font(.caption2)
+        .fixedSize(horizontal: true, vertical: false)
     }
 
-    private func outputButton(_ title: String, kind: GeneratedOutputKind, isReady: Bool) -> some View {
+    private func outputButton(
+        _ abbreviation: String,
+        fullTitle: String,
+        systemImage: String,
+        kind: GeneratedOutputKind,
+        isReady: Bool
+    ) -> some View {
         Button {
             action(kind)
         } label: {
-            Label(title, systemImage: isGenerating(kind) ? "clock" : (isReady ? "checkmark.circle" : "plus.circle"))
+            HStack(spacing: 3) {
+                Image(systemName: isGenerating(kind) ? "clock" : (isReady ? "checkmark.circle.fill" : systemImage))
+                    .font(.system(size: 9, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                Text(abbreviation)
+                    .font(DS.font(10, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
+            }
+            .frame(width: 32, height: 24)
+            .contentShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 5)
-        .padding(.vertical, 2)
-        .background(isReady ? Color.green.opacity(0.10) : Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 4))
-        .foregroundStyle(isReady ? Color.green : Color.accentColor)
+        .background(outputBackground(isReady: isReady), in: RoundedRectangle(cornerRadius: 7))
+        .overlay {
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(isReady ? Color.green.opacity(0.38) : DS.accent200, lineWidth: 1)
+        }
+        .foregroundStyle(isReady ? Color.green : DS.accent700)
         .disabled(isGenerating(kind))
-        .help(isReady ? "Open \(title)" : "Generate \(title)")
+        .help(isReady ? "Open \(fullTitle)" : "Generate \(fullTitle)")
+        .accessibilityLabel(isReady ? "Open \(fullTitle)" : "Generate \(fullTitle)")
+    }
+
+    private func outputBackground(isReady: Bool) -> Color {
+        isReady ? Color.green.opacity(0.10) : DS.surface
     }
 }
 
@@ -2243,6 +2342,10 @@ struct ConfigurationSummaryView: View {
     @State private var unitAssessmentWindowsText = ""
     @State private var unitNotes = ""
     @State private var skippedDayDate = Date.now
+    @State private var snapshotName = ""
+    @State private var selectedSnapshotID: UUID?
+    @State private var isShowingClearConfirmation = false
+    @State private var progressActionMessage: String?
 
     var body: some View {
         Form {
@@ -2263,6 +2366,67 @@ struct ConfigurationSummaryView: View {
                 Text("Use the profile button at the top of the app to create or switch local test teachers.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+            Section("Progress safety") {
+                Text("Save a restorable local copy before clearing imported documents, lesson records, and planner entries.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    TextField("Snapshot name", text: $snapshotName)
+                    Button("Save current progress") {
+                        store.saveCurrentProgressSnapshot(named: snapshotName)
+                        snapshotName = ""
+                        selectedSnapshotID = store.progressSnapshots.first?.id
+                        progressActionMessage = "Current progress saved."
+                    }
+                }
+                if store.progressSnapshots.isEmpty {
+                    Text("No saved progress yet.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Saved progress", selection: Binding(
+                        get: { selectedSnapshotID ?? store.progressSnapshots.first?.id },
+                        set: { selectedSnapshotID = $0 }
+                    )) {
+                        ForEach(store.progressSnapshots) { snapshot in
+                            Text("\(snapshot.displayName) • \(snapshot.savedAt, format: .dateTime.month().day().hour().minute())")
+                                .tag(Optional(snapshot.id))
+                        }
+                    }
+                    Button("Reload saved progress") {
+                        guard let selectedSnapshot else { return }
+                        store.restoreProgressSnapshot(selectedSnapshot)
+                        selectedSnapshotID = selectedSnapshot.id
+                        progressActionMessage = "Saved progress reloaded."
+                    }
+                    .disabled(selectedSnapshot == nil)
+                }
+                Button("Clear documents and entries", role: .destructive) {
+                    isShowingClearConfirmation = true
+                }
+                Text("Clearing keeps the local profile and workspace shell, but removes imported documents, lessons, generated-output history, current daily plan, current weekly planner, registered source folders, and course pacing.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                if let progressActionMessage {
+                    Label(progressActionMessage, systemImage: "checkmark.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(Color.green)
+                }
+            }
+            .confirmationDialog(
+                "Clear all documents and entries?",
+                isPresented: $isShowingClearConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Clear documents, lessons, and planners", role: .destructive) {
+                    store.clearCurrentDocumentsAndEntries()
+                    progressActionMessage = "Documents, lessons, and planner entries cleared."
+                    selectedPacingUnitID = nil
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will wipe the current profile's imported documents, lessons, generated-output history, daily plan, weekly planner, registered source folders, and pacing model. Save current progress first if you may need to reload it.")
             }
             if let configuration = store.configuration {
                 LabeledContent("Workspace", value: configuration.workspaceName)
@@ -2539,6 +2703,11 @@ struct ConfigurationSummaryView: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var selectedSnapshot: PlanningProgressSnapshot? {
+        let id = selectedSnapshotID ?? store.progressSnapshots.first?.id
+        return store.progressSnapshots.first { $0.id == id }
     }
 
     private func chooseOutputFolder() {

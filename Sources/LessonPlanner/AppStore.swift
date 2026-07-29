@@ -28,6 +28,7 @@ final class AppStore: ObservableObject {
     @Published private(set) var mostRecentLessonID: UUID?
     @Published private(set) var importedSources: [ImportedSource] = []
     @Published private(set) var generatedOutputs: [GeneratedOutputRecord] = []
+    @Published private(set) var progressSnapshots: [PlanningProgressSnapshot] = []
     @Published private(set) var teacherProfiles: [TeacherProfile] = []
     @Published private(set) var activeTeacherProfileID: UUID?
     @Published private(set) var slideDeckAvailability: SlideDeckAvailability
@@ -126,6 +127,10 @@ final class AppStore: ObservableObject {
     }
 
     func reload() {
+        reload(syncReadableDocuments: true)
+    }
+
+    private func reload(syncReadableDocuments: Bool) {
         do {
             teacherProfiles = try repository.loadTeacherProfiles()
             activeTeacherProfileID = try repository.loadActiveTeacherProfileID()
@@ -137,8 +142,11 @@ final class AppStore: ObservableObject {
             lessons = try repository.loadLessons()
             importedSources = try repository.loadImportedSources()
             generatedOutputs = try repository.loadGeneratedOutputs()
+            progressSnapshots = try repository.loadProgressSnapshots()
             lastError = nil
-            syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: false)
+            if syncReadableDocuments {
+                syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: false)
+            }
         } catch {
             lastError = error.localizedDescription
         }
@@ -164,6 +172,76 @@ final class AppStore: ObservableObject {
             try repository.saveActiveTeacherProfileID(profile?.id)
             activeTeacherProfileID = profile?.id
             reload()
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func saveCurrentProgressSnapshot(named name: String? = nil) {
+        let snapshotName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let snapshot = PlanningProgressSnapshot(
+            id: UUID(),
+            name: snapshotName?.isEmpty == false ? snapshotName! : "Saved progress",
+            savedAt: .now,
+            configuration: configuration,
+            dailyPlan: dailyPlan,
+            weeklyPlan: weeklyPlan,
+            lessons: lessons,
+            importedSources: importedSources,
+            generatedOutputs: generatedOutputs
+        )
+        do {
+            try repository.saveProgressSnapshot(snapshot)
+            progressSnapshots = try repository.loadProgressSnapshots()
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func restoreProgressSnapshot(_ snapshot: PlanningProgressSnapshot) {
+        do {
+            if let configuration = snapshot.configuration {
+                try repository.saveConfiguration(configuration)
+            }
+            try repository.saveDailyPlan(snapshot.dailyPlan)
+            try repository.saveWeeklyPlan(snapshot.weeklyPlan)
+            try repository.saveLessons(snapshot.lessons)
+            try repository.saveImportedSources(snapshot.importedSources)
+            try repository.saveGeneratedOutputs(snapshot.generatedOutputs)
+            reload(syncReadableDocuments: false)
+            weeklyPlan = snapshot.weeklyPlan
+            dailyPlan = snapshot.dailyPlan
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func clearCurrentDocumentsAndEntries() {
+        if var configuration {
+            configuration.sourceRegistrations = []
+            configuration.coursePacingPlan = nil
+            configuration.updatedAt = .now
+            self.configuration = configuration
+            saveConfiguration()
+        }
+        dailyPlan = .empty()
+        weeklyPlan = .empty(for: weeklyPlan.weekOf)
+        lessons = []
+        mostRecentLessonID = nil
+        importedSources = []
+        generatedOutputs = []
+        lastPresentationTemplatePlaceholderResolution = []
+
+        saveDailyPlan()
+        saveWeeklyPlan()
+        do {
+            try repository.saveLessons([])
+            try repository.saveImportedSources([])
+            try repository.saveGeneratedOutputs([])
+            progressSnapshots = try repository.loadProgressSnapshots()
+            lastError = nil
         } catch {
             lastError = error.localizedDescription
         }

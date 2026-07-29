@@ -170,6 +170,146 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertNil(store.configuration)
     }
 
+    @MainActor
+    func testAppStoreSavesAndRestoresCurrentProgressSnapshot() throws {
+        let repository = try makeRepository()
+        let workspace = repository.rootURL.appending(path: "workspace")
+        let source = ImportedSource(
+            id: UUID(),
+            reference: FileReference(url: URL(fileURLWithPath: "/tmp/Scope.pdf")),
+            setupRole: .pacingGuide,
+            extractionMethod: .embeddedText,
+            confidence: nil,
+            extractedText: "Unit 1\nLesson 1: Place value",
+            reviewStatus: .reviewed,
+            importedAt: .now,
+            updatedAt: .now
+        )
+        var configuration = AppConfiguration(
+            workspaceName: "Snapshot Workspace",
+            workspaceReference: FileReference(url: workspace),
+            sourceRegistrations: [
+                SourceRegistration(
+                    id: UUID(),
+                    displayName: "Sources",
+                    kind: .curriculum,
+                    reference: FileReference(url: URL(fileURLWithPath: "/tmp/sources")),
+                    notes: "",
+                    addedAt: .now
+                )
+            ],
+            coursePacingPlan: CoursePacingPlan.starter(from: [source])
+        )
+        configuration.coursePacingPlan?.reviewStatus = .approved
+        var lesson = LessonRecord.draft(title: "Place value")
+        lesson.status = .approved
+        try repository.saveConfiguration(configuration)
+        try repository.saveLessons([lesson])
+        try repository.saveImportedSources([source])
+        try repository.saveGeneratedOutputs([
+            GeneratedOutputRecord(
+                id: UUID(),
+                lessonRecordID: lesson.id,
+                kind: .lessonPlanHTML,
+                displayName: "place-value.html",
+                filePath: "/tmp/place-value.html",
+                templateDisplayName: nil,
+                createdAt: .now
+            )
+        ])
+
+        let store = AppStore(repository: repository)
+        store.addTask(title: "Prepare manipulatives")
+        store.addScheduleBlock(title: "Math", start: .now, end: Date.now.addingTimeInterval(1_800), type: "Instruction")
+        XCTAssertEqual(store.weeklyPlan.assignments.count, 1)
+        store.saveCurrentProgressSnapshot(named: "Before reset")
+        let snapshot = try XCTUnwrap(store.progressSnapshots.first)
+
+        store.clearCurrentDocumentsAndEntries()
+        XCTAssertTrue(store.lessons.isEmpty)
+        XCTAssertTrue(store.importedSources.isEmpty)
+        XCTAssertTrue(store.generatedOutputs.isEmpty)
+        XCTAssertTrue(store.dailyPlan.tasks.isEmpty)
+        XCTAssertTrue(store.weeklyPlan.assignments.isEmpty)
+
+        store.restoreProgressSnapshot(snapshot)
+
+        XCTAssertEqual(store.lessons.map(\.title), ["Place value"])
+        XCTAssertEqual(store.importedSources.map(\.reference.displayName), ["Scope.pdf"])
+        XCTAssertEqual(store.generatedOutputs.map(\.displayName), ["place-value.html"])
+        XCTAssertEqual(store.dailyPlan.tasks.map(\.title), ["Prepare manipulatives"])
+        XCTAssertEqual(store.dailyPlan.scheduleBlocks.map(\.title), ["Math"])
+        XCTAssertEqual(store.weeklyPlan.assignments.count, 1)
+        XCTAssertEqual(store.configuration?.sourceRegistrations.map(\.displayName), ["Sources"])
+        XCTAssertEqual(store.configuration?.coursePacingPlan?.reviewStatus, .approved)
+    }
+
+    @MainActor
+    func testAppStoreClearsCurrentDocumentsAndEntriesButKeepsWorkspaceShell() throws {
+        let repository = try makeRepository()
+        let workspace = repository.rootURL.appending(path: "workspace")
+        let source = ImportedSource(
+            id: UUID(),
+            reference: FileReference(url: URL(fileURLWithPath: "/tmp/Scope.pdf")),
+            setupRole: .pacingGuide,
+            extractionMethod: .embeddedText,
+            confidence: nil,
+            extractedText: "Unit 1",
+            reviewStatus: .reviewed,
+            importedAt: .now,
+            updatedAt: .now
+        )
+        var lesson = LessonRecord.draft(title: "Community helpers")
+        lesson.status = .approved
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Clear Workspace",
+            workspaceReference: FileReference(url: workspace),
+            outputFolderReference: FileReference(url: repository.rootURL.appending(path: "outputs")),
+            sourceRegistrations: [
+                SourceRegistration(
+                    id: UUID(),
+                    displayName: "Sources",
+                    kind: .curriculum,
+                    reference: FileReference(url: URL(fileURLWithPath: "/tmp/sources")),
+                    notes: "",
+                    addedAt: .now
+                )
+            ],
+            coursePacingPlan: CoursePacingPlan.starter(from: [source])
+        ))
+        try repository.saveLessons([lesson])
+        try repository.saveImportedSources([source])
+        try repository.saveGeneratedOutputs([
+            GeneratedOutputRecord(
+                id: UUID(),
+                lessonRecordID: lesson.id,
+                kind: .slideDeckPPTX,
+                displayName: "deck.pptx",
+                filePath: "/tmp/deck.pptx",
+                templateDisplayName: nil,
+                createdAt: .now
+            )
+        ])
+
+        let store = AppStore(repository: repository)
+        store.addTask(title: "Print handouts")
+        store.addWeeklyAssignment(lessonID: lesson.id, date: store.weeklyPlan.weekOf, start: .now, end: Date.now.addingTimeInterval(1_800))
+        store.clearCurrentDocumentsAndEntries()
+
+        XCTAssertEqual(store.configuration?.workspaceName, "Clear Workspace")
+        XCTAssertEqual(store.configuration?.outputFolderReference?.displayName, "outputs")
+        XCTAssertTrue(store.configuration?.sourceRegistrations.isEmpty == true)
+        XCTAssertNil(store.configuration?.coursePacingPlan)
+        XCTAssertTrue(store.lessons.isEmpty)
+        XCTAssertTrue(store.importedSources.isEmpty)
+        XCTAssertTrue(store.generatedOutputs.isEmpty)
+        XCTAssertTrue(store.dailyPlan.tasks.isEmpty)
+        XCTAssertTrue(store.weeklyPlan.assignments.isEmpty)
+        XCTAssertTrue(try repository.loadLessons().isEmpty)
+        XCTAssertTrue(try repository.loadImportedSources().isEmpty)
+        XCTAssertTrue(try repository.loadGeneratedOutputs().isEmpty)
+    }
+
     func testCoursePacingStarterExtractsReviewedSetupStructure() throws {
         let source = ImportedSource(
             id: UUID(),

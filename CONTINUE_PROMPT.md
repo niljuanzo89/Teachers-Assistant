@@ -65,7 +65,8 @@ xcodebuild -project LessonPlanner.xcodeproj -scheme LessonPlanner \
 ```
 
 Baseline is **101 tests passing**. The project is under git — `git log --oneline` for the
-current commit history (7 commits as of this handoff, most recent `f7f921a`).
+current commit history. As of this handoff, the latest committed redesign work is Batch A;
+Batch B This Week changes are verified but still awaiting owner visual approval before commit.
 
 Use a second model (Codex, via the `codex-bridge` skill) only when an independent opinion is
 genuinely valuable — e.g. an unfamiliar file format's exact rules, or a correctness review of
@@ -104,7 +105,7 @@ a finished diff — not as a routine step.
 
 ## Where things stand
 
-**Recently completed and verified (through Batch 007):**
+**Recently completed and verified (through Batch 011):**
 
 - Weekly planning grid: rows size to their tallest cell (88pt floor), nearby start times
   cluster into one row via the tested `WeeklyGridLayout` type. Visually confirmed.
@@ -123,28 +124,51 @@ a finished diff — not as a routine step.
   with me up front rather than assumed. Screenshot:
   `Design Screenshots/2026-07-29/09-today-sunrise-redesign.png`. Design reference preserved
   at `Design Reference/warm-morning-2026-07-29/`.
+- **"Sunrise Planner" visual redesign, Batch B (This Week) — implemented, verified, and
+  captured after reboot; awaiting owner visual approval.** The stale PID 23296 blocker is no
+  longer active after reboot. A first real capture exposed horizontal clipping, so
+  `WorkspaceView.swift` was corrected to make the weekly board the full-width primary surface
+  and move weekly tools below it. Re-verified afterward: `swift build` passed, `swift test
+  --disable-sandbox --scratch-path /private/tmp/lessonplanner-build -Xswiftc -gnone` passed
+  101 tests and real `xcodebuild` succeeded. Corrected screenshot:
+  `Design Screenshots/2026-07-29/10-this-week-sunrise-redesign.png`.
+- **Batch B polish (This Week output buttons) — implemented and visually captured; awaiting
+  owner approval.** Owner said the Plan/Deck/Guide text wrapping was visually problematic and
+  generated outputs stayed orange after click. `WeeklyAssignmentOutputControlsView` now uses
+  compact fixed-size icon + letter chips (`P`, `D`, `G`), with green check styling for
+  generated/openable outputs and light outlined orange styling for pending outputs. Full
+  hover help/accessibility labels preserve meaning. Verification: 101 tests passed and
+  Xcode build succeeded. Screenshot:
+  `Design Screenshots/2026-07-29/11-this-week-output-button-fix.png`. Failed stale-window
+  artifact remains at `10-capture-failed-old-stuck-instance.png` and must not be used as
+  proof.
+- **Progress safety controls — implemented and verified; visual confirmation still needed.**
+  Workspace now has a "Progress safety" section to save current progress, reload a saved
+  progress snapshot, and clear documents/entries behind a destructive confirmation dialog.
+  Clear wipes imported documents, lessons, generated-output history, current daily plan,
+  current weekly planner, registered source folders, and course pacing while keeping the
+  local profile/workspace/output folder shell. It does not delete generated files from disk.
+  Snapshot restore deliberately skips readable-document auto-sync so reloading is exact.
+  Verification: 103 tests passed and Xcode build succeeded.
 
-**This is a deliberate pause point, not a finished feature.** This Week, Planning Preview,
-Document Intake, and Workspace still use the *original* stock-SwiftUI look. I asked to pause
-after the Today screen so I could review it before the same treatment rolls out further.
+**This is a deliberate pause point, not a finished feature.** Planning Preview, Document
+Intake, and Workspace still use the *original* stock-SwiftUI look. Do not move to them until
+This Week has been visually captured and approved.
 
 ## Start here
 
-1. **Ask me directly whether the Today screen redesign looks right**, or whether I have
-   feedback first. Don't assume approval — I paused here specifically to look at it. If you
-   want the screenshot again, it's at
-   `Design Screenshots/2026-07-29/09-today-sunrise-redesign.png`, or launch the app:
+1. **Ask me to visually approve the latest This Week screenshot and the new Workspace
+   Progress safety section** before making more UI
+   redesign changes:
 
-   ```sh
-   open -n /private/tmp/LessonPlannerDerivedData/Build/Products/Debug/LessonPlanner.app \
-     --env LESSONPLANNER_DESIGN_CAPTURE=1 --env LESSONPLANNER_INITIAL_TAB=today
-   ```
+   `Design Screenshots/2026-07-29/11-this-week-output-button-fix.png`
 
-   (Rebuild first if `/private/tmp/LessonPlannerDerivedData` is stale or missing — it doesn't
-   survive a reboot.)
+   Mention that the output actions now use compact P/D/G icon chips to avoid wrapping, and
+   generated outputs turn green rather than staying orange. Also mention that the new
+   Progress safety controls are functionally verified but have not yet had owner visual QA.
 
-2. **If I approve or give feedback that doesn't change the approach**: continue with Batch B
-   of the redesign — This Week — following
+2. **If I approve or give feedback that doesn't change the approach**: continue with Batch C
+   of the redesign — Planning Preview — following
    `/Users/nils/.claude/plans/snuggly-brewing-elephant.md`'s described rollout (foundation is
    already built; each remaining batch re-skins one/two screens onto it). Declare compute
    level and model shape first, as always.

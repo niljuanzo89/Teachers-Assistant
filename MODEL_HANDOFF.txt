@@ -1,5 +1,5 @@
 LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
-Last updated: 2026-07-29 (through Batch 007)
+Last updated: 2026-07-29 (through Batch 011)
 
 PURPOSE OF THIS DOCUMENT
 
@@ -101,9 +101,11 @@ Main files:
 
 - Sources/LessonPlanner/Views/WorkspaceView.swift
   Main SwiftUI workspace. Contains the five screens (Today, This Week, Planning Preview,
-  Document Intake, Workspace) and their top-level chrome. The Today screen and the top
-  nav/profile band now use the new "Sunrise Planner" design system (see section 4); the other
-  four screens are still the original stock-SwiftUI look, pending Batches B–D.
+  Document Intake, Workspace) and their top-level chrome. The Today screen and top
+  nav/profile band are visually confirmed in the "Sunrise Planner" design system. The This
+  Week screen has Batch B code implemented, build/test verified, and captured from the real
+  current build after reboot; it is awaiting owner visual approval before the next screen.
+  Planning Preview, Document Intake, and Workspace still need the same treatment.
 
 - Sources/LessonPlanner/Views/DesignSystem.swift
   New as of Batch 007. The "Sunrise Planner" design-system layer: warm color tokens, radii,
@@ -154,8 +156,10 @@ Design screenshot folder:
 /Users/nils/Documents/Program Development Folder/LessonPlanner/Design Screenshots/
 
 Contains dated subfolders — 2026-07-28/ (original UI, pre-redesign baseline) and 2026-07-29/
-(intrinsic-row-height weekly-grid confirmation, and 09-today-sunrise-redesign.png — the first
-redesigned screen).
+(intrinsic-row-height weekly-grid confirmation, 09-today-sunrise-redesign.png,
+10-this-week-sunrise-redesign.png, and 11-this-week-output-button-fix.png). The file
+10-capture-failed-old-stuck-instance.png is intentionally a failed stale-window artifact and
+must not be treated as proof of a current screen.
 
 Design reference folder (new as of Batch 007):
 
@@ -180,8 +184,12 @@ Local app shell:
 - Local testing profiles to simulate multiple users without real login/cloud infrastructure.
 - Active local profile banner to reduce testing confusion.
 - Local profile creation/switching panel.
+- Progress safety controls in Workspace: save current progress to a local snapshot, reload a
+  saved snapshot, and clear the active profile's documents/lessons/planner entries behind a
+  destructive confirmation dialog. Clear keeps profile/workspace/output folder shell intact
+  and currently removes generated-output history without deleting generated files from disk.
 
-Visual design ("Sunrise Planner" redesign, in progress as of Batch 007):
+Visual design ("Sunrise Planner" redesign, in progress as of Batch 011):
 
 - A warm, rounded, serif visual language (color tokens, shadows, typography) is implemented
   in Sources/LessonPlanner/Views/DesignSystem.swift, recreating the owner's design handoff
@@ -194,8 +202,25 @@ Visual design ("Sunrise Planner" redesign, in progress as of Batch 007):
 - Done and visually confirmed: the custom top nav bar + profile band (replacing the native
   TabView chrome) and the full Today screen (card-grid periods, notepad-styled full-height
   checklist).
-- Not yet re-skinned: This Week, Planning Preview, Document Intake, Workspace — still the
-  original stock-SwiftUI look. This is a deliberate stop point; see section 13.
+- Code implemented, build/test verified, and captured after reboot: This Week. It now uses a
+  board-first five-day layout with day cards, time rails, lesson cards, and real Plan/Deck/
+  Guide output actions; weekly controls are preserved below the board in warm tool cards.
+  Owner feedback on the original text-heavy Plan/Deck/Guide chips was addressed in Batch 010:
+  output actions are now fixed-size icon + letter chips with green check styling for
+  generated/openable outputs and light outlined orange styling for pending outputs. Stop for
+  owner visual approval before moving on.
+- Not yet re-skinned: Planning Preview, Document Intake, Workspace. Do not start them until
+  the owner visually confirms the This Week screen.
+
+Progress snapshots:
+
+- `PlanningProgressSnapshot` captures the active profile's configuration, daily plan, weekly
+  plan, lessons, imported sources, and generated-output history.
+- Snapshots are saved locally by `LocalRepository` under the active profile's
+  `progress-snapshots/` folder.
+- `AppStore.restoreProgressSnapshot(_:)` uses a reload path that skips readable-document
+  auto-sync; this is intentional so restoring a snapshot is exact and does not duplicate
+  assignments already stored in the snapshot.
 
 Document intake:
 
@@ -443,7 +468,10 @@ something else ("Id a task") in a screenshot.
 
 - Visual PDF content, handwriting, diagrams, and some fraction/equation formatting are not reliably extracted. OCR/math/diagram understanding remains a future source-quality pipeline.
 - Weekly package generation can create/link missing outputs, but OS-level notifications are not implemented.
-- Visual redesign ("Sunrise Planner") is in progress: Today screen and top-level chrome are done and visually confirmed; This Week, Planning Preview, Document Intake, and Workspace still use the original stock-SwiftUI look. See section 4 and section 13.
+- Visual redesign ("Sunrise Planner") is in progress: Today screen and top-level chrome are
+  done and visually confirmed; This Week code is implemented and build/test verified but
+  blocked on visual confirmation; Planning Preview, Document Intake, and Workspace still use
+  the original stock-SwiftUI look. See section 4 and section 13.
 - Weekly planner rows size to their tallest cell, so nothing is clipped and sparse rows collapse. Very dense cells will make a row tall; if that becomes a problem the answer is a different overflow pattern (collapsed cards with click-to-expand, a detail drawer, or an agenda view), NOT a return to fixed row heights.
 - Local teacher profiles are test scaffolding only, not real accounts. Real login, user assignment, cloud sync, permissions, and admin roles are future infrastructure work.
 - Native PowerPoint exporter is functional but generic/minimal. It does not yet preserve or fill real customer-owned PowerPoint layouts — `PowerPointTemplateInspector.resolvePlaceholders(url:)` (Batch 005) is a prerequisite building block for that, not yet consumed by the exporter itself.
@@ -454,7 +482,7 @@ something else ("Id a task") in a screenshot.
 
 8. VERIFICATION STATUS
 
-Current baseline (as of Batch 007): `swift test -Xswiftc -gnone` — 101 tests passed, 0
+Current baseline (as of Batch 008): `swift test -Xswiftc -gnone` — 101 tests passed, 0
 failures. Real `xcodebuild` (not just SwiftPM) also passes and has been re-confirmed after
 every new source file added this session (WeeklyGridLayout.swift, DesignSystem.swift).
 
@@ -472,6 +500,9 @@ summary here. Headlines:
   Real customer-template visual confirmation still needed from the owner.
 - Batch 007: design-system foundation + Today screen redesign; 101/101 tests unaffected
   (pure View-layer change); visually confirmed with live data via `computer-use`.
+- Batch 008: This Week redesign code pass; 101/101 tests passed and real `xcodebuild`
+  succeeded, but visual confirmation is blocked by stale PID 23296 owning the visible app
+  window.
 
 Known environment gotchas:
 
@@ -526,29 +557,32 @@ System Events/Accessibility is not needed and has historically been unavailable.
 
 10. NEXT HUMAN NEEDED ACTIONS
 
-1. Review the Today screen redesign (Design Screenshots/2026-07-29/09-today-sunrise-redesign.png)
-   and say go/no-go/adjust before Batches B–D (This Week, Planning Preview, Document Intake,
-   Workspace) continue the same visual treatment.
-2. Register a real customer-owned `.pptx` template (through the interactive file picker) and
+1. Clear the stale old LessonPlanner instance (PID 23296). It survived `kill -9` during
+   Batch 008 and still owns the only visible app window. A reboot is likely the cleanest fix.
+2. After reboot/clear, launch the current build on This Week and visually confirm the Batch B
+   redesign before continuing to Planning Preview.
+3. Review the Today screen screenshot if needed:
+   Design Screenshots/2026-07-29/09-today-sunrise-redesign.png.
+4. Register a real customer-owned `.pptx` template (through the interactive file picker) and
    click "Inspect presentation template" to visually confirm the new "Placeholder inheritance"
    list — this project's own generated decks can't exercise it, since they don't use
    placeholders.
-3. Inspect a generated PowerPoint deck in Microsoft PowerPoint.
-4. Upload/open a generated deck in Google Slides for compatibility review.
-5. Decide whether the weekly planner still needs a dedicated overflow pattern for very dense
+5. Inspect a generated PowerPoint deck in Microsoft PowerPoint.
+6. Upload/open a generated deck in Google Slides for compatibility review.
+7. Decide whether the weekly planner still needs a dedicated overflow pattern for very dense
    blocks now that rows grow to fit (collapsed cards with click-to-expand, a detail drawer, or
    a separate agenda view — internal per-cell scroll has been tried and removed; do not reach
    for it again).
-6. Decide whether OS-level notifications are required beyond the in-app weekly prompt.
+8. Decide whether OS-level notifications are required beyond the in-app weekly prompt.
 
 
 11. NEXT IMPLEMENTATION STEPS
 
 Likely next development sequence, in the owner's stated priority order as of 2026-07-29:
 
-1. Continue the "Sunrise Planner" redesign — Batches B (This Week), C (Planning Preview),
-   D (Document Intake + Workspace) — once the owner has reviewed Batch A (this session's
-   Today-screen work). Follow the plan at
+1. Visually confirm the Batch B This Week redesign after clearing the stale app process.
+   If approved, continue the "Sunrise Planner" redesign with Batch C (Planning Preview),
+   then Batch D (Document Intake + Workspace), following
    /Users/nils/.claude/plans/snuggly-brewing-elephant.md.
 2. Layout-preserving PowerPoint export: use `PowerPointTemplateInspector.resolvePlaceholders(url:)`
    (Batch 005/006) to actually place approved-lesson content into a customer-owned template's
@@ -592,25 +626,26 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 007), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 008), the app has a working local-first prototype path:
 
 document/folder import -> automatic role sorting and pacing scaffold -> weekly planner
 population -> interactive weekly lesson cells -> lesson plan/deck/differentiation guide
 outputs -> weekly hub package -> (new, not yet exporter-integrated) template placeholder
 inheritance resolution for customer-owned PowerPoint templates.
 
-The project is paused mid-way through the "Sunrise Planner" visual redesign, at a deliberate
-checkpoint the owner asked for: the design-system foundation and the Today screen are done,
-committed, and visually confirmed; This Week, Planning Preview, Document Intake, and
-Workspace are unchanged, waiting on the owner's review of the Today screen before continuing
-with the same treatment (Batches B–D, see section 11).
+The project is paused mid-way through the "Sunrise Planner" visual redesign. The design-system
+foundation and Today screen are done, committed, and visually confirmed. The This Week screen
+has uncommitted Batch B code that builds and passes tests, but visual confirmation is blocked
+by the stale old LessonPlanner PID 23296. Planning Preview, Document Intake, and Workspace are
+unchanged and should wait until This Week is visually approved.
 
 Immediate next session should:
 
-1. Read CONTINUITY_LOG.md's Batch 007 entry and this document's sections 4/11/13 for full
+1. Read CONTINUITY_LOG.md's Batch 008 entry and this document's sections 4/11/13 for full
    context — do not re-derive the font/icon/staging decisions, they're already made.
-2. Ask the owner whether the Today screen redesign looked right, or whether they have
-   feedback to fold in before continuing.
-3. If green-lit, propose Batch B (This Week) — compute/model-shape declaration, following the
-   same DesignSystem.swift foundation already built.
-4. Otherwise, address whatever feedback the owner gives on the Today screen first.
+2. Ask the owner to reboot or otherwise clear the stale old LessonPlanner process if it is
+   still present.
+3. Relaunch the current build with `LESSONPLANNER_INITIAL_TAB=week`, capture the real This
+   Week screen, and ask for visual confirmation.
+4. If green-lit, propose Batch C (Planning Preview) — compute/model-shape declaration,
+   following the same DesignSystem.swift foundation already built.

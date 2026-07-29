@@ -739,6 +739,23 @@ struct AppConfiguration: Codable, Equatable {
     var updatedAt: Date = .now
 }
 
+struct PlanningProgressSnapshot: Codable, Equatable, Identifiable {
+    var id: UUID
+    var name: String
+    var savedAt: Date
+    var configuration: AppConfiguration?
+    var dailyPlan: DailyPlan
+    var weeklyPlan: WeeklyPlan
+    var lessons: [LessonRecord]
+    var importedSources: [ImportedSource]
+    var generatedOutputs: [GeneratedOutputRecord]
+
+    var displayName: String {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedName.isEmpty ? "Saved progress" : trimmedName
+    }
+}
+
 enum LessonStatus: String, Codable, CaseIterable {
     case draft, reviewed, approved, generated
 }

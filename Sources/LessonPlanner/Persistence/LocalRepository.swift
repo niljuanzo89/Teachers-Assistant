@@ -17,6 +17,8 @@ protocol LocalRepositoryProtocol {
     func saveImportedSources(_ sources: [ImportedSource]) throws
     func loadGeneratedOutputs() throws -> [GeneratedOutputRecord]
     func saveGeneratedOutputs(_ outputs: [GeneratedOutputRecord]) throws
+    func loadProgressSnapshots() throws -> [PlanningProgressSnapshot]
+    func saveProgressSnapshot(_ snapshot: PlanningProgressSnapshot) throws
 }
 
 private struct ActiveTeacherProfileSelection: Codable, Equatable {
@@ -99,6 +101,23 @@ struct LocalRepository: LocalRepositoryProtocol {
 
     func saveGeneratedOutputs(_ outputs: [GeneratedOutputRecord]) throws {
         try save(outputs, to: dataRootURL().appending(path: "generated-outputs.json"))
+    }
+
+    func loadProgressSnapshots() throws -> [PlanningProgressSnapshot] {
+        let snapshotsURL = try dataRootURL().appending(path: "progress-snapshots")
+        guard FileManager.default.fileExists(atPath: snapshotsURL.path) else { return [] }
+        let files = try FileManager.default.contentsOfDirectory(
+            at: snapshotsURL,
+            includingPropertiesForKeys: nil
+        )
+        return try files
+            .filter { $0.pathExtension == "json" }
+            .compactMap { try load(PlanningProgressSnapshot.self, from: $0) }
+            .sorted { $0.savedAt > $1.savedAt }
+    }
+
+    func saveProgressSnapshot(_ snapshot: PlanningProgressSnapshot) throws {
+        try save(snapshot, to: dataRootURL().appending(path: "progress-snapshots/\(snapshot.id.uuidString).json"))
     }
 
     private func dataRootURL() throws -> URL {
