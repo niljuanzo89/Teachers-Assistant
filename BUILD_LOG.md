@@ -911,3 +911,18 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   directly creating duplicate schedule blocks.
 - Verification: full Swift test suite passed 105 tests with 0 failures; real Xcode build
   succeeded.
+
+### 2026-07-29 — Two-stage document intake gate
+
+- Split the Document Intake workflow into two explicit lanes: Planning and Content.
+- Planning imports now cover daily schedules, pacing guides, curriculum maps, calendars, and
+  assessment schedules. Content imports cover lesson packets, unit lessons, worksheets,
+  activities, and teacher guides.
+- Added a schedule-scaffold readiness signal based on readable daily schedule time blocks.
+  The Content import button is disabled until at least one daily schedule block is detected.
+- Content imports are now forced into the `lessonMaterial` role once unlocked, so a unit
+  packet cannot accidentally become a governing planning document.
+- Added regression coverage for the new gate: content import is refused before a daily
+  schedule exists, then unlocks after a planning import detects a schedule block.
+- Verification: full Swift test suite passed 107 tests with 0 failures; real Xcode build
+  succeeded.

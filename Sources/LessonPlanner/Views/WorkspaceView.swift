@@ -313,6 +313,18 @@ struct SourceImportView: View {
         ImportedSourceIntakeReport.analyze(store.importedSources)
     }
 
+    private var planningSources: [ImportedSource] {
+        store.importedSources.filter { $0.effectiveSetupRole.intakeCategory == .planning }
+    }
+
+    private var contentSources: [ImportedSource] {
+        store.importedSources.filter { $0.effectiveSetupRole.intakeCategory == .content }
+    }
+
+    private var otherSources: [ImportedSource] {
+        store.importedSources.filter { $0.effectiveSetupRole.intakeCategory == .other }
+    }
+
     fileprivate init(selectedTab: Binding<WorkspaceTab>) {
         _selectedTab = selectedTab
     }
@@ -327,19 +339,43 @@ struct SourceImportView: View {
                             .foregroundStyle(DS.text)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer()
-                        Button("Add\ndocuments…") { chooseDocumentItems() }
-                            .buttonStyle(.dsPrimary)
-                            .multilineTextAlignment(.center)
                     }
                     .padding([.horizontal, .top], 18)
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Choose PDF or Word documents together, or select a folder.")
+                        Text("Start with planning documents, then add lesson content.")
                             .font(DS.font(14))
                             .foregroundStyle(DS.text)
-                        Text("Readable files are sorted automatically and used to update pacing and this week's plan.")
+                        Text("Content unlocks after a readable daily schedule is detected, so lessons can land in the right subject blocks.")
                             .font(DS.font(13))
                             .foregroundStyle(DS.neutral700)
+                    }
+                    .padding(.horizontal, 18)
+
+                    VStack(spacing: 10) {
+                        DocumentIntakeStepCard(
+                            number: "1",
+                            title: "Planning",
+                            detail: "Daily schedules, pacing guides, curriculum maps, and calendars.",
+                            status: intakeReport.hasScheduleScaffold ? "\(intakeReport.scheduleBlockCount) schedule block(s) detected" : "Daily schedule needed",
+                            systemImage: "calendar.badge.clock",
+                            isReady: intakeReport.hasScheduleScaffold,
+                            buttonTitle: "Add planning files…"
+                        ) {
+                            chooseDocumentItems(.planning)
+                        }
+                        DocumentIntakeStepCard(
+                            number: "2",
+                            title: "Content",
+                            detail: "Lesson packets, unit lessons, worksheets, activities, and teacher guides.",
+                            status: intakeReport.hasScheduleScaffold ? "Ready for lesson content" : "Locked until schedule is set",
+                            systemImage: "doc.text",
+                            isReady: intakeReport.hasScheduleScaffold,
+                            buttonTitle: "Add content files…",
+                            isDisabled: !intakeReport.hasScheduleScaffold
+                        ) {
+                            chooseDocumentItems(.content)
+                        }
                     }
                     .padding(.horizontal, 18)
 
@@ -350,15 +386,25 @@ struct SourceImportView: View {
 
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 10) {
-                            ForEach(store.importedSources, id: \.id) { source in
-                                ImportedSourceRow(
-                                    source: source,
-                                    isSelected: selectedSourceID == source.id
-                                ) {
-                                    selectedSourceID = source.id
-                                    loadSelection(source.id)
-                                }
+                            SourceSection(title: "Planning", sources: planningSources, selectedSourceID: selectedSourceID) { id in
+                                selectedSourceID = id
+                                loadSelection(id)
                             }
+                            SourceSection(title: "Content", sources: contentSources, selectedSourceID: selectedSourceID) { id in
+                                selectedSourceID = id
+                                loadSelection(id)
+                            }
+                            SourceSection(title: "Other", sources: otherSources, selectedSourceID: selectedSourceID) { id in
+                                selectedSourceID = id
+                                loadSelection(id)
+                            }
+                            if store.importedSources.isEmpty {
+                                Text("No files imported yet.")
+                                    .font(DS.font(13))
+                                    .foregroundStyle(DS.neutral700)
+                                    .padding(.horizontal, 4)
+                                    .padding(.top, 4)
+                                }
                         }
                         .padding(.horizontal, 14)
                         .padding(.bottom, 18)
@@ -506,7 +552,7 @@ struct SourceImportView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
                 IntakeStatePanel(hasImports: !store.importedSources.isEmpty, report: intakeReport) {
-                    chooseDocumentItems()
+                    chooseDocumentItems(.planning)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -530,17 +576,33 @@ struct SourceImportView: View {
         }
     }
 
-    private func chooseDocumentItems() {
+    private enum IntakeUploadKind {
+        case planning
+        case content
+    }
+
+    private func chooseDocumentItems(_ kind: IntakeUploadKind) {
+        if kind == .content, !store.hasImportedScheduleScaffold {
+            actionMessage = "Add a readable daily schedule before importing lesson content."
+            return
+        }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = true
         panel.allowedContentTypes = supportedDocumentTypes + [.folder]
         if panel.runModal() == .OK {
-            store.importDocumentItems(panel.urls)
+            switch kind {
+            case .planning:
+                store.importPlanningDocumentItems(panel.urls)
+            case .content:
+                store.importContentDocumentItems(panel.urls)
+            }
             selectedSourceID = store.importedSources.first?.id
             loadSelection(selectedSourceID)
-            actionMessage = "Documents added. Readable setup documents updated pacing and this week's planner."
+            actionMessage = kind == .planning
+                ? "Planning documents added. The app checked for a daily schedule scaffold."
+                : "Content documents added. Lessons were placed into available schedule blocks."
         }
     }
 
@@ -620,6 +682,57 @@ private struct ImportedSourceRoleSummaryView: View {
     }
 }
 
+private struct DocumentIntakeStepCard: View {
+    var number: String
+    var title: String
+    var detail: String
+    var status: String
+    var systemImage: String
+    var isReady: Bool
+    var buttonTitle: String
+    var isDisabled = false
+    var action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(isReady ? DS.accent100 : DS.neutral100)
+                        .frame(width: 36, height: 36)
+                    Text(number)
+                        .font(DS.font(15, weight: .bold))
+                        .foregroundStyle(isReady ? DS.accent700 : DS.neutral700)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(title, systemImage: systemImage)
+                        .font(DS.font(15.5, weight: .semibold))
+                        .foregroundStyle(DS.text)
+                    Text(detail)
+                        .font(DS.font(12.5))
+                        .foregroundStyle(DS.neutral700)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+            }
+            Text(status)
+                .font(DS.font(12.5, weight: .semibold))
+                .foregroundStyle(isReady ? DS.accent700 : DS.accent2_700)
+            Button(buttonTitle, action: action)
+                .buttonStyle(.dsPrimary)
+                .disabled(isDisabled)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isDisabled ? DS.neutral100.opacity(0.68) : DS.accent100.opacity(0.52))
+        .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.radiusMD)
+                .stroke(isReady ? DS.accent300 : DS.divider, lineWidth: 1)
+        }
+    }
+}
+
 private struct FlowRoleCounts: View {
     var report: ImportedSourceIntakeReport
 
@@ -631,6 +744,33 @@ private struct FlowRoleCounts: View {
                     Text("\(role.displayName): \(count)")
                         .font(DS.font(12))
                         .foregroundStyle(DS.neutral700)
+                }
+            }
+        }
+    }
+}
+
+private struct SourceSection: View {
+    var title: String
+    var sources: [ImportedSource]
+    var selectedSourceID: UUID?
+    var select: (UUID) -> Void
+
+    var body: some View {
+        if !sources.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title)
+                    .font(DS.font(12, weight: .bold))
+                    .foregroundStyle(DS.neutral700)
+                    .textCase(.uppercase)
+                    .padding(.horizontal, 4)
+                ForEach(sources, id: \.id) { source in
+                    ImportedSourceRow(
+                        source: source,
+                        isSelected: selectedSourceID == source.id
+                    ) {
+                        select(source.id)
+                    }
                 }
             }
         }
@@ -687,15 +827,15 @@ private struct IntakeStatePanel: View {
                         .font(.system(size: 42, weight: .semibold))
                         .foregroundStyle(hasImports ? DS.accent700 : DS.accent600)
                 }
-                Text(hasImports ? "All set for this week" : "Choose setup documents")
+                Text(hasImports ? "Planning documents found" : "Start with planning")
                     .font(DS.font(28, weight: .semibold))
                     .foregroundStyle(DS.text)
-                Text(hasImports ? report.pacingStatus : "Add pacing guides, curriculum maps, calendars, assessment schedules, and lesson materials from files or a folder.")
+                Text(hasImports ? report.pacingStatus : "Add the daily schedule first, then add pacing guides or curriculum maps. Lesson content unlocks after the schedule scaffold is detected.")
                     .font(DS.font(14))
                     .foregroundStyle(DS.neutral700)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 420)
-                Button(hasImports ? "Add more documents…" : "Add documents…") {
+                Button(hasImports ? "Add planning files…" : "Add planning files…") {
                     chooseDocuments()
                 }
                 .buttonStyle(.dsPrimary)

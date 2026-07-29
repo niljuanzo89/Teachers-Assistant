@@ -235,11 +235,17 @@ Progress snapshots:
 
 Document intake:
 
-- One document intake area.
+- Two-stage document intake area: Planning first, Content second.
 - Accepts PDF and DOCX.
 - Accepts multiple files in one picker.
 - Accepts folders and scans supported files inside them.
-- Sorts imported files into likely setup/planning roles.
+- Sorts imported files into likely planning/content roles.
+- Planning imports include daily schedules, pacing guides, curriculum maps, calendars, and
+  assessment schedules.
+- Content imports include lesson packets, unit lessons, worksheets, activities, and teacher
+  guides.
+- Content import is disabled until at least one readable daily schedule time block is
+  detected, so lessons cannot populate before the schedule scaffold exists.
 - Readable imports are usable by default.
 - Manual text edits/fill-ins remain optional for unreadable or blank content.
 - Document-level teacher approval was intentionally removed because it was too cumbersome.
@@ -637,24 +643,26 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 019), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 020), the app has a working local-first prototype path:
 
-document/folder import -> automatic role sorting and pacing scaffold -> weekly planner
+two-stage document intake -> automatic role sorting and pacing scaffold -> weekly planner
 population -> interactive weekly lesson cells -> lesson plan/deck/differentiation guide
-outputs -> weekly hub package -> (new, not yet exporter-integrated) template placeholder
-inheritance resolution for customer-owned PowerPoint templates.
+outputs -> weekly hub package -> template placeholder inheritance resolution for
+customer-owned PowerPoint templates.
 
 The project is paused mid-way through the "Sunrise Planner" visual redesign. The design-system
 foundation and Today screen are done, committed, and visually confirmed. This Week has been
 reskinned and polished with compact P/D/G output chips. Planning Preview has now been
 reskinned in Batch 012 with a warm lesson sidebar, status tags, collapsible editor cards,
 styled warning/readiness/output controls, and preserved lesson/output behavior. Document
-Intake has been reskinned in Batch 013 with a warm import panel, automatic sorting summary,
-ready-state panel, styled source detail/review cards, and guarded clear/start-over behavior.
+Intake has been reskinned in Batch 013 and then updated in Batch 020 into a two-stage
+workflow: Planning files first, Content files second. Content import is disabled until a
+readable daily schedule time block is detected, so the schedule scaffold exists before lesson
+content populates the planner.
 Workspace is the remaining stock-looking screen, except for the already-added Progress safety
 section.
 
-Local verification for Batch 019: full Swift test suite passed 105 tests with 0 failures;
+Local verification for Batch 020: full Swift test suite passed 107 tests with 0 failures;
 real Xcode build succeeded. Screenshot:
 `Design Screenshots/2026-07-29/15-this-week-output-key.png`.
 
@@ -662,8 +670,8 @@ GitHub status: local branch is `main`; remote is
 `https://github.com/niljuanzo89/Teachers-Assistant.git`; GitHub Desktop successfully
 published the real LessonPlanner project to GitHub after an earlier empty-clone mismatch was
 corrected. Batch 016 pushed Batches 014-016 to GitHub through GitHub Desktop after
-command-line git again failed for missing HTTPS credentials. Batches 017-019 are local
-commits/commit candidates until the next sync cadence.
+command-line git again failed for missing HTTPS credentials. Batches 017-019 were later
+synced; Batch 020 should be committed and then synced according to the approved cadence.
 
 Immediate next session should:
 
@@ -675,13 +683,11 @@ Immediate next session should:
    ported the stronger early slide-deck arc into the supported native exporter; next apply
    `LessonOutputContent` to the lesson-plan and differentiation-guide HTML templates, then
    improve lesson content enrichment from source text.
-4. Preserve the planning-documents vs content-documents boundary from Batch 018: planning
-   documents govern pacing/time, content packets drive the concrete lesson sequence. A
-   subject-specific content packet, such as a math unit, should schedule into the matching
-   subject block only.
-5. Next intake architecture should be multi-step: first ingest/confirm the daily schedule so
-   subject blocks establish the weekly/daily frame, then upload content materials and pacing
-   guides, then populate one lesson per matching subject block per day. Empty blocks should
-   remain subject placeholders with manual teacher entry options.
-4. Use the approved GitHub cadence: commit each verified batch, then push every 2-3 committed
+4. Preserve the two-stage intake boundary from Batch 020: planning documents establish the
+   daily schedule and pacing/time scaffold first; content packets then drive concrete lesson
+   sequence. A subject-specific content packet, such as a math unit, should schedule into the
+   matching subject block only.
+5. Continue the intake architecture by adding teacher-visible schedule confirmation and empty
+   subject placeholders with manual entry options.
+6. Use the approved GitHub cadence: commit each verified batch, then push every 2-3 committed
    batches or before risky/handoff work. If command-line auth fails, use GitHub Desktop.

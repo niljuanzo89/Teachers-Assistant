@@ -90,6 +90,10 @@ final class AppStore: ObservableObject {
         ReleaseReadinessReport.analyze(configuration: configuration, lessons: lessons, generatedOutputs: generatedOutputs)
     }
 
+    var hasImportedScheduleScaffold: Bool {
+        !importedDailyScheduleBlocks(from: importedSources).isEmpty
+    }
+
     var localWorkflowQAReport: LocalWorkflowQAReport {
         LocalWorkflowQAReport.analyze(
             activeTeacherProfile: activeTeacherProfile,
@@ -705,18 +709,22 @@ final class AppStore: ObservableObject {
     }
 
     func importDocument(_ url: URL) {
+        importDocument(url, roleOverride: nil)
+    }
+
+    private func importDocument(_ url: URL, roleOverride: ImportedSourceRole?) {
         let fileExtension = url.pathExtension.lowercased()
         switch fileExtension {
         case "pdf":
-            importPDF(url)
+            importPDF(url, roleOverride: roleOverride)
         case "docx":
-            importDOCX(url)
+            importDOCX(url, roleOverride: roleOverride)
         default:
             lastError = PDFTextExtractionError.unsupportedFileType.localizedDescription
         }
     }
 
-    private func importPDF(_ url: URL) {
+    private func importPDF(_ url: URL, roleOverride: ImportedSourceRole?) {
         guard let document = PDFDocument(url: url) else {
             lastError = PDFTextExtractionError.unreadable.localizedDescription
             return
@@ -738,7 +746,7 @@ final class AppStore: ObservableObject {
         }
         let source = ImportedSource(
             id: UUID(), reference: FileReference(url: url),
-            setupRole: ImportedSourceRole.infer(displayName: url.lastPathComponent, extractedText: extraction.text),
+            setupRole: roleOverride ?? ImportedSourceRole.infer(displayName: url.lastPathComponent, extractedText: extraction.text),
             extractionMethod: extraction.method,
             confidence: extraction.confidence, extractedText: extraction.text,
             reviewStatus: extraction.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .imported : .reviewed,
@@ -748,12 +756,12 @@ final class AppStore: ObservableObject {
         saveImportedSources()
     }
 
-    private func importDOCX(_ url: URL) {
+    private func importDOCX(_ url: URL, roleOverride: ImportedSourceRole?) {
         do {
             let text = try extractDOCXText(from: url)
             let source = ImportedSource(
                 id: UUID(), reference: FileReference(url: url),
-                setupRole: ImportedSourceRole.infer(displayName: url.lastPathComponent, extractedText: text),
+                setupRole: roleOverride ?? ImportedSourceRole.infer(displayName: url.lastPathComponent, extractedText: text),
                 extractionMethod: .embeddedText,
                 confidence: nil, extractedText: text,
                 reviewStatus: .reviewed, importedAt: .now, updatedAt: .now
@@ -773,19 +781,41 @@ final class AppStore: ObservableObject {
         syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: true)
     }
 
+    func importPlanningDocumentItems(_ urls: [URL]) {
+        importDocumentItems(urls, roleOverride: nil, shouldSyncPlanner: true)
+    }
+
+    func importContentDocumentItems(_ urls: [URL]) {
+        guard hasImportedScheduleScaffold else {
+            lastError = "Add a readable daily schedule before importing lesson content."
+            return
+        }
+        importDocumentItems(urls, roleOverride: .lessonMaterial, shouldSyncPlanner: true)
+    }
+
     func importDocumentItems(_ urls: [URL]) {
+        importDocumentItems(urls, roleOverride: nil, shouldSyncPlanner: true)
+    }
+
+    private func importDocumentItems(_ urls: [URL], roleOverride: ImportedSourceRole?, shouldSyncPlanner: Bool) {
         for url in urls {
             var isDirectory: ObjCBool = false
             if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue {
-                importDocumentsInFolder(url)
+                importDocumentsInFolder(url, roleOverride: roleOverride, shouldSyncPlanner: false)
             } else {
-                importDocument(url)
+                importDocument(url, roleOverride: roleOverride)
             }
         }
-        syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: true)
+        if shouldSyncPlanner {
+            syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: true)
+        }
     }
 
     func importDocumentsInFolder(_ folderURL: URL) {
+        importDocumentsInFolder(folderURL, roleOverride: nil, shouldSyncPlanner: true)
+    }
+
+    private func importDocumentsInFolder(_ folderURL: URL, roleOverride: ImportedSourceRole?, shouldSyncPlanner: Bool) {
         let allowedExtensions = Set(["pdf", "docx"])
         guard let enumerator = FileManager.default.enumerator(
             at: folderURL,
@@ -806,9 +836,11 @@ final class AppStore: ObservableObject {
             return
         }
         for url in urls {
-            importDocument(url)
+            importDocument(url, roleOverride: roleOverride)
         }
-        syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: true)
+        if shouldSyncPlanner {
+            syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: true)
+        }
     }
 
     func refreshWeeklyPlannerFromReadableDocuments() {

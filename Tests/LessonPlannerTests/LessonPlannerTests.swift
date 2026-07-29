@@ -2205,6 +2205,50 @@ final class LessonPlannerTests: XCTestCase {
     }
 
     @MainActor
+    func testContentImportRequiresDailyScheduleScaffold() throws {
+        let repository = try makeRepository()
+        let contentURL = repository.rootURL.appending(path: "Math Unit Lessons.docx")
+        try makeDOCX(at: contentURL, paragraphs: [
+            "Unit 1: Place Value",
+            "Monday: Place value review"
+        ])
+        let store = AppStore(repository: repository)
+
+        store.importContentDocumentItems([contentURL])
+
+        XCTAssertEqual(try repository.loadImportedSources().count, 0)
+        XCTAssertEqual(store.lastError, "Add a readable daily schedule before importing lesson content.")
+    }
+
+    @MainActor
+    func testPlanningImportUnlocksContentImportAfterScheduleDetection() throws {
+        let repository = try makeRepository()
+        let scheduleURL = repository.rootURL.appending(path: "Daily Schedule.docx")
+        let contentURL = repository.rootURL.appending(path: "Math Unit Lessons.docx")
+        try makeDOCX(at: scheduleURL, paragraphs: [
+            "Sample Daily Schedule",
+            "9:45 AM - 10:45 AM",
+            "Math"
+        ])
+        try makeDOCX(at: contentURL, paragraphs: [
+            "Unit 1: Place Value",
+            "Monday: Place value review"
+        ])
+        let store = AppStore(repository: repository)
+
+        store.importPlanningDocumentItems([scheduleURL])
+        XCTAssertTrue(store.hasImportedScheduleScaffold)
+
+        store.importContentDocumentItems([contentURL])
+
+        let imported = try repository.loadImportedSources()
+        XCTAssertEqual(imported.count, 2)
+        XCTAssertTrue(imported.contains { $0.reference.displayName == "Daily Schedule.docx" && $0.effectiveSetupRole == .instructionalCalendar })
+        XCTAssertTrue(imported.contains { $0.reference.displayName == "Math Unit Lessons.docx" && $0.effectiveSetupRole == .lessonMaterial })
+        XCTAssertTrue(ImportedSourceIntakeReport.analyze(imported).hasScheduleScaffold)
+    }
+
+    @MainActor
     func testDocumentImportAutomaticallyBuildsWeeklyPlanningScaffold() throws {
         let repository = try makeRepository()
         try repository.saveConfiguration(AppConfiguration(

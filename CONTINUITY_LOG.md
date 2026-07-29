@@ -891,6 +891,47 @@ reality: GitHub Desktop sync works and `main` tracks `origin/main`.
 
 ---
 
+### Batch 020 — 2026-07-29 — Two-stage document intake gate
+
+**Compute:** medium. **Model shape:** single sufficient — focused UI workflow and import
+guardrails.
+
+**Goal.** Make the document intake screen reflect the intended workflow: planning documents
+establish the schedule scaffold first, then content documents populate the matching subject
+blocks.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Reviewed the reported workflow issue | User clarified that planning documents and content documents should be separate categories |
+| 2 | Inspected Document Intake UI | Found one generic "Add documents" path that still encouraged dumping all files in at once |
+| 3 | Inspected import pipeline | Found role inference existed, but content import was not visibly or behaviorally gated by schedule readiness |
+| 4 | Added intake category model | `ImportedSourceRole` now exposes Planning, Content, or Other grouping |
+| 5 | Added schedule-scaffold reporting | Intake report now counts readable daily schedule time blocks |
+| 6 | Exposed schedule readiness in `AppStore` | UI can now ask whether an imported daily schedule scaffold exists |
+| 7 | Split import methods | Added planning import and content import entry points |
+| 8 | Added content gate | Content import now refuses to run until a readable daily schedule block is detected |
+| 9 | Forced content role on content import | Once unlocked, content files are stored as `lessonMaterial` so they drive lesson sequence, not governing schedule |
+| 10 | Reworked Document Intake sidebar | Added separate Planning and Content cards with status text and separate upload buttons |
+| 11 | Grouped imported files visually | Sidebar now lists imported sources under Planning, Content, and Other sections |
+| 12 | Updated empty-state wording | Empty intake panel now directs the teacher to start with planning files, especially daily schedule |
+| 13 | Added regression test for locked content import | Content upload before daily schedule is refused and imports nothing |
+| 14 | Added regression test for unlock flow | Planning schedule import unlocks content import and stores content as lesson material |
+| 15 | Ran full Swift test suite | 107 tests passed, 0 failures |
+| 16 | Ran real Xcode build | BUILD SUCCEEDED |
+| 17 | Updated `BUILD_LOG.md` | Recorded the two-stage intake gate and verification |
+| 18 | Updated `CONTINUITY_LOG.md` | This entry captures rationale, implementation, and tests |
+
+**Outcome.** Document Intake now matches the desired teacher workflow: first upload planning
+documents to establish the daily/weekly structure, then upload content materials. The app no
+longer invites content upload before it knows the daily schedule scaffold.
+
+**Verification.**
+
+- Full Swift test suite passed: 107 tests, 0 failures.
+- Real Xcode build succeeded.
+
+---
+
 ### Batch 018 — 2026-07-29 — Fix subject-block auto-scheduling
 
 **Compute:** medium. **Model shape:** single sufficient — one real scheduling bug with a

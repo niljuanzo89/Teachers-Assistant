@@ -33,6 +33,17 @@ enum ImportedSourceRole: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    var intakeCategory: ImportedSourceIntakeCategory {
+        switch self {
+        case .pacingGuide, .curriculumMap, .instructionalCalendar, .assessmentSchedule:
+            .planning
+        case .lessonMaterial:
+            .content
+        case .other:
+            .other
+        }
+    }
+
     static func infer(displayName: String, extractedText: String) -> ImportedSourceRole {
         let combined = "\(displayName) \(extractedText.prefix(2_000))".lowercased()
 
@@ -56,6 +67,22 @@ enum ImportedSourceRole: String, Codable, CaseIterable, Identifiable {
 
     private static func containsAny(_ needles: [String], in haystack: String) -> Bool {
         needles.contains { haystack.contains($0) }
+    }
+}
+
+enum ImportedSourceIntakeCategory: String, Codable, CaseIterable, Identifiable {
+    case planning
+    case content
+    case other
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .planning: "Planning"
+        case .content: "Content"
+        case .other: "Other"
+        }
     }
 }
 
@@ -801,22 +828,27 @@ struct ImportedSourceIntakeReport: Equatable {
     var totalCount: Int
     var reviewedCount: Int
     var pacingReadyCount: Int
+    var scheduleBlockCount: Int
     var roleCounts: [ImportedSourceRole: Int]
 
     var canBuildCoursePacing: Bool { pacingReadyCount > 0 }
+    var hasScheduleScaffold: Bool { scheduleBlockCount > 0 }
 
     var title: String {
         totalCount == 0 ? "No documents imported yet" : "\(totalCount) document(s) imported"
     }
 
     var pacingStatus: String {
+        if hasScheduleScaffold {
+            return "\(scheduleBlockCount) daily schedule block(s) detected. Content can now be placed into the weekly planner."
+        }
         if canBuildCoursePacing {
-            return "\(pacingReadyCount) readable setup document(s) ready to guide pacing"
+            return "\(pacingReadyCount) readable planning document(s) found. Add a daily schedule so lessons have fixed time blocks."
         }
         if reviewedCount > 0 {
-            return "Readable documents are available, but none are marked as pacing setup yet"
+            return "Readable documents are available, but no daily schedule has been detected yet"
         }
-        return "Import a readable pacing guide, curriculum map, calendar, or assessment schedule to start pacing"
+        return "Import a readable daily schedule and pacing guide to start the planner scaffold"
     }
 
     static func analyze(_ sources: [ImportedSource]) -> ImportedSourceIntakeReport {
@@ -825,12 +857,34 @@ struct ImportedSourceIntakeReport: Equatable {
             roleCounts[source.effectiveSetupRole, default: 0] += 1
         }
         let reviewedSources = sources.filter { !$0.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let scheduleSources = reviewedSources.filter { source in
+            source.effectiveSetupRole == .instructionalCalendar
+                || source.reference.displayName.lowercased().contains("schedule")
+                || source.extractedText.lowercased().contains("sample daily schedule")
+        }
+        let scheduleBlockCount = scheduleSources.reduce(0) { count, source in
+            count + Self.detectScheduleBlockCount(in: source.extractedText)
+        }
         return ImportedSourceIntakeReport(
             totalCount: sources.count,
             reviewedCount: reviewedSources.count,
             pacingReadyCount: reviewedSources.filter { $0.effectiveSetupRole.supportsCoursePacing }.count,
+            scheduleBlockCount: scheduleBlockCount,
             roleCounts: roleCounts
         )
+    }
+
+    private static func detectScheduleBlockCount(in text: String) -> Int {
+        let lines = text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let timePattern = #"^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?\s*[-–]\s*(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?$"#
+        let regex = try? NSRegularExpression(pattern: timePattern)
+        return lines.filter { line in
+            let range = NSRange(line.startIndex..<line.endIndex, in: line)
+            return regex?.firstMatch(in: line, range: range) != nil
+        }.count
     }
 }
 
