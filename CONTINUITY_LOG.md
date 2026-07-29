@@ -425,3 +425,76 @@ never populate the view (no placeholders in them). If you register a real templa
 3. Source-readiness screen — owner priority #2, medium-to-high compute, dual helpful.
 4. Document Intake polish — owner priority #3, low-to-medium compute, single sufficient.
 5. PowerPoint/Google Slides round-trip review of a generated deck — needs the owner directly.
+
+---
+
+### Batch 007 — 2026-07-29 — "Sunrise Planner" redesign, Batch A: foundation + Today screen
+
+**Compute:** high. **Model shape:** single sufficient — a visual/layout implementation with
+the two real technical forks (font, icons) resolved with the owner up front via
+`AskUserQuestion`, so no second-model opinion was needed for the implementation itself.
+
+**Goal.** The owner supplied a complete design handoff (`Warm Morning Lesson Planner.zip`) —
+a warm-toned, rounded, serif redesign of all 5 screens. Given the size, entered plan mode,
+proposed a staged rollout (foundation + one screen first, stop and confirm visually, then the
+remaining 4 screens in later batches), and got explicit plan approval before writing code.
+Full plan preserved at `/Users/nils/.claude/plans/snuggly-brewing-elephant.md`.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Extract and read the design handoff (`README.md`, `Lesson Planner.dc.html`, all 5 reference screenshots) | Full written spec: warm cream/amber/terracotta palette, Source Serif 4 typography, rounded cards, soft interactive shadows, custom top nav replacing native chrome |
+| 2 | Check for bundled font files | None — only a Google Fonts web `@import`, unusable in a native app |
+| 3 | `AskUserQuestion`: font strategy (system serif vs. bundle real Source Serif 4 files) | Owner chose system serif (renders as New York) — zero new assets/licensing |
+| 4 | `AskUserQuestion`: icon strategy (SF Symbols hierarchical vs. hand-drawn duotone shapes) | Owner chose SF Symbols with `.symbolRenderingMode(.hierarchical)` |
+| 5 | Read current `WorkspaceView.swift` chrome, `DailyPlanView`, `DraftLessonView` | Confirmed: 100% stock SwiftUI today; `DailyPlanView`'s existing `HStack` shape already matches the design's Today layout almost exactly — this is a re-skin, not a rebuild |
+| 6 | Write and get approval for a staged implementation plan (Batch A = foundation + Today; B–D = the other 4 screens, each its own future batch) | Approved |
+| 7 | Copy the design handoff into the project as `Design Reference/warm-morning-2026-07-29/` | So Batches B–D don't need the original zip re-supplied |
+| 8 | Create `Sources/LessonPlanner/Views/DesignSystem.swift` — color tokens, radii, shadow/hover-lift modifiers, typography helper, `DSCard`/`DSTag`/`DSPrimaryButtonStyle`/`DSSecondaryButtonStyle`/`DSTextFieldStyle` | New file |
+| 9 | Register the new file in `project.pbxproj` (4-entry pattern, `WeeklyGridLayout.swift` precedent) | Done |
+| 10 | `swift build` — design-system file standalone | Compiled clean |
+| 11 | Replace `WorkspaceView`'s native `TabView` chrome with a custom `SunriseTopNavBar` + restyled `ActiveTeacherProfileBanner`; restyle `WeeklyPlanningPromptBanner` to the warm palette (kept, not dropped — it isn't in the design mock only because that mock's sample state has no due prompt) | Done; `selectedTab` state and `LESSONPLANNER_INITIAL_TAB` behavior preserved exactly |
+| 12 | `swift build` | Compiled clean |
+| 13 | Discover a real functional gap while re-skinning `DailyPlanView`: the design calls for remove buttons (trash icon per period, × per task), but `AppStore` had no `removeScheduleBlock`/`removeTask` methods — only add/toggle | Judged this a necessary small extension, not scope creep — a decorative-only trash icon would be a worse, misleading half-implementation |
+| 14 | Add `AppStore.removeScheduleBlock(_:)` and `removeTask(_:)`, matching the existing add/toggle pattern exactly; extend `addScheduleBlock` with a default-valued `notes:` parameter so the design's "Instruction" field is genuinely teacher-authored data, not a mislabeled duplicate of the subject field | Backward-compatible (default parameter), no persisted-schema change |
+| 15 | Rewrite `DailyPlanView`: `LazyVGrid` of `PeriodCard`s (time/title/instruction/subject tag/trash), restyled add-block form, and a new `ChecklistPanel` (gradient spine, `ChecklistTaskRow` with custom checkbox, strikethrough-when-complete, remove button, 44pt rows with bottom dividers standing in for the design's "ruled paper" background) | Done |
+| 16 | `swift build`, `swift test -Xswiftc -gnone` | Compiled clean; 101/101 tests passed — confirms the View-layer-only boundary held |
+| 17 | Real `xcodebuild` (validates the new pbxproj entries) | BUILD SUCCEEDED; binary timestamp checked against wall clock |
+| 18 | Launch on the Today tab, `activate` + window-ID `screencapture` — initial capture showed an empty periods grid (this profile's `dailyPlan.scheduleBlocks` is genuinely empty, not a bug) and surfaced a real defect: the restyled "Subject" field was pre-filled with the leftover string `"Instruction"` (the original code's default `blockType` value), confusingly duplicating the "Instruction" field's placeholder above it | Fixed: default `blockType` to `""` |
+| 19 | Used `computer-use` (owner granted access) to actually type into the running app and add a real period + task, to see populated-state rendering rather than just the empty state — first attempt sent all typed text into one field (clicks were outrunning SwiftUI's focus-change timing); added short waits between click and type, which fixed it | Confirmed: period card, subject tag, checklist row, checked/strikethrough state, and hover-lift all render correctly |
+| 20 | Captured the final permanent screenshot to `Design Screenshots/2026-07-29/09-today-sunrise-redesign.png`; cleaned up scratch files and all launched app instances (one old, already-stuck zombie process from a much earlier session — pid 23296, "SX" state, unkillable even with `-9` — was left alone; it predates this batch and is unrelated) | Done |
+
+**Outcome.** The foundation (`DesignSystem.swift`) and the Today screen are fully re-skinned
+and match the design handoff's intent closely: warm palette, serif typography via system
+New York, rounded cards with hover-lift shadows, notepad-styled checklist with gradient spine,
+custom top nav with active-state styling, restyled profile band and weekly-prompt banner.
+All 101 existing tests unaffected. Two small, deliberate `AppStore` additions
+(`removeScheduleBlock`, `removeTask`, plus an `addScheduleBlock` default parameter) were made
+mid-batch to keep the design's interactive affordances real rather than decorative — outside
+the plan's original "no AppStore changes" line, but a natural, low-risk necessity discovered
+during implementation, not a new scope decision requiring a stop.
+
+**Dead ends / gotchas worth keeping.**
+
+- `computer-use` clicks immediately followed by `type` in the same batch can outrun SwiftUI's
+  AppKit focus-change timing — all typed text lands in whatever field was focused *before*
+  the click. Insert a short `wait` (~0.3s) between a `left_click` that changes focus and the
+  `type` that follows it.
+- A blinking text-field caret can visually merge with the first letter of placeholder text in
+  a screenshot, making it misread (e.g. "Add a task" briefly reading as "Id a task"). Not a
+  bug — re-screenshot after the field loses focus (or after the blink cycles) before concluding
+  there's a real text-rendering defect.
+- `open_application`/generic app-name activation can grab the wrong one of several
+  same-bundle-ID running instances (e.g. an old stuck process). When multiple `LessonPlanner`
+  processes are running, `osascript -e 'tell application "LessonPlanner" to activate'` (proven
+  in Batch 004) is more reliable than `computer-use`'s `open_application` for targeting the
+  specific freshly-launched instance.
+
+**Still open — this is a checkpoint, not "done."**
+
+1. **Batches B–D** (This Week, Planning Preview, Document Intake, Workspace) — not started.
+   Per the plan, stop here and confirm the Today screen with the owner before continuing.
+2. Layout-preserving exporter path using resolved placeholder frames — unrelated prior work,
+   still not started.
+3. Source-readiness screen — owner priority #2.
+4. Document Intake polish — owner priority #3 (will likely be partly satisfied by Batch C).
+5. PowerPoint/Google Slides round-trip review — needs the owner directly.

@@ -158,3 +158,21 @@ see it — this project's own generated decks have no placeholders to show.
 2. Visual confirmation of the new "Placeholder inheritance" list against a real template.
 3. A layout-preserving exporter path that actually uses the resolved placeholder frames —
    not started.
+
+## "Sunrise Planner" visual redesign (Batch 007, in progress)
+
+The owner supplied a full design handoff (warm/rounded/serif reskin of all 5 screens),
+preserved at `Design Reference/warm-morning-2026-07-29/`. Plan at
+`/Users/nils/.claude/plans/snuggly-brewing-elephant.md`. Font: system serif (New York), not
+bundled Source Serif 4. Icons: SF Symbols with `.symbolRenderingMode(.hierarchical)`, not
+hand-drawn shapes. Both confirmed with the owner.
+
+**Done:** foundation (`Sources/LessonPlanner/Views/DesignSystem.swift` — `DS` color/radius/
+shadow tokens, `DSCard`, `DSTag`, button/text-field styles) and the Today screen, fully
+re-skinned and visually confirmed
+(`Design Screenshots/2026-07-29/09-today-sunrise-redesign.png`). All 101 tests still pass —
+this is a View-layer-only change.
+
+**Not started:** This Week, Planning Preview, Document Intake, Workspace. Per the plan, this
+was a deliberate stop point — confirm the Today screen with the owner before continuing to
+the rest, rather than redesigning all 5 screens before any feedback.

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-private enum WorkspaceTab: Hashable {
+private enum WorkspaceTab: CaseIterable, Hashable {
     case today, week, planning, sourceImport, workspace
 
     static var initialDesignCaptureTab: WorkspaceTab {
@@ -14,6 +14,26 @@ private enum WorkspaceTab: Hashable {
         default: .today
         }
     }
+
+    var title: String {
+        switch self {
+        case .today: "Today"
+        case .week: "This Week"
+        case .planning: "Planning Preview"
+        case .sourceImport: "Document Intake"
+        case .workspace: "Workspace"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .today: "sun.max"
+        case .week: "calendar"
+        case .planning: "list.clipboard"
+        case .sourceImport: "tray.and.arrow.down"
+        case .workspace: "square.stack.3d.up"
+        }
+    }
 }
 
 struct WorkspaceView: View {
@@ -22,7 +42,8 @@ struct WorkspaceView: View {
     @State private var isShowingProfileManager = false
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 0) {
+            SunriseTopNavBar(selectedTab: $selectedTab)
             ActiveTeacherProfileBanner {
                 isShowingProfileManager = true
             }
@@ -33,29 +54,84 @@ struct WorkspaceView: View {
                 } dismiss: {
                     store.markWeeklyPlanningPromptHandled()
                 }
+                .padding(.horizontal, 28)
+                .padding(.top, 16)
             }
-            TabView(selection: $selectedTab) {
-                DailyPlanView()
-                    .tabItem { Label("Today", systemImage: "calendar") }
-                    .tag(WorkspaceTab.today)
-                WeeklyPlannerView()
-                    .tabItem { Label("This Week", systemImage: "calendar.badge.clock") }
-                    .tag(WorkspaceTab.week)
-                DraftLessonView()
-                    .tabItem { Label("Planning Preview", systemImage: "doc.text") }
-                    .tag(WorkspaceTab.planning)
-                SourceImportView(selectedTab: $selectedTab)
-                    .tabItem { Label("Document Intake", systemImage: "doc.viewfinder") }
-                    .tag(WorkspaceTab.sourceImport)
-                ConfigurationSummaryView()
-                    .tabItem { Label("Workspace", systemImage: "folder") }
-                    .tag(WorkspaceTab.workspace)
-            }
+            selectedContent
+                .padding(28)
         }
-        .padding(20)
+        .background(DS.bg)
         .sheet(isPresented: $isShowingProfileManager) {
             LocalTeacherProfileManagerSheet()
                 .environmentObject(store)
+        }
+    }
+
+    @ViewBuilder
+    private var selectedContent: some View {
+        switch selectedTab {
+        case .today: DailyPlanView()
+        case .week: WeeklyPlannerView()
+        case .planning: DraftLessonView()
+        case .sourceImport: SourceImportView(selectedTab: $selectedTab)
+        case .workspace: ConfigurationSummaryView()
+        }
+    }
+}
+
+/// The persistent top navigation bar from the 2026-07-29 "Sunrise Planner" redesign — replaces
+/// the app's native `TabView` chrome with the design's custom mark + wordmark + nav-button row.
+private struct SunriseTopNavBar: View {
+    @Binding var selectedTab: WorkspaceTab
+
+    var body: some View {
+        HStack(spacing: 24) {
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 11)
+                        .fill(LinearGradient(colors: [DS.accent, DS.accent2], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 34, height: 34)
+                    Image(systemName: "sun.max.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(DS.bg)
+                        .font(.system(size: 15))
+                }
+                Text("Sunrise Planner")
+                    .font(DS.font(19, weight: .semibold))
+                    .foregroundStyle(DS.text)
+            }
+            Spacer(minLength: 12)
+            HStack(spacing: 6) {
+                ForEach(WorkspaceTab.allCases, id: \.self) { tab in
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: tab.systemImage)
+                                .symbolRenderingMode(.hierarchical)
+                                .font(.system(size: 14))
+                            Text(tab.title)
+                                .font(DS.font(14, weight: .semibold))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 9)
+                        .background(selectedTab == tab ? DS.accent : Color.clear)
+                        .foregroundStyle(selectedTab == tab ? DS.bg : DS.neutral700)
+                        .clipShape(RoundedRectangle(cornerRadius: DS.radiusSM))
+                        .shadow(
+                            color: selectedTab == tab ? DS.ShadowLevel.sm.color : .clear,
+                            radius: DS.ShadowLevel.sm.radius, x: 0, y: DS.ShadowLevel.sm.y
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 16)
+        .background(DS.surface)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(DS.divider).frame(height: 1)
         }
     }
 }
@@ -66,23 +142,36 @@ private struct ActiveTeacherProfileBanner: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: store.activeTeacherProfile == nil ? "person.crop.circle" : "person.crop.circle.badge.checkmark")
-                .foregroundStyle(store.activeTeacherProfile == nil ? Color.secondary : Color.accentColor)
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(colors: [DS.accent, DS.accent2], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 38, height: 38)
+                Text(avatarInitial)
+                    .font(DS.font(16, weight: .semibold))
+                    .foregroundStyle(DS.bg)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.activeTeacherProfile?.displayName ?? "Unprofiled local data")
-                    .font(.headline)
+                    .font(DS.font(15, weight: .semibold))
+                    .foregroundStyle(DS.text)
                 Text(profileDetail)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(DS.font(12))
+                    .foregroundStyle(DS.accent800.opacity(0.85))
             }
             Spacer()
             Button(store.activeTeacherProfile == nil ? "Set up profile" : "Switch profile") {
                 openProfileManager()
             }
+            .buttonStyle(.dsSecondary)
         }
-        .padding(10)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 28)
+        .padding(.vertical, 12)
+        .background(DS.accent100)
+    }
+
+    private var avatarInitial: String {
+        let name = store.activeTeacherProfile?.displayName
+        return name?.first.map { String($0).uppercased() } ?? "?"
     }
 
     private var profileDetail: String {
@@ -178,24 +267,29 @@ private struct WeeklyPlanningPromptBanner: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "bell.badge")
-                .foregroundStyle(Color.accentColor)
+            Image(systemName: "bell.badge.fill")
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(DS.accent700)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Weekly planning prompt")
-                    .font(.headline)
+                    .font(DS.font(14, weight: .semibold))
+                    .foregroundStyle(DS.accent900)
                 if let duePromptDate = store.weeklyPlanningPromptStatus.duePromptDate {
                     Text("It is time to prepare the weekly package for \(duePromptDate, format: .dateTime.weekday(.wide).month().day().hour().minute()).")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(DS.font(12))
+                        .foregroundStyle(DS.accent800.opacity(0.85))
                 }
             }
             Spacer()
-            Button("Open weekly planner", action: openWeeklyPlanner)
-            Button("Dismiss", action: dismiss)
+            Button("Open weekly planner", action: openWeeklyPlanner).buttonStyle(.dsSecondary)
+            Button("Dismiss", action: dismiss).buttonStyle(.dsSecondary)
         }
-        .padding(12)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(14)
+        .background(DS.accent100)
+        .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.radiusMD).stroke(DS.accent300, lineWidth: 1)
+        }
     }
 }
 
@@ -480,65 +574,196 @@ private struct SourceReadinessView: View {
 struct DailyPlanView: View {
     @EnvironmentObject private var store: AppStore
     @State private var blockTitle = ""
-    @State private var blockType = "Instruction"
+    @State private var blockType = ""
+    @State private var blockInstruction = ""
     @State private var start = Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: .now) ?? .now
     @State private var end = Calendar.current.date(bySettingHour: 8, minute: 45, second: 0, of: .now) ?? .now
     @State private var taskTitle = ""
 
     var body: some View {
-        HStack(alignment: .top, spacing: 28) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Today")
-                    .font(.largeTitle.bold())
-                Text(store.dailyPlan.date, format: .dateTime.weekday(.wide).month().day())
-                    .foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 24) {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    Text("Today's periods")
+                        .font(DS.font(26, weight: .semibold))
+                        .foregroundStyle(DS.text)
+                    Spacer()
+                    Text(store.dailyPlan.date, format: .dateTime.weekday(.wide).month().day())
+                        .font(DS.font(13))
+                        .foregroundStyle(DS.neutral600)
+                }
 
-                GroupBox("Schedule") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(store.dailyPlan.scheduleBlocks) { block in
-                            HStack {
-                                Text(block.start, format: .dateTime.hour().minute())
-                                    .monospacedDigit()
-                                Text(block.title).bold()
-                                Spacer()
-                                Text(block.type).foregroundStyle(.secondary)
-                            }
-                        }
-                        Divider()
-                        TextField("Block title", text: $blockTitle)
-                        TextField("Block type", text: $blockType)
-                        HStack {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 16)], spacing: 16) {
+                    ForEach(store.dailyPlan.scheduleBlocks) { block in
+                        PeriodCard(block: block) { store.removeScheduleBlock(block) }
+                    }
+                }
+
+                DSCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        TextField("Block title", text: $blockTitle).textFieldStyle(.ds)
+                        TextField("Instruction", text: $blockInstruction).textFieldStyle(.ds)
+                        HStack(spacing: 12) {
+                            TextField("Subject", text: $blockType).textFieldStyle(.ds).frame(width: 140)
                             DatePicker("Start", selection: $start, displayedComponents: .hourAndMinute)
+                                .frame(width: 150)
                             DatePicker("End", selection: $end, displayedComponents: .hourAndMinute)
+                                .frame(width: 150)
+                            Spacer()
                             Button("Add") {
                                 let title = blockTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                                 guard !title.isEmpty else { return }
-                                store.addScheduleBlock(title: title, start: start, end: end, type: blockType)
+                                store.addScheduleBlock(title: title, start: start, end: end, type: blockType, notes: blockInstruction)
                                 blockTitle = ""
+                                blockInstruction = ""
                             }
+                            .buttonStyle(.dsPrimary)
                         }
                     }
-                    .padding(4)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Checklist").font(.title2.bold())
-                ForEach(store.dailyPlan.tasks) { task in
-                    Toggle(isOn: Binding(
-                        get: { task.status == .complete },
-                        set: { _ in store.toggleTask(task) }
-                    )) {
-                        Text(task.title)
-                    }
+            ChecklistPanel(taskTitle: $taskTitle)
+                .frame(width: 300)
+        }
+    }
+}
+
+private struct PeriodCard: View {
+    var block: ScheduleBlock
+    var remove: () -> Void
+
+    var body: some View {
+        DSCard(liftsOnHover: true) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("\(block.start.formatted(.dateTime.hour().minute())) – \(block.end.formatted(.dateTime.hour().minute()))")
+                    .font(DS.font(12, weight: .semibold))
+                    .foregroundStyle(DS.accent700)
+                Text(block.title)
+                    .font(DS.font(16, weight: .semibold))
+                    .foregroundStyle(DS.text)
+                if !block.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(block.notes)
+                        .font(DS.font(13))
+                        .foregroundStyle(DS.neutral700)
                 }
                 HStack {
-                    TextField("Add a task", text: $taskTitle)
-                    Button("Add") { store.addTask(title: taskTitle); taskTitle = "" }
+                    DSTag(text: block.type, variant: .accent)
+                    Spacer()
+                    Button(action: remove) {
+                        Image(systemName: "trash")
+                            .symbolRenderingMode(.hierarchical)
+                            .font(.system(size: 12))
+                            .foregroundStyle(DS.neutral500)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Remove this period")
                 }
             }
-            .frame(width: 300, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// The Today screen's full-height, notepad-styled checklist — the design's single most
+/// distinctive layout element (an 8pt gradient "spine" evoking a notepad binding, and a
+/// ruled-paper task list where every row is exactly 44pt tall to align with the rule lines).
+private struct ChecklistPanel: View {
+    @EnvironmentObject private var store: AppStore
+    @Binding var taskTitle: String
+
+    var body: some View {
+        DSCard(padding: 0) {
+            HStack(spacing: 0) {
+                Rectangle()
+                    .fill(LinearGradient(colors: [DS.accent, DS.accent2], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 8)
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "pencil")
+                            .symbolRenderingMode(.hierarchical)
+                        Text("Checklist")
+                            .font(DS.font(20, weight: .semibold))
+                    }
+                    .foregroundStyle(DS.text)
+                    .padding(20)
+
+                    HStack(spacing: 8) {
+                        TextField("Add a task", text: $taskTitle).textFieldStyle(.ds)
+                        Button("Add") {
+                            store.addTask(title: taskTitle)
+                            taskTitle = ""
+                        }
+                        .buttonStyle(.dsPrimary)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
+
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(store.dailyPlan.tasks) { task in
+                                ChecklistTaskRow(
+                                    task: task,
+                                    toggle: { store.toggleTask(task) },
+                                    remove: { store.removeTask(task) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+}
+
+private struct ChecklistTaskRow: View {
+    var task: DailyTask
+    var toggle: () -> Void
+    var remove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button(action: toggle) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(task.status == .complete ? DS.accent : DS.surface)
+                        .frame(width: 20, height: 20)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 7).stroke(DS.divider, lineWidth: 1)
+                        }
+                    if task.status == .complete {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(DS.bg)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .help("Mark task complete")
+
+            Text(task.title)
+                .font(DS.font(14))
+                .foregroundStyle(task.status == .complete ? DS.neutral600 : DS.text)
+                .strikethrough(task.status == .complete)
+                .opacity(task.status == .complete ? 0.5 : 1)
+                .lineLimit(2)
+
+            Spacer(minLength: 4)
+
+            Button(action: remove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(DS.neutral500)
+            }
+            .buttonStyle(.plain)
+            .help("Remove task")
+        }
+        .padding(.horizontal, 20)
+        .frame(minHeight: 44)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(DS.divider).frame(height: 1)
         }
     }
 }

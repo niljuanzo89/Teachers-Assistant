@@ -684,3 +684,39 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   section correctly absent when no template is registered. The actual placeholder-inheritance
   list has not been visually confirmed — it needs a real customer-owned `.pptx` registered
   through the interactive file picker, which the owner needs to do.
+
+### 2026-07-29 — "Sunrise Planner" redesign, Batch A: foundation + Today screen
+
+- The owner supplied a full design handoff (warm-toned, rounded, serif reskin of all 5
+  screens), preserved in the project at `Design Reference/warm-morning-2026-07-29/`.
+- Entered plan mode given the scope; proposed and got approval for a staged rollout —
+  foundation + one screen first, confirm visually, then the remaining 4 screens as later
+  batches. Plan at `/Users/nils/.claude/plans/snuggly-brewing-elephant.md`.
+- Two technical forks resolved with the owner before implementation: typography uses
+  SwiftUI's system serif (New York) rather than bundling the actual Source Serif 4 files
+  (not included in the handoff — only a Google Fonts web import, unusable natively); icons
+  stay SF Symbols with `.symbolRenderingMode(.hierarchical)` rather than hand-drawn shapes.
+- Added `Sources/LessonPlanner/Views/DesignSystem.swift`: the `DS` namespace (warm palette,
+  radii, shadow + hover-lift modifiers, serif typography helper) and reusable `DSCard`,
+  `DSTag`, `DSPrimaryButtonStyle`/`DSSecondaryButtonStyle`, `DSTextFieldStyle`.
+- Replaced `WorkspaceView`'s native `TabView` chrome with a custom top nav bar and restyled
+  the existing profile band and weekly-planning-prompt banner to the warm palette — same
+  functionality, new visual language.
+- Fully re-skinned the Today screen: periods became a card grid (`PeriodCard`), the checklist
+  became a notepad-styled full-height panel (`ChecklistPanel`/`ChecklistTaskRow`) with a
+  gradient spine and ruled-row dividers.
+- Discovered mid-implementation that the design's remove affordances (trash icon per period,
+  × per task) had no backing `AppStore` methods — added `removeScheduleBlock`/`removeTask`
+  and a default-valued `notes:` parameter on `addScheduleBlock`, matching the existing add/
+  toggle pattern exactly. Small, deliberate, backward-compatible additions, not a schema
+  change — needed so the redesign's buttons are real, not decorative.
+- Visually confirmed with real data (using owner-granted `computer-use` access to type into
+  the running app) against the handoff's reference screenshot; caught and fixed one real bug
+  along the way (a leftover default value made the restyled "Subject" field show
+  "Instruction" instead of being empty). Screenshot saved to
+  `Design Screenshots/2026-07-29/09-today-sunrise-redesign.png`.
+- `swift test -Xswiftc -gnone`: 101 tests passed, 0 failures — unaffected, confirming this was
+  a View-layer-only change. Real `xcodebuild`: BUILD SUCCEEDED (new file registered in
+  `project.pbxproj`).
+- This Week, Planning Preview, Document Intake, and Workspace are not yet re-skinned — a
+  deliberate stop point to confirm the approach with the owner before continuing.

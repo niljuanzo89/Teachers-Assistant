@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/broadsheet-a6f96984-e199-4c49-9e81-c97d9c75cda4/styles.css">
+<script src="_ds/broadsheet-a6f96984-e199-4c49-9e81-c97d9c75cda4/_ds_bundle.js"></script>
+<style>
+:root{
+  --color-bg:#faf1e2;
+  --color-surface:#fffaf1;
+  --color-text:#2f2415;
+  --color-accent:#dd7e2c;
+  --color-accent-2:#d1573f;
+  --color-divider: color-mix(in srgb, #2f2415 14%, transparent);
+  --color-neutral-100:#fbf6ee;
+  --color-neutral-200:#f2e9d9;
+  --color-neutral-300:#e3d6c0;
+  --color-neutral-400:#cdbc9e;
+  --color-neutral-500:#ab9878;
+  --color-neutral-600:#8a765a;
+  --color-neutral-700:#6b5a42;
+  --color-neutral-800:#493d2c;
+  --color-neutral-900:#2c2417;
+  --color-accent-100:#fdecd2;
+  --color-accent-200:#fbd9a8;
+  --color-accent-300:#f6c078;
+  --color-accent-400:#eda552;
+  --color-accent-500:#e08a3c;
+  --color-accent-600:#c96f28;
+  --color-accent-700:#a85720;
+  --color-accent-800:#7c3f19;
+  --color-accent-900:#4a2510;
+  --color-accent-2-100:#fbe2da;
+  --color-accent-2-200:#f6c4b4;
+  --color-accent-2-300:#eea08a;
+  --color-accent-2-400:#e07c60;
+  --color-accent-2-500:#d1573f;
+  --color-accent-2-600:#b23f2b;
+  --color-accent-2-700:#8f2f20;
+  --color-accent-2-800:#642015;
+  --color-accent-2-900:#3a130c;
+  --radius-sm:10px;
+  --radius-md:14px;
+  --radius-lg:22px;
+  --shadow-sm:0 1px 2px rgba(120,72,20,0.10);
+  --shadow-md:0 10px 24px -8px rgba(120,72,20,0.26), 0 2px 6px rgba(120,72,20,0.12);
+  --shadow-lg:0 26px 50px -16px rgba(120,72,20,0.32), 0 8px 20px -6px rgba(120,72,20,0.16);
+}
+body{margin:0}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--color-accent-300);border-radius:8px}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+<div style="min-height:100vh;background:radial-gradient(1200px 500px at 10% -10%, #fff3de 0%, transparent 60%), var(--color-bg);font-family:var(--font-body);color:var(--color-text);display:flex;flex-direction:column;">
+
+  <!-- Top nav -->
+  <div style="display:flex;align-items:center;gap:28px;padding:16px 28px;background:var(--color-surface);border-bottom:1px solid var(--color-divider);box-shadow:0 2px 10px rgba(120,72,20,0.06);">
+    <div style="display:flex;align-items:center;gap:10px;margin-right:8px;">
+      <div style="width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--color-accent-300),var(--color-accent-600));display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-sm);">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="14" r="4"/><path d="M12 4v2M4.9 8.9l1.4 1.4M19.1 8.9l-1.4 1.4M4 14H2M22 14h-2"/></svg>
+      </div>
+      <div style="font-family:var(--font-heading);font-weight:600;font-size:19px;letter-spacing:-0.01em;">Sunrise Planner</div>
+    </div>
+
+    <button type="button" onClick="{{ goToday }}" style="{{ navTodayStyle }}">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor" opacity="0.22" stroke="none"/><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
+      Today
+    </button>
+    <button type="button" onClick="{{ goWeek }}" style="{{ navWeekStyle }}">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3" fill="currentColor" opacity="0.15" stroke="none"/><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      This Week
+    </button>
+    <button type="button" onClick="{{ goPlanning }}" style="{{ navPlanningStyle }}">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2.5" fill="currentColor" opacity="0.15" stroke="none"/><rect x="5" y="4" width="14" height="17" rx="2.5"/><rect x="9" y="2.3" width="6" height="3.2" rx="1"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4.5"/></svg>
+      Planning Preview
+    </button>
+    <button type="button" onClick="{{ goIntake }}" style="{{ navIntakeStyle }}">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v5.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V13" fill="currentColor" opacity="0.15"/><path d="M4 13v5.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V13"/><path d="M12 3v10M8 9.5 12 13.5 16 9.5"/></svg>
+      Document Intake
+    </button>
+    <button type="button" onClick="{{ goWorkspace }}" style="{{ navWorkspaceStyle }}">
+      <svg viewBox="0 0 256 256" width="19" height="19" fill="currentColor"><path opacity="0.28" d="M224,80l-96,56L32,80l96-56Z"/><path d="M230.91,172A8,8,0,0,1,228,182.91l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,36,169.09l92,53.65,92-53.65A8,8,0,0,1,230.91,172ZM220,121.09l-92,53.65L36,121.09A8,8,0,0,0,28,134.91l96,56a8,8,0,0,0,8.06,0l96-56A8,8,0,1,0,220,121.09ZM24,80a8,8,0,0,1,4-6.91l96-56a8,8,0,0,1,8.06,0l96,56a8,8,0,0,1,0,13.82l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,24,80Zm23.88,0L128,126.74,208.12,80,128,33.26Z"/></svg>
+      Workspace
+    </button>
+  </div>
+
+  <!-- Profile bar -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:var(--color-accent-100);border-bottom:1px solid var(--color-divider);">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--color-accent-400),var(--color-accent-2-500));display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--font-heading);font-weight:600;box-shadow:var(--shadow-sm);">N</div>
+      <div>
+        <div style="font-family:var(--font-heading);font-weight:600;font-size:15px;">Nikolai</div>
+        <div style="font-size:12px;color:var(--color-accent-800);opacity:0.85;">Teacher · 2nd grade · Local testing profile</div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-secondary" style="border-radius:var(--radius-sm);background:var(--color-surface);box-shadow:var(--shadow-sm);">Switch profile</button>
+  </div>
+
+  <!-- TODAY -->
+  <sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:1;padding:28px;display:flex;gap:24px;align-items:stretch;min-height:0;">
+      <div style="flex:1;display:flex;flex-direction:column;gap:20px;min-width:0;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;">
+          <h2 style="margin:0;font-size:26px;">Today's periods</h2>
+          <div style="color:var(--color-neutral-700);font-size:13px;">{{ todayDateLabel }}</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;">
+          <sc-for list="{{ blocksView }}" as="b" hint-placeholder-count="5">
+            <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:8px;transition:box-shadow .15s, transform .15s;" style-hover="box-shadow:var(--shadow-md);transform:translateY(-2px);">
+              <div style="font-size:12px;color:var(--color-accent-700);font-weight:600;letter-spacing:0.02em;">{{ b.start }} – {{ b.end }}</div>
+              <div style="font-family:var(--font-heading);font-weight:600;font-size:16px;">{{ b.title }}</div>
+              <div style="font-size:13px;color:var(--color-neutral-700);flex:1;">{{ b.instruction }}</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span class="tag {{ b.tagClass }}">{{ b.subject }}</span>
+                <button type="button" onClick="{{ b.remove }}" style="background:none;border:none;cursor:pointer;color:var(--color-neutral-500);padding:4px;border-radius:8px;" style-hover="background:var(--color-accent-2-100);color:var(--color-accent-2-700);">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-9 0 1 12.5A2 2 0 0 0 9 21h6a2 2 0 0 0 2-1.5L18 7"/></svg>
+                </button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm);">
+          <h4 style="margin-bottom:12px;">Add a schedule block</h4>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <input class="input" placeholder="Block title" value="{{ newBlockTitle }}" onChange="{{ setNewBlockTitle }}" style="border-radius:var(--radius-sm);" />
+            <input class="input" placeholder="Instruction" value="{{ newBlockInstruction }}" onChange="{{ setNewBlockInstruction }}" style="border-radius:var(--radius-sm);" />
+            <div style="display:flex;gap:10px;align-items:center;">
+              <label style="font-size:12px;color:var(--color-neutral-700);">Start</label>
+              <input class="input" value="{{ newBlockStart }}" onChange="{{ setNewBlockStart }}" style="border-radius:var(--radius-sm);width:110px;" />
+              <label style="font-size:12px;color:var(--color-neutral-700);">End</label>
+              <input class="input" value="{{ newBlockEnd }}" onChange="{{ setNewBlockEnd }}" style="border-radius:var(--radius-sm);width:110px;" />
+              <button type="button" class="btn btn-primary" onClick="{{ addBlock }}" style="border-radius:var(--radius-sm);box-shadow:var(--shadow-sm);margin-left:auto;" style-hover="box-shadow:var(--shadow-md);transform:translateY(-1px);">Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:300px;flex:none;position:relative;display:flex;flex-direction:column;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:8px;background:linear-gradient(180deg,var(--color-accent-400),var(--color-accent-2-400));"></div>
+        <div style="padding:18px 20px 14px 26px;border-bottom:1px solid var(--color-divider);display:flex;align-items:center;gap:8px;">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="var(--color-accent-700)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <h4 style="margin:0;">Checklist</h4>
+        </div>
+        <div style="padding:14px 18px 10px 26px;display:flex;gap:8px;">
+          <input class="input" placeholder="Add a task" value="{{ newTaskText }}" onChange="{{ setNewTaskText }}" style="border-radius:var(--radius-sm);" />
+          <button type="button" class="btn btn-primary" onClick="{{ addTask }}" style="border-radius:var(--radius-sm);box-shadow:var(--shadow-sm);flex:none;" style-hover="box-shadow:var(--shadow-md);">Add</button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:4px 16px 18px 26px;background-image:repeating-linear-gradient(to bottom, transparent, transparent 43px, var(--color-divider) 44px);background-position:0 2px;">
+          <sc-for list="{{ checklistView }}" as="t" hint-placeholder-count="6">
+            <div style="display:flex;align-items:center;gap:10px;height:44px;">
+              <button type="button" onClick="{{ t.toggle }}" style="width:20px;height:20px;border-radius:7px;border:1.5px solid var(--color-divider);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;{{ t.boxStyleStr }}">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="var(--color-bg)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="{{ t.checkIconStyle }}"><path d="M5 13l4 4L19 7"/></svg>
+              </button>
+              <div style="flex:1;font-size:14px;{{ t.textStyleStr }}">{{ t.text }}</div>
+              <button type="button" onClick="{{ t.remove }}" style="background:none;border:none;cursor:pointer;color:var(--color-neutral-400);padding:2px;">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- THIS WEEK -->
+  <sc-if value="{{ isWeek }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;padding:28px;display:flex;flex-direction:column;gap:18px;overflow:hidden;">
+      <h1 style="font-size:28px;">This week</h1>
+      <div style="display:grid;grid-template-columns:repeat(5,minmax(230px,1fr));gap:16px;flex:1;min-height:0;">
+        <sc-for list="{{ weekView }}" as="day" hint-placeholder-count="5">
+          <div style="display:flex;flex-direction:column;min-height:0;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);overflow:hidden;">
+            <div style="padding:14px 16px;background:var(--color-accent-100);border-bottom:1px solid var(--color-divider);">
+              <div style="font-family:var(--font-heading);font-weight:600;font-size:16px;">{{ day.name }}</div>
+              <div style="font-size:12px;color:var(--color-accent-800);opacity:0.8;">{{ day.date }}</div>
+            </div>
+            <div style="flex:1;overflow-y:auto;padding:14px;display:flex;gap:10px;min-height:0;">
+              <div style="flex:none;width:56px;display:flex;flex-direction:column;gap:14px;padding-top:2px;">
+                <sc-for list="{{ day.lessons }}" as="l" hint-placeholder-count="4">
+                  <div style="font-size:11px;color:var(--color-neutral-600);line-height:1.3;border-right:2px solid var(--color-accent-200);padding-right:8px;">{{ l.time }}</div>
+                </sc-for>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+                <sc-for list="{{ day.lessons }}" as="l" hint-placeholder-count="4">
+                  <div style="background:var(--color-neutral-100);border-radius:var(--radius-md);padding:12px;box-shadow:var(--shadow-sm);transition:box-shadow .15s;" style-hover="box-shadow:var(--shadow-md);">
+                    <div style="font-family:var(--font-heading);font-weight:600;font-size:13.5px;margin-bottom:4px;">{{ l.title }}</div>
+                    <div style="font-size:11px;color:var(--color-neutral-600);margin-bottom:8px;">{{ l.source }}</div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                      <span class="tag {{ l.tagClass }}" style="border-radius:8px;">{{ l.subject }}</span>
+                      <button type="button" onClick="{{ l.togglePlan }}" style="{{ l.planBtnStyle }}">Plan</button>
+                      <button type="button" onClick="{{ l.toggleDeck }}" style="{{ l.deckBtnStyle }}">Deck</button>
+                      <button type="button" onClick="{{ l.toggleGuide }}" style="{{ l.guideBtnStyle }}">Guide</button>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- PLANNING PREVIEW -->
+  <sc-if value="{{ isPlanning }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;padding:28px;display:grid;grid-template-columns:280px 1fr;gap:24px;min-height:0;">
+      <div style="display:flex;flex-direction:column;min-height:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="margin:0;">Lessons</h3>
+          <button type="button" class="btn btn-secondary" style="border-radius:var(--radius-sm);background:var(--color-surface);">New</button>
+        </div>
+        <div style="overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px;">
+          <sc-for list="{{ lessonsView }}" as="ls" hint-placeholder-count="10">
+            <button type="button" onClick="{{ ls.select }}" style="{{ ls.rowStyle }}">
+              <div style="font-size:13.5px;font-weight:600;font-family:var(--font-heading);text-align:left;">{{ ls.title }}</div>
+              <span class="tag {{ ls.statusTagClass }}" style="align-self:flex-start;border-radius:8px;">{{ ls.status }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="min-height:0;overflow-y:auto;padding-right:6px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <h2 style="margin:0;">Lesson editor</h2>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:var(--color-neutral-700);">Status</span>
+            <select class="input" value="{{ selectedLesson.status }}" onChange="{{ setStatus }}" style="border-radius:var(--radius-sm);width:auto;">
+              <option value="Draft">Draft</option>
+              <option value="Approved">Approved</option>
+              <option value="Needs review">Needs review</option>
+            </select>
+          </div>
+        </div>
+        <p style="color:var(--color-neutral-700);font-size:13px;margin-bottom:16px;">Edit and review this record before output generation. It remains local and traceable to its source.</p>
+
+        <div style="display:flex;gap:10px;align-items:flex-start;background:var(--color-accent-100);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:20px;color:var(--color-accent-800);">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px;"><path d="M12 3.5 2.5 20h19Z" fill="currentColor" opacity="0.18" stroke="none"/><path d="M12 3.5 2.5 20h19Z"/><path d="M12 9.5v5M12 17.2v.1"/></svg>
+          <div style="font-size:13px;">Auto-created from readable planning documents. Fill any blank or incorrect fields as needed.</div>
+        </div>
+
+        <!-- Core lesson -->
+        <div style="border-radius:var(--radius-lg);background:var(--color-surface);border:1px solid var(--color-divider);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow-sm);">
+          <button type="button" onClick="{{ toggleCore }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:none;border:none;cursor:pointer;font-family:var(--font-heading);font-weight:600;font-size:15px;color:var(--color-text);">
+            Core lesson
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{ coreChevronStyle }}"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <sc-if value="{{ openCore }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:0 18px 18px;display:flex;flex-direction:column;gap:10px;">
+              <input class="input" value="{{ selectedLesson.coreTitle }}" onChange="{{ setCoreTitle }}" style="border-radius:var(--radius-sm);" />
+              <input class="input" placeholder="Subject" value="{{ selectedLesson.subject }}" onChange="{{ setSubject }}" style="border-radius:var(--radius-sm);" />
+              <input class="input" placeholder="Grade or age range" value="{{ selectedLesson.grade }}" onChange="{{ setGrade }}" style="border-radius:var(--radius-sm);" />
+              <input class="input" placeholder="Learning objective" value="{{ selectedLesson.objective }}" onChange="{{ setObjective }}" style="border-radius:var(--radius-sm);" />
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- Instructional sequence -->
+        <div style="border-radius:var(--radius-lg);background:var(--color-surface);border:1px solid var(--color-divider);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow-sm);">
+          <button type="button" onClick="{{ toggleSequence }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:none;border:none;cursor:pointer;font-family:var(--font-heading);font-weight:600;font-size:15px;color:var(--color-text);">
+            Instructional sequence
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{ sequenceChevronStyle }}"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <sc-if value="{{ openSequence }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:0 18px 18px;display:flex;flex-direction:column;gap:10px;">
+              <div style="font-size:12px;color:var(--color-neutral-600);">Auto-filled from course pacing. Add details if needed.</div>
+              <input class="input" placeholder="Step title" value="{{ selectedLesson.stepTitle }}" onChange="{{ setStepTitle }}" style="border-radius:var(--radius-sm);" />
+              <input class="input" placeholder="Step notes" value="{{ selectedLesson.stepNotes }}" onChange="{{ setStepNotes }}" style="border-radius:var(--radius-sm);" />
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- Materials & assessment -->
+        <div style="border-radius:var(--radius-lg);background:var(--color-surface);border:1px solid var(--color-divider);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow-sm);">
+          <button type="button" onClick="{{ toggleMaterials }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:none;border:none;cursor:pointer;font-family:var(--font-heading);font-weight:600;font-size:15px;color:var(--color-text);">
+            Materials and assessment
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{ materialsChevronStyle }}"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <sc-if value="{{ openMaterials }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:0 18px 18px;display:flex;flex-direction:column;gap:10px;">
+              <textarea class="input" placeholder="Materials (one per line)" value="{{ selectedLesson.materials }}" onChange="{{ setMaterials }}" style="border-radius:var(--radius-sm);"></textarea>
+              <input class="input" placeholder="Assessment or success check" value="{{ selectedLesson.assessment }}" onChange="{{ setAssessment }}" style="border-radius:var(--radius-sm);" />
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- Differentiation -->
+        <div style="border-radius:var(--radius-lg);background:var(--color-surface);border:1px solid var(--color-divider);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow-sm);">
+          <button type="button" onClick="{{ toggleDifferentiation }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:none;border:none;cursor:pointer;font-family:var(--font-heading);font-weight:600;font-size:15px;color:var(--color-text);">
+            Differentiation
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{ differentiationChevronStyle }}"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <sc-if value="{{ openDifferentiation }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:0 18px 18px;display:flex;flex-direction:column;gap:10px;">
+              <input class="input" placeholder="Scaffolds, groups, extensions, and printable resources" value="{{ selectedLesson.differentiation }}" onChange="{{ setDifferentiation }}" style="border-radius:var(--radius-sm);" />
+              <input class="input" placeholder="Student printable prompt (optional)" value="{{ selectedLesson.prompt }}" onChange="{{ setPrompt }}" style="border-radius:var(--radius-sm);" />
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- Source -->
+        <div style="border-radius:var(--radius-lg);background:var(--color-surface);border:1px solid var(--color-divider);margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow-sm);">
+          <button type="button" onClick="{{ toggleSource }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:none;border:none;cursor:pointer;font-family:var(--font-heading);font-weight:600;font-size:15px;color:var(--color-text);">
+            Source provenance
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{ sourceChevronStyle }}"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <sc-if value="{{ openSource }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:0 18px 18px;font-size:13px;color:var(--color-neutral-700);">{{ selectedLesson.source }}</div>
+          </sc-if>
+        </div>
+
+        <div style="background:var(--color-accent-2-100);border-radius:var(--radius-md);padding:14px 16px;color:var(--color-accent-2-800);font-size:13px;">
+          Export readiness — required fields look complete for this lesson. Nice work!
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- DOCUMENT INTAKE -->
+  <sc-if value="{{ isIntake }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;padding:28px;display:grid;grid-template-columns:340px 1fr;gap:24px;min-height:0;">
+      <div style="display:flex;flex-direction:column;min-height:0;">
+        <div style="display:flex;align-items:start;justify-content:space-between;margin-bottom:12px;">
+          <h1 style="font-size:26px;margin:0;">Document intake</h1>
+          <button type="button" class="btn btn-primary" onClick="{{ importDocs }}" style="border-radius:var(--radius-sm);box-shadow:var(--shadow-sm);" style-hover="box-shadow:var(--shadow-md);">Add documents…</button>
+        </div>
+        <p style="font-size:13px;color:var(--color-neutral-700);margin-bottom:16px;">Choose PDF or Word documents together, or select a folder. Readable files are sorted and used to update pacing and this week's plan automatically.</p>
+
+        <sc-if value="{{ intakeImported }}" hint-placeholder-val="{{ true }}">
+          <div style="background:var(--color-accent-100);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:16px;color:var(--color-accent-800);">
+            <div style="font-weight:600;font-size:13px;margin-bottom:4px;">✓ {{ intakeCount }} document(s) imported</div>
+            <div style="font-size:12px;opacity:0.85;">9 readable setup document(s) ready to guide pacing</div>
+            <div style="font-size:12px;opacity:0.85;margin-top:6px;">Pacing guide: 3 · Instructional calendar: 2 · Lesson material: 24</div>
+            <button type="button" onClick="{{ resetIntake }}" style="background:none;border:none;color:var(--color-accent-2-700);font-size:12px;cursor:pointer;margin-top:8px;padding:0;text-decoration:underline;">Clear and start over</button>
+          </div>
+          <div style="overflow-y:auto;display:flex;flex-direction:column;gap:2px;">
+            <sc-for list="{{ intakeDocs }}" as="doc" hint-placeholder-count="9">
+              <div style="padding:10px 6px;border-bottom:1px solid var(--color-divider);">
+                <div style="font-size:13.5px;font-weight:600;">{{ doc.name }}</div>
+                <div style="font-size:11.5px;color:var(--color-neutral-600);">{{ doc.type }} · Text extracted locally</div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ intakeNotImported }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--color-surface);border:2px dashed var(--color-accent-300);border-radius:var(--radius-lg);gap:12px;">
+          <div style="width:64px;height:64px;border-radius:20px;background:var(--color-accent-100);display:flex;align-items:center;justify-content:center;color:var(--color-accent-700);">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v5.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V13"/><path d="M12 3v10M8 9.5 12 13.5 16 9.5"/></svg>
+          </div>
+          <h2 style="margin:0;">Choose setup documents</h2>
+          <p style="max-width:360px;text-align:center;color:var(--color-neutral-700);font-size:13px;">Add pacing guides, curriculum maps, calendars, assessment schedules, and lesson materials from files or a folder.</p>
+        </div>
+      </sc-if>
+      <sc-if value="{{ intakeImported }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--color-surface);border-radius:var(--radius-lg);gap:10px;box-shadow:var(--shadow-sm);">
+          <div style="width:64px;height:64px;border-radius:20px;background:var(--color-accent-2-100);display:flex;align-items:center;justify-content:center;color:var(--color-accent-2-700);">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="m5 12 5 5L20 7"/></svg>
+          </div>
+          <h2 style="margin:0;">All set for this week</h2>
+          <p style="max-width:340px;text-align:center;color:var(--color-neutral-700);font-size:13px;">Pacing and this week's plan are already up to date from your imported documents.</p>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <!-- WORKSPACE -->
+  <sc-if value="{{ isWorkspace }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;padding:28px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h1 style="font-size:28px;margin:0;">Workspace</h1>
+        <div style="font-size:13px;color:var(--color-neutral-700);">{{ selectedCountLabel }}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <sc-for list="{{ workspaceView }}" as="w" hint-placeholder-count="9">
+          <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:var(--shadow-sm);{{ w.rowStyleStr }}">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <button type="button" onClick="{{ w.toggleSelect }}" style="width:19px;height:19px;border-radius:6px;border:1.5px solid var(--color-divider);flex:none;cursor:pointer;{{ w.checkStyleStr }}"></button>
+              <div style="flex:1;">
+                <div style="font-family:var(--font-heading);font-weight:600;font-size:14.5px;">{{ w.name }}</div>
+                <div style="font-size:12px;color:var(--color-neutral-600);">{{ w.modules }} modules, {{ w.lessons }} lessons, {{ w.days }} estimated days · {{ w.dates }}</div>
+              </div>
+              <button type="button" onClick="{{ w.toggle }}" class="btn btn-secondary" style="border-radius:var(--radius-sm);background:var(--color-neutral-100);">Edit</button>
+            </div>
+            <sc-if value="{{ w.expanded }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--color-divider);font-size:12.5px;color:var(--color-neutral-700);">{{ w.assessments }}</div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const SUBJECT_TAG = {
+  'Math':'tag-accent','English':'tag-accent-2','Science':'tag-neutral',
+  'Social Studies':'tag-outline','Art':'tag-accent'
+};
+const STATUS_TAG = { 'Approved':'tag-accent', 'Draft':'tag-neutral', 'Needs review':'tag-accent-2' };
+
+const WEEK_SEED = [
+  { id:1, name:'Monday', date:'Jul 27', lessons:[
+    {id:101,time:'8:00\u20138:45 AM',title:'Reading warm-up',subject:'English',source:'English plans / Module 1',planAdded:true,deckAdded:false,guideAdded:false},
+    {id:102,time:'8:45\u20139:30 AM',title:'Number talk: place value',subject:'Math',source:'Math plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:103,time:'9:45\u201310:30 AM',title:'States of matter lab',subject:'Science',source:'Science plans / Module 1',planAdded:false,deckAdded:true,guideAdded:false},
+    {id:104,time:'10:30\u201311:15 AM',title:'Community helpers',subject:'Social Studies',source:'Social studies plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+  ]},
+  { id:2, name:'Tuesday', date:'Jul 28', lessons:[
+    {id:201,time:'8:00\u20138:45 AM',title:'Line variety study',subject:'Art',source:'Art plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:202,time:'8:45\u20139:30 AM',title:'Rounding in context',subject:'Math',source:'Math plans / Module 1',planAdded:true,deckAdded:false,guideAdded:false},
+    {id:203,time:'9:45\u201310:30 AM',title:'Map skills: symbols',subject:'Social Studies',source:'Social studies plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:204,time:'10:30\u201311:15 AM',title:'Question formation',subject:'Science',source:'Science plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+  ]},
+  { id:3, name:'Wednesday', date:'Jul 29', lessons:[
+    {id:301,time:'8:00\u20138:45 AM',title:'Text evidence practice',subject:'English',source:'English plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:302,time:'8:45\u20139:30 AM',title:'Addition strategies',subject:'Math',source:'Math plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:303,time:'9:45\u201310:30 AM',title:'Rules and responsibilities',subject:'Social Studies',source:'Social studies plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:304,time:'10:30\u201311:15 AM',title:'Observation skills',subject:'Science',source:'Science plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+  ]},
+  { id:4, name:'Thursday', date:'Jul 30', lessons:[
+    {id:401,time:'8:00\u20138:45 AM',title:'Collaborative discussion',subject:'English',source:'English plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:402,time:'8:45\u20139:30 AM',title:'Subtraction strategies',subject:'Math',source:'Math plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:403,time:'9:45\u201310:30 AM',title:'Color choices',subject:'Art',source:'Art plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:404,time:'10:30\u201311:15 AM',title:'Tools of scientists',subject:'Science',source:'Science plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+  ]},
+  { id:5, name:'Friday', date:'Jul 31', lessons:[
+    {id:501,time:'8:00\u20138:45 AM',title:'Weekly reading reflection',subject:'English',source:'English plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:502,time:'8:45\u20139:30 AM',title:'Problem solving',subject:'Math',source:'Math plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:503,time:'9:45\u201310:30 AM',title:'Community map project',subject:'Social Studies',source:'Social studies plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+    {id:504,time:'10:30\u201311:15 AM',title:'Sketchbook launch',subject:'Art',source:'Art plans / Module 1',planAdded:false,deckAdded:false,guideAdded:false},
+  ]},
+];
+
+const LESSONS_SEED = [
+  {id:1,title:'Reading warm-up',subject:'English',status:'Approved',coreTitle:'Reading warm-up',grade:'Grade 2',objective:'Students build fluency through partner read-aloud.',stepTitle:'Partner read-aloud',stepNotes:'Pair students, alternate paragraphs, quick share-out.',materials:'Leveled readers\nTimer',assessment:'Listen in on two pairs; note fluency.',differentiation:'Pair strong readers with emerging readers.',prompt:'What was tricky about your partner\'s book?',source:'Pacing: English plans.pdf / Module 1 / Reading warm-up'},
+  {id:2,title:'Number talk: place value',subject:'Math',status:'Approved',coreTitle:'Number talk: place value',grade:'Grade 2',objective:'Students reason about tens and ones mentally.',stepTitle:'Mental math warm-up',stepNotes:'Pose a number, collect strategies on the board.',materials:'Whiteboard\nBase-ten blocks',assessment:'Cold-call two strategies for accuracy.',differentiation:'Offer blocks for concrete support; extend with 3-digit numbers.',prompt:'Explain your strategy in one sentence.',source:'Pacing: Math plans.pdf / Module 1 / Number talk'},
+  {id:3,title:'States of matter lab',subject:'Science',status:'Approved',coreTitle:'States of matter lab',grade:'Grade 2',objective:'Students classify materials as solid, liquid, or gas.',stepTitle:'Station rotation',stepNotes:'Three stations, five minutes each, recording sheet.',materials:'Ice\nWater\nBalloons\nRecording sheets',assessment:'Check recording sheet for accurate classification.',differentiation:'Sentence starters for recording sheet.',prompt:'Draw one example of each state.',source:'Pacing: Science plans.pdf / Module 1 / States of matter'},
+  {id:4,title:'Community helpers',subject:'Social Studies',status:'Approved',coreTitle:'Community helpers',grade:'Grade 2',objective:'Students identify roles that keep a community running.',stepTitle:'Discuss and map',stepNotes:'Brainstorm helpers, place on a simple community map.',materials:'Community map handout\nMarkers',assessment:'Check map for at least four helpers placed correctly.',differentiation:'Picture cards for helper roles.',prompt:'Which helper would you like to be?',source:'Pacing: Social studies plans.pdf / Module 1 / Community helpers'},
+  {id:5,title:'Sketchbook launch',subject:'Art',status:'Approved',coreTitle:'Sketchbook launch',grade:'Grade 2',objective:'Students set up a sketchbook and practice mark-making.',stepTitle:'Cover page and materials',stepNotes:'Decorate cover, practice five line types.',materials:'Sketchbooks\nPencils',assessment:'Quick rubric: technique, effort, completeness.',differentiation:'Offer stencils for fine motor support.',prompt:'Which line type is your favorite?',source:'Pacing: Art plans.pdf / Module 1 / Sketchbook launch'},
+  {id:6,title:'Line variety study',subject:'Art',status:'Approved',coreTitle:'Line variety study',grade:'Grade 2',objective:'Students explore thick, thin, curved, and zigzag lines.',stepTitle:'Guided practice',stepNotes:'Model each line type, students fill a page.',materials:'Drawing paper\nMarkers',assessment:'Quick rubric: technique, effort, completeness.',differentiation:'Extension: combine three line types in one drawing.',prompt:'Describe your favorite line combination.',source:'Pacing: Art plans.pdf / Module 1 / Line variety'},
+  {id:7,title:'Text evidence practice',subject:'English',status:'Approved',coreTitle:'Text evidence practice',grade:'Grade 2',objective:'Students find evidence in text to support an answer.',stepTitle:'Guided practice',stepNotes:'Model finding evidence, students practice in pairs.',materials:'Short passage\nHighlighters',assessment:'Collect one written response; check for evidence.',differentiation:'Sentence starters for response.',prompt:'Underline your favorite piece of evidence.',source:'Pacing: English plans.pdf / Module 1 / Text evidence'},
+  {id:8,title:'Rounding in context',subject:'Math',status:'Approved',coreTitle:'Rounding in context',grade:'Grade 2',objective:'Students round numbers to solve real-world problems.',stepTitle:'Problem set',stepNotes:'Work through three word problems as a class.',materials:'Number line\nWorksheet',assessment:'Use a 3-question exit ticket.',differentiation:'Number line support; extension with larger numbers.',prompt:'Round this number and explain why.',source:'Pacing: Math plans.pdf / Module 1 / Rounding in context'},
+  {id:9,title:'Map skills: symbols',subject:'Social Studies',status:'Draft',coreTitle:'Map skills: symbols',grade:'Grade 2',objective:'Students read and interpret simple map symbols.',stepTitle:'Symbol scavenger hunt',stepNotes:'Match symbols to a legend on a sample map.',materials:'Sample maps\nLegend cards',assessment:'Check legend matching for accuracy.',differentiation:'Provide symbol cards pre-matched for support.',prompt:'What symbol would you add to this map?',source:'Pacing: Social studies plans.pdf / Module 1 / Map symbols'},
+  {id:10,title:'Question formation',subject:'Science',status:'Approved',coreTitle:'Question formation',grade:'Grade 2',objective:'Students write testable questions about the natural world.',stepTitle:'Guided brainstorm',stepNotes:'Model a testable question, students write their own.',materials:'Journals\nSentence frames',assessment:'Check recording sheet for accurate observations.',differentiation:'Sentence frames for question writing.',prompt:'Write one question about the weather.',source:'Pacing: Science plans.pdf / Module 1 / Question formation'},
+  {id:11,title:'Addition strategies',subject:'Math',status:'Approved',coreTitle:'Addition strategies',grade:'Grade 2',objective:'Students use multiple strategies to add two-digit numbers.',stepTitle:'Strategy share',stepNotes:'Students solve a problem three ways and compare.',materials:'Base-ten blocks\nWhiteboards',assessment:'Use a 3-question exit ticket.',differentiation:'Blocks for concrete support; extension with mental math.',prompt:'Which strategy was fastest for you?',source:'Pacing: Math plans.pdf / Module 1 / Addition strategies'},
+  {id:12,title:'Color choices',subject:'Art',status:'Draft',coreTitle:'Color choices',grade:'Grade 2',objective:'Students explore warm and cool color families.',stepTitle:'Color mixing',stepNotes:'Mix warm and cool palettes, paint a small study.',materials:'Watercolors\nPalettes',assessment:'Quick rubric: technique, effort, completeness.',differentiation:'Pre-mixed colors for support.',prompt:'Which palette feels warmer to you?',source:'Pacing: Art plans.pdf / Module 1 / Color choices'},
+  {id:13,title:'Collaborative discussion',subject:'English',status:'Approved',coreTitle:'Collaborative discussion',grade:'Grade 2',objective:'Students build on each other\'s ideas in discussion.',stepTitle:'Group discussion',stepNotes:'Small groups discuss a prompt, share back whole-group.',materials:'Discussion prompts\nTimer',assessment:'Collect one written response; check for claim and evidence.',differentiation:'Sentence starters for discussion.',prompt:'What idea did a classmate add to yours?',source:'Pacing: English plans.pdf / Module 1 / Collaborative discussion'},
+  {id:14,title:'Subtraction strategies',subject:'Math',status:'Needs review',coreTitle:'Subtraction strategies',grade:'Grade 2',objective:'Students use regrouping to subtract two-digit numbers.',stepTitle:'Guided practice',stepNotes:'Model regrouping, students practice with blocks.',materials:'Base-ten blocks\nWorksheet',assessment:'Use a 3-question exit ticket to identify regrouping needs.',differentiation:'Blocks for concrete support.',prompt:'Explain regrouping in your own words.',source:'Pacing: Math plans.pdf / Module 1 / Subtraction strategies'},
+];
+
+const WORKSPACE_SEED = [
+  {id:1,name:'Math Sample Week and Lesson Plans.pdf',modules:1,lessons:6,days:6,dates:'Dates not set',expanded:false,selected:false,assessments:'Assessment: Use a 3-question exit ticket to identify regrouping or place-value needs.'},
+  {id:2,name:'English Sample Week and Lesson Plans.pdf',modules:1,lessons:6,days:6,dates:'Dates not set',expanded:false,selected:false,assessments:'Assessment: Collect one written response; check for claim, evidence, and explanation.'},
+  {id:3,name:'Social Studies Sample Week and Lesson Plans.pdf',modules:1,lessons:6,days:6,dates:'Dates not set',expanded:false,selected:false,assessments:'Assessment: Review notebook entry for vocabulary accuracy and explanation.'},
+  {id:4,name:'Science Sample Week and Lesson Plans.pdf',modules:1,lessons:6,days:6,dates:'Dates not set',expanded:false,selected:false,assessments:'Assessment: Check recording sheet for accurate observations and evidence-based conclusion.'},
+  {id:5,name:'Art Sample Week and Lesson Plans.pdf',modules:1,lessons:6,days:6,dates:'Dates not set',expanded:false,selected:false,assessments:'Assessment: Use a quick rubric \u2014 technique, effort, completeness, and reflection.'},
+  {id:6,name:'School Pacing Guide Sep 1\u2013Dec 20.pdf',modules:1,lessons:1,days:1,dates:'Dates not set',expanded:false,selected:false,assessments:'Whole-school pacing reference, no assessments attached.'},
+  {id:7,name:'Sample Daily Schedule.pdf',modules:1,lessons:1,days:1,dates:'Dates not set',expanded:false,selected:false,assessments:'Instructional calendar reference, no assessments attached.'},
+  {id:8,name:'Math Sample Week and Lesson Plans.docx',modules:1,lessons:5,days:5,dates:'Dates not set',expanded:false,selected:false,assessments:'Assessment, Assessment, Assessment, Assessment, Assessment'},
+];
+
+class Component extends DCLogic {
+  state = {
+    view: 'today',
+    blocks: [
+      {id:1,start:'8:00 AM',end:'8:45 AM',title:'Reading warm-up',instruction:'Partner read-aloud + quick share',subject:'English'},
+      {id:2,start:'8:45 AM',end:'9:30 AM',title:'Number talk: place value',instruction:'Whole-group mental math warm-up',subject:'Math'},
+      {id:3,start:'9:45 AM',end:'10:30 AM',title:'States of matter lab',instruction:'Stations: solid, liquid, gas',subject:'Science'},
+      {id:4,start:'10:30 AM',end:'11:15 AM',title:'Community helpers',instruction:'Discuss roles + map activity',subject:'Social Studies'},
+      {id:5,start:'1:00 PM',end:'1:45 PM',title:'Sketchbook launch',instruction:'Cover page + materials intro',subject:'Art'},
+    ],
+    newBlockTitle:'', newBlockInstruction:'', newBlockStart:'8:00 AM', newBlockEnd:'8:45 AM',
+    checklist: [
+      {id:1,text:'Print exit tickets for math',done:false},
+      {id:2,text:'Email field trip permission slips',done:false},
+      {id:3,text:'Restock art supply bins',done:true},
+      {id:4,text:'Review reading group notes',done:false},
+    ],
+    newTaskText:'',
+    week: JSON.parse(JSON.stringify(WEEK_SEED)),
+    lessons: JSON.parse(JSON.stringify(LESSONS_SEED)),
+    selectedLessonId: 1,
+    openCore:true, openSequence:false, openMaterials:false, openDifferentiation:false, openSource:false,
+    intakeImported: true,
+    workspace: JSON.parse(JSON.stringify(WORKSPACE_SEED)),
+  };
+
+  goToday = () => this.setState({view:'today'});
+  goWeek = () => this.setState({view:'week'});
+  goPlanning = () => this.setState({view:'planning'});
+  goIntake = () => this.setState({view:'intake'});
+  goWorkspace = () => this.setState({view:'workspace'});
+
+  setNewBlockTitle = (e) => this.setState({newBlockTitle:e.target.value});
+  setNewBlockInstruction = (e) => this.setState({newBlockInstruction:e.target.value});
+  setNewBlockStart = (e) => this.setState({newBlockStart:e.target.value});
+  setNewBlockEnd = (e) => this.setState({newBlockEnd:e.target.value});
+  addBlock = () => {
+    if (!this.state.newBlockTitle.trim()) return;
+    this.setState(s => ({
+      blocks:[...s.blocks,{id:Date.now(),title:s.newBlockTitle,instruction:s.newBlockInstruction,start:s.newBlockStart,end:s.newBlockEnd,subject:'Math'}],
+      newBlockTitle:'', newBlockInstruction:''
+    }));
+  };
+
+  setNewTaskText = (e) => this.setState({newTaskText:e.target.value});
+  addTask = () => {
+    if (!this.state.newTaskText.trim()) return;
+    this.setState(s => ({checklist:[...s.checklist,{id:Date.now(),text:s.newTaskText,done:false}], newTaskText:''}));
+  };
+
+  toggleWeekFlag = (dayId, lessonId, flag) => this.setState(s => ({
+    week: s.week.map(d => d.id!==dayId ? d : {...d, lessons: d.lessons.map(l => l.id!==lessonId ? l : {...l,[flag]:!l[flag]})})
+  }));
+
+  toggleCore = () => this.setState(s=>({openCore:!s.openCore}));
+  toggleSequence = () => this.setState(s=>({openSequence:!s.openSequence}));
+  toggleMaterials = () => this.setState(s=>({openMaterials:!s.openMaterials}));
+  toggleDifferentiation = () => this.setState(s=>({openDifferentiation:!s.openDifferentiation}));
+  toggleSource = () => this.setState(s=>({openSource:!s.openSource}));
+
+  updateSelected = (field, value) => this.setState(s => ({
+    lessons: s.lessons.map(l => l.id===s.selectedLessonId ? {...l,[field]:value} : l)
+  }));
+  setCoreTitle = (e) => this.updateSelected('coreTitle', e.target.value);
+  setSubject = (e) => this.updateSelected('subject', e.target.value);
+  setGrade = (e) => this.updateSelected('grade', e.target.value);
+  setObjective = (e) => this.updateSelected('objective', e.target.value);
+  setStepTitle = (e) => this.updateSelected('stepTitle', e.target.value);
+  setStepNotes = (e) => this.updateSelected('stepNotes', e.target.value);
+  setMaterials = (e) => this.updateSelected('materials', e.target.value);
+  setAssessment = (e) => this.updateSelected('assessment', e.target.value);
+  setDifferentiation = (e) => this.updateSelected('differentiation', e.target.value);
+  setPrompt = (e) => this.updateSelected('prompt', e.target.value);
+  setStatus = (e) => this.updateSelected('status', e.target.value);
+
+  importDocs = () => this.setState({intakeImported:true});
+  resetIntake = () => this.setState({intakeImported:false});
+
+  navStyle(active) {
+    return active
+      ? 'display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:var(--radius-sm);background:var(--color-accent);color:var(--color-bg);border:none;cursor:pointer;font-family:var(--font-heading);font-weight:600;font-size:14px;box-shadow:var(--shadow-sm);'
+      : 'display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:var(--radius-sm);background:transparent;color:var(--color-neutral-700);border:none;cursor:pointer;font-family:var(--font-heading);font-weight:600;font-size:14px;';
+  }
+
+  renderVals() {
+    const s = this.state;
+    const view = s.view;
+
+    const blocksView = s.blocks.map(b => ({
+      ...b,
+      tagClass: SUBJECT_TAG[b.subject] || 'tag-neutral',
+      remove: () => this.setState(st => ({blocks: st.blocks.filter(x=>x.id!==b.id)})),
+    }));
+
+    const checklistView = s.checklist.map(t => ({
+      ...t,
+      toggle: () => this.setState(st => ({checklist: st.checklist.map(x=>x.id===t.id?{...x,done:!x.done}:x)})),
+      remove: () => this.setState(st => ({checklist: st.checklist.filter(x=>x.id!==t.id)})),
+      boxStyleStr: t.done ? 'background:var(--color-accent);border-color:var(--color-accent);' : 'background:var(--color-surface);',
+      checkIconStyle: t.done ? 'opacity:1;' : 'opacity:0;',
+      textStyleStr: t.done ? 'text-decoration:line-through;opacity:0.5;' : '',
+    }));
+
+    const weekView = s.week.map(day => ({
+      ...day,
+      lessons: day.lessons.map(l => ({
+        ...l,
+        tagClass: SUBJECT_TAG[l.subject] || 'tag-neutral',
+        togglePlan: () => this.toggleWeekFlag(day.id, l.id, 'planAdded'),
+        toggleDeck: () => this.toggleWeekFlag(day.id, l.id, 'deckAdded'),
+        toggleGuide: () => this.toggleWeekFlag(day.id, l.id, 'guideAdded'),
+        planBtnStyle: this.pillStyle(l.planAdded),
+        deckBtnStyle: this.pillStyle(l.deckAdded),
+        guideBtnStyle: this.pillStyle(l.guideAdded),
+      })),
+    }));
+
+    const selectedLesson = s.lessons.find(l => l.id === s.selectedLessonId) || s.lessons[0];
+    const lessonsView = s.lessons.map(ls => ({
+      ...ls,
+      statusTagClass: STATUS_TAG[ls.status] || 'tag-neutral',
+      select: () => this.setState({selectedLessonId: ls.id}),
+      rowStyle: ls.id===selectedLesson.id
+        ? 'display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;width:100%;padding:10px 12px;border-radius:var(--radius-sm);background:var(--color-accent-100);border:none;cursor:pointer;'
+        : 'display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;width:100%;padding:10px 12px;border-radius:var(--radius-sm);background:transparent;border:none;cursor:pointer;',
+    }));
+
+    const workspaceView = s.workspace.map(w => ({
+      ...w,
+      toggle: () => this.setState(st => ({workspace: st.workspace.map(x=>x.id===w.id?{...x,expanded:!x.expanded}:x)})),
+      toggleSelect: () => this.setState(st => ({workspace: st.workspace.map(x=>x.id===w.id?{...x,selected:!x.selected}:x)})),
+      rowStyleStr: w.selected ? 'outline:2px solid var(--color-accent-300);' : '',
+      checkStyleStr: w.selected ? 'background:var(--color-accent);border-color:var(--color-accent);' : 'background:var(--color-surface);',
+    }));
+
+    const selectedCount = s.workspace.filter(w=>w.selected).length;
+
+    return {
+      isToday: view==='today', isWeek: view==='week', isPlanning: view==='planning',
+      isIntake: view==='intake', isWorkspace: view==='workspace',
+      goToday: this.goToday, goWeek: this.goWeek, goPlanning: this.goPlanning,
+      goIntake: this.goIntake, goWorkspace: this.goWorkspace,
+      navTodayStyle: this.navStyle(view==='today'),
+      navWeekStyle: this.navStyle(view==='week'),
+      navPlanningStyle: this.navStyle(view==='planning'),
+      navIntakeStyle: this.navStyle(view==='intake'),
+      navWorkspaceStyle: this.navStyle(view==='workspace'),
+
+      todayDateLabel: 'Tuesday, July 28',
+      blocksView, addBlock: this.addBlock,
+      newBlockTitle: s.newBlockTitle, newBlockInstruction: s.newBlockInstruction,
+      newBlockStart: s.newBlockStart, newBlockEnd: s.newBlockEnd,
+      setNewBlockTitle: this.setNewBlockTitle, setNewBlockInstruction: this.setNewBlockInstruction,
+      setNewBlockStart: this.setNewBlockStart, setNewBlockEnd: this.setNewBlockEnd,
+      checklistView, newTaskText: s.newTaskText, setNewTaskText: this.setNewTaskText, addTask: this.addTask,
+
+      weekView,
+
+      lessonsView, selectedLesson,
+      openCore: s.openCore, openSequence: s.openSequence, openMaterials: s.openMaterials,
+      openDifferentiation: s.openDifferentiation, openSource: s.openSource,
+      toggleCore: this.toggleCore, toggleSequence: this.toggleSequence,
+      toggleMaterials: this.toggleMaterials, toggleDifferentiation: this.toggleDifferentiation,
+      toggleSource: this.toggleSource,
+      coreChevronStyle: s.openCore ? 'transform:rotate(180deg);' : '',
+      sequenceChevronStyle: s.openSequence ? 'transform:rotate(180deg);' : '',
+      materialsChevronStyle: s.openMaterials ? 'transform:rotate(180deg);' : '',
+      differentiationChevronStyle: s.openDifferentiation ? 'transform:rotate(180deg);' : '',
+      sourceChevronStyle: s.openSource ? 'transform:rotate(180deg);' : '',
+      setCoreTitle: this.setCoreTitle, setSubject: this.setSubject, setGrade: this.setGrade, setObjective: this.setObjective,
+      setStepTitle: this.setStepTitle, setStepNotes: this.setStepNotes,
+      setMaterials: this.setMaterials, setAssessment: this.setAssessment,
+      setDifferentiation: this.setDifferentiation, setPrompt: this.setPrompt, setStatus: this.setStatus,
+
+      intakeImported: s.intakeImported, intakeNotImported: !s.intakeImported,
+      importDocs: this.importDocs, resetIntake: this.resetIntake,
+      intakeCount: 29,
+      intakeDocs: [
+        {name:'Math Sample Week and Lesson Plans.pdf', type:'Lesson material'},
+        {name:'English Sample Week and Lesson Plans.pdf', type:'Lesson material'},
+        {name:'Social Studies Sample Week and Lesson Plans.pdf', type:'Lesson material'},
+        {name:'Science Sample Week and Lesson Plans.pdf', type:'Lesson material'},
+        {name:'Art Sample Week and Lesson Plans.pdf', type:'Lesson material'},
+        {name:'School Pacing Guide Sep 1-Dec 20.pdf', type:'Pacing guide'},
+        {name:'Sample Daily Schedule.pdf', type:'Instructional calendar'},
+        {name:'Math Sample Week and Lesson Plans.docx', type:'Lesson material'},
+        {name:'2nd Grade Assessment Calendar.pdf', type:'Instructional calendar'},
+      ],
+
+      workspaceView, selectedCountLabel: selectedCount ? `${selectedCount} selected` : `${s.workspace.length} documents`,
+    };
+  }
+
+  pillStyle(active) {
+    return active
+      ? 'display:inline-flex;align-items:center;gap:4px;font-size:11px;font-family:var(--font-heading);font-weight:600;padding:4px 9px;border-radius:8px;background:var(--color-accent);color:var(--color-bg);border:none;cursor:pointer;'
+      : 'display:inline-flex;align-items:center;gap:4px;font-size:11px;font-family:var(--font-heading);font-weight:600;padding:4px 9px;border-radius:8px;background:var(--color-surface);color:var(--color-accent-700);border:1px solid var(--color-accent-200);cursor:pointer;';
+  }
+}
+</script>
+</body>
+</html>

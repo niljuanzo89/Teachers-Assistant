@@ -430,9 +430,14 @@ final class AppStore: ObservableObject {
         return Calendar.current.startOfDay(for: endDate) >= Calendar.current.startOfDay(for: startDate)
     }
 
-    func addScheduleBlock(title: String, start: Date, end: Date, type: String) {
-        dailyPlan.scheduleBlocks.append(ScheduleBlock(id: UUID(), title: title, start: start, end: end, type: type, linkedLessonRecordID: nil, notes: ""))
+    func addScheduleBlock(title: String, start: Date, end: Date, type: String, notes: String = "") {
+        dailyPlan.scheduleBlocks.append(ScheduleBlock(id: UUID(), title: title, start: start, end: end, type: type, linkedLessonRecordID: nil, notes: notes))
         dailyPlan.scheduleBlocks.sort { $0.start < $1.start }
+        saveDailyPlan()
+    }
+
+    func removeScheduleBlock(_ block: ScheduleBlock) {
+        dailyPlan.scheduleBlocks.removeAll { $0.id == block.id }
         saveDailyPlan()
     }
 
@@ -589,6 +594,11 @@ final class AppStore: ObservableObject {
     func toggleTask(_ task: DailyTask) {
         guard let index = dailyPlan.tasks.firstIndex(where: { $0.id == task.id }) else { return }
         dailyPlan.tasks[index].status = task.status == .open ? .complete : .open
+        saveDailyPlan()
+    }
+
+    func removeTask(_ task: DailyTask) {
+        dailyPlan.tasks.removeAll { $0.id == task.id }
         saveDailyPlan()
     }
 

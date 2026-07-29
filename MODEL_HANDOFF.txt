@@ -361,6 +361,15 @@ Problem: scripted app executable launch sometimes did not appear in the window l
 - OCR/math/diagram understanding remains a future source-quality pipeline.
 - Weekly package generation can create/link missing outputs, but OS-level notifications are not implemented.
 - UI is functionally improving but not final visual design. User wants screenshots/visuals to run through a design tool.
+- As of 2026-07-29 (Batch 007), a full visual redesign ("Sunrise Planner" — warm/rounded/serif)
+  is underway. Design handoff preserved at Design Reference/warm-morning-2026-07-29/; plan at
+  /Users/nils/.claude/plans/snuggly-brewing-elephant.md. Foundation (Sources/LessonPlanner/
+  Views/DesignSystem.swift) and the Today screen are done and visually confirmed
+  (Design Screenshots/2026-07-29/09-today-sunrise-redesign.png). This Week, Planning Preview,
+  Document Intake, and Workspace still use the old stock-SwiftUI look — a deliberate stop
+  point to confirm the approach before continuing. Typography uses system serif (New York),
+  not bundled Source Serif 4; icons stay SF Symbols (hierarchical rendering), not hand-drawn
+  duotone shapes — both confirmed with the owner as pragmatic native substitutes.
 - Weekly planner rows now size to their tallest cell, so nothing is clipped and sparse rows collapse. Very dense cells will make a row tall; if that becomes a problem the answer is a different overflow pattern (collapsed cards with click-to-expand, a detail drawer, or an agenda view), NOT a return to fixed row heights.
 - Local teacher profiles are test scaffolding only, not real accounts.
 - Real login, user assignment, cloud sync, permissions, and admin roles are future infrastructure work.

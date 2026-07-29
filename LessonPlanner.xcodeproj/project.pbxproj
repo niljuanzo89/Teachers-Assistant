@@ -19,6 +19,7 @@
 		A00000000000000000000013 /* NativePowerPointExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* NativePowerPointExporter.swift */; };
 		A00000000000000000000014 /* PowerPointTemplateInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* PowerPointTemplateInspector.swift */; };
 		A00000000000000000000015 /* WeeklyGridLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* WeeklyGridLayout.swift */; };
+		A00000000000000000000016 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* DesignSystem.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +38,7 @@
 		A10000000000000000000013 /* NativePowerPointExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativePowerPointExporter.swift; sourceTree = "<group>"; };
 		A10000000000000000000014 /* PowerPointTemplateInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerPointTemplateInspector.swift; sourceTree = "<group>"; };
 		A10000000000000000000015 /* WeeklyGridLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyGridLayout.swift; sourceTree = "<group>"; };
+		A10000000000000000000016 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -44,7 +46,7 @@
 		A20000000000000000000002 /* LessonPlanner */ = {isa = PBXGroup; children = (A10000000000000000000001 /* LessonPlannerApp.swift */, A10000000000000000000004 /* AppStore.swift */, A10000000000000000000010 /* LessonPlanRenderer.swift */, A10000000000000000000011 /* SlideDeckBridge.swift */, A10000000000000000000013 /* NativePowerPointExporter.swift */, A10000000000000000000014 /* PowerPointTemplateInspector.swift */, A10000000000000000000015 /* WeeklyGridLayout.swift */, A10000000000000000000012 /* SlideDeckGenerator.mjs */, A20000000000000000000003 /* Models */, A20000000000000000000004 /* Persistence */, A20000000000000000000005 /* Views */, A10000000000000000000009 /* Info.plist */, ); path = Sources/LessonPlanner; sourceTree = "<group>"; };
 		A20000000000000000000003 /* Models */ = {isa = PBXGroup; children = (A10000000000000000000002 /* AppModels.swift */, ); path = Models; sourceTree = "<group>"; };
 		A20000000000000000000004 /* Persistence */ = {isa = PBXGroup; children = (A10000000000000000000003 /* LocalRepository.swift */, ); path = Persistence; sourceTree = "<group>"; };
-		A20000000000000000000005 /* Views */ = {isa = PBXGroup; children = (A10000000000000000000005 /* RootView.swift */, A10000000000000000000006 /* SetupWizardView.swift */, A10000000000000000000007 /* WorkspaceView.swift */, ); path = Views; sourceTree = "<group>"; };
+		A20000000000000000000005 /* Views */ = {isa = PBXGroup; children = (A10000000000000000000005 /* RootView.swift */, A10000000000000000000006 /* SetupWizardView.swift */, A10000000000000000000007 /* WorkspaceView.swift */, A10000000000000000000016 /* DesignSystem.swift */, ); path = Views; sourceTree = "<group>"; };
 		A20000000000000000000006 /* Products */ = {isa = PBXGroup; children = (A10000000000000000000008 /* LessonPlanner.app */, ); name = Products; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
@@ -61,7 +63,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A50000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001 /* LessonPlannerApp.swift in Sources */, A00000000000000000000002 /* AppModels.swift in Sources */, A00000000000000000000003 /* LocalRepository.swift in Sources */, A00000000000000000000004 /* AppStore.swift in Sources */, A00000000000000000000005 /* RootView.swift in Sources */, A00000000000000000000006 /* SetupWizardView.swift in Sources */, A00000000000000000000007 /* WorkspaceView.swift in Sources */, A00000000000000000000010 /* LessonPlanRenderer.swift in Sources */, A00000000000000000000011 /* SlideDeckBridge.swift in Sources */, A00000000000000000000013 /* NativePowerPointExporter.swift in Sources */, A00000000000000000000014 /* PowerPointTemplateInspector.swift in Sources */, A00000000000000000000015 /* WeeklyGridLayout.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
+		A50000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001 /* LessonPlannerApp.swift in Sources */, A00000000000000000000002 /* AppModels.swift in Sources */, A00000000000000000000003 /* LocalRepository.swift in Sources */, A00000000000000000000004 /* AppStore.swift in Sources */, A00000000000000000000005 /* RootView.swift in Sources */, A00000000000000000000006 /* SetupWizardView.swift in Sources */, A00000000000000000000007 /* WorkspaceView.swift in Sources */, A00000000000000000000010 /* LessonPlanRenderer.swift in Sources */, A00000000000000000000011 /* SlideDeckBridge.swift in Sources */, A00000000000000000000013 /* NativePowerPointExporter.swift in Sources */, A00000000000000000000014 /* PowerPointTemplateInspector.swift in Sources */, A00000000000000000000015 /* WeeklyGridLayout.swift in Sources */, A00000000000000000000016 /* DesignSystem.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
