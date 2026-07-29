@@ -835,9 +835,11 @@ final class AppStore: ObservableObject {
                 return approvedPlan
             }()
         } else {
-            let lessonPlanningSources = readableSources.filter { source in
-                ![ImportedSourceRole.instructionalCalendar, .assessmentSchedule].contains(source.effectiveSetupRole)
+            let lessonMaterialSources = readableSources.filter { $0.effectiveSetupRole == .lessonMaterial }
+            let pacingSequenceSources = readableSources.filter { source in
+                [.pacingGuide, .curriculumMap].contains(source.effectiveSetupRole)
             }
+            let lessonPlanningSources = lessonMaterialSources.isEmpty ? pacingSequenceSources : lessonMaterialSources
             var starterPlan = CoursePacingPlan.starter(from: lessonPlanningSources.isEmpty ? readableSources : lessonPlanningSources)
             guard !starterPlan.units.isEmpty else { return }
             starterPlan.reviewStatus = .approved
@@ -948,7 +950,7 @@ final class AppStore: ObservableObject {
         for suggestion: WeeklyPacingSuggestion,
         in blocks: [ImportedDailyScheduleBlock]
     ) -> ImportedDailyScheduleBlock? {
-        let subjectText = "\(suggestion.unitTitle) \(suggestion.moduleTitle) \(suggestion.pacingLessonTitle)".lowercased()
+        let subjectText = "\(suggestion.unitTitle) \(suggestion.moduleTitle) \(suggestion.pacingLessonTitle) \(suggestion.sourceNotes)".lowercased()
         let candidates: [String]
         if subjectText.contains("english") || subjectText.contains("ela") || subjectText.contains("reading") || subjectText.contains("writing") {
             candidates = ["english", "ela", "language arts", "reading", "writing"]
@@ -985,21 +987,33 @@ final class AppStore: ObservableObject {
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        let timePattern = #"^(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})$"#
+        let timePattern = #"^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?\s*[-–]\s*(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?$"#
         let regex = try? NSRegularExpression(pattern: timePattern)
         return lines.enumerated().compactMap { index, line in
             let range = NSRange(line.startIndex..<line.endIndex, in: line)
-            guard let match = regex?.firstMatch(in: line, range: range), match.numberOfRanges == 5 else { return nil }
-            func intValue(_ rangeIndex: Int) -> Int {
-                guard let range = Range(match.range(at: rangeIndex), in: line) else { return 0 }
-                return Int(line[range]) ?? 0
+            guard let match = regex?.firstMatch(in: line, range: range), match.numberOfRanges == 7 else { return nil }
+            func stringValue(_ rangeIndex: Int) -> String {
+                guard let range = Range(match.range(at: rangeIndex), in: line) else { return "" }
+                return String(line[range])
             }
+            func intValue(_ rangeIndex: Int) -> Int {
+                Int(stringValue(rangeIndex)) ?? 0
+            }
+            func adjustedHour(_ hour: Int, marker: String) -> Int {
+                switch marker.lowercased() {
+                case "pm" where hour < 12: return hour + 12
+                case "am" where hour == 12: return 0
+                default: return hour
+                }
+            }
+            let startMarker = stringValue(3)
+            let endMarker = stringValue(6).isEmpty ? startMarker : stringValue(6)
             let label = index + 1 < lines.count ? lines[index + 1] : "Scheduled block"
             return ImportedDailyScheduleBlock(
-                startHour: intValue(1),
+                startHour: adjustedHour(intValue(1), marker: startMarker),
                 startMinute: intValue(2),
-                endHour: intValue(3),
-                endMinute: intValue(4),
+                endHour: adjustedHour(intValue(4), marker: endMarker),
+                endMinute: intValue(5),
                 label: label
             )
         }

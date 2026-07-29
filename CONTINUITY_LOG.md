@@ -888,6 +888,41 @@ reality: GitHub Desktop sync works and `main` tracks `origin/main`.
 - Swift build passed with the documented temp-cache / no-SwiftPM-sandbox workaround.
 - Full Swift test suite passed: 103 tests, 0 failures.
 - Real Xcode build succeeded.
+
+---
+
+### Batch 018 — 2026-07-29 — Fix subject-block auto-scheduling
+
+**Compute:** medium. **Model shape:** single sufficient — one real scheduling bug with a
+focused regression test.
+
+**Goal.** Fix the reported workflow where a math unit packet populated unrelated daily blocks
+instead of only the math schedule block.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Received owner bug report | Expected math lessons one per day in the 9:45-10:45 Math block; actual planner filled all day blocks |
+| 2 | Inspected weekly sync pipeline | Found auto-population in `syncReadableDocumentsIntoWeeklyPlanner` and schedule matching in `bestScheduleBlock` |
+| 3 | Inspected pacing starter logic | Found broad planning documents and lesson-material documents were both eligible to create lesson sequences |
+| 4 | Identified product boundary | Planning documents should govern timing/pacing; content documents should supply concrete lesson sequence |
+| 5 | Tightened source-role inference | Daily/class/instructional schedule phrases now classify as instructional calendars before lesson-material detection |
+| 6 | Tightened lesson-sequence source selection | If lesson-material/content packets are present, they drive starter lesson sequence instead of broad pacing/curriculum docs |
+| 7 | Preserved pacing fallback | If no content packet is present, pacing guide/curriculum map sources can still create the starter sequence |
+| 8 | Added source notes to weekly suggestions | The scheduler can now use source filename/context like "Math Unit Lessons.docx" for subject matching |
+| 9 | Improved daily schedule parsing | Time parser now accepts AM/PM ranges such as `9:45 AM - 10:45 AM` |
+| 10 | Added regression test | Broad pacing guide + AM/PM daily schedule + math unit packet now schedules five math lessons only in the Math block |
+| 11 | Ran full Swift tests | 104 tests passed, 0 failures |
+| 12 | Ran real Xcode build | BUILD SUCCEEDED |
+| 13 | Updated handoff/milestone docs | `BUILD_LOG.md`, `MODEL_HANDOFF.txt`, and this continuity log record the cause and fix |
+
+**Outcome.** The scheduler now respects the planning-vs-content boundary and the subject
+block. A math content packet drives the week’s lesson sequence and schedules into the Math
+block only, not every block in the uploaded daily schedule.
+
+**Verification.**
+
+- Full Swift test suite passed: 104 tests, 0 failures.
+- Real Xcode build succeeded.
 - Visual inspection of the fresh weekly-tab build showed the alignment improvement, but no
   clean screenshot artifact was retained because capture attempts grabbed overlays or Codex.
 

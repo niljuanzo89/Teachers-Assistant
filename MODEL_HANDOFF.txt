@@ -1,5 +1,5 @@
 LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
-Last updated: 2026-07-29 (through Batch 017, local commit ahead of GitHub)
+Last updated: 2026-07-29 (through Batch 018, local commits ahead of GitHub)
 
 PURPOSE OF THIS DOCUMENT
 
@@ -637,7 +637,7 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 017), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 018), the app has a working local-first prototype path:
 
 document/folder import -> automatic role sorting and pacing scaffold -> weekly planner
 population -> interactive weekly lesson cells -> lesson plan/deck/differentiation guide
@@ -654,16 +654,16 @@ ready-state panel, styled source detail/review cards, and guarded clear/start-ov
 Workspace is the remaining stock-looking screen, except for the already-added Progress safety
 section.
 
-Local verification for Batch 017: Swift build with temp caches passed; full Swift test suite
-passed 103 tests with 0 failures; real Xcode build succeeded. Screenshot:
+Local verification for Batch 018: full Swift test suite passed 104 tests with 0 failures;
+real Xcode build succeeded. Screenshot:
 `Design Screenshots/2026-07-29/15-this-week-output-key.png`.
 
 GitHub status: local branch is `main`; remote is
 `https://github.com/niljuanzo89/Teachers-Assistant.git`; GitHub Desktop successfully
 published the real LessonPlanner project to GitHub after an earlier empty-clone mismatch was
 corrected. Batch 016 pushed Batches 014-016 to GitHub through GitHub Desktop after
-command-line git again failed for missing HTTPS credentials. Batch 017 is a new local commit
-candidate until the next sync cadence.
+command-line git again failed for missing HTTPS credentials. Batches 017-018 are local
+commits/commit candidates until the next sync cadence.
 
 Immediate next session should:
 
@@ -675,5 +675,9 @@ Immediate next session should:
    ported the stronger early slide-deck arc into the supported native exporter; next apply
    `LessonOutputContent` to the lesson-plan and differentiation-guide HTML templates, then
    improve lesson content enrichment from source text.
+4. Preserve the planning-documents vs content-documents boundary from Batch 018: planning
+   documents govern pacing/time, content packets drive the concrete lesson sequence. A
+   subject-specific content packet, such as a math unit, should schedule into the matching
+   subject block only.
 4. Use the approved GitHub cadence: commit each verified batch, then push every 2-3 committed
    batches or before risky/handoff work. If command-line auth fails, use GitHub Desktop.

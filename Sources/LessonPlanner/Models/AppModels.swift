@@ -42,7 +42,7 @@ enum ImportedSourceRole: String, Codable, CaseIterable, Identifiable {
         if containsAny(["curriculum map", "standards map", "course map", "essential standards", "priority standards"], in: combined) {
             return .curriculumMap
         }
-        if containsAny(["school calendar", "instructional calendar", "district calendar", "holiday", "break", "no school", "early release"], in: combined) {
+        if containsAny(["daily schedule", "sample daily schedule", "class schedule", "instructional schedule", "school calendar", "instructional calendar", "district calendar", "holiday", "break", "no school", "early release"], in: combined) {
             return .instructionalCalendar
         }
         if containsAny(["assessment calendar", "assessment schedule", "benchmark", "unit test", "interim assessment", "quiz schedule"], in: combined) {
@@ -599,6 +599,7 @@ struct WeeklyPacingSuggestion: Equatable, Identifiable {
     var unitTitle: String
     var moduleTitle: String
     var pacingLessonTitle: String
+    var sourceNotes: String = ""
     var suggestedDate: Date
     var estimatedInstructionalDay: Int
     var estimatedInstructionalDays: Int
@@ -669,6 +670,7 @@ struct WeeklyPacingSuggestionReport: Equatable {
                 unitTitle: item.unit.title,
                 moduleTitle: item.module.title,
                 pacingLessonTitle: item.lesson.title,
+                sourceNotes: item.lesson.sourceNotes,
                 suggestedDate: suggestedDate,
                 estimatedInstructionalDay: item.overallSequence,
                 estimatedInstructionalDays: item.lesson.estimatedInstructionalDays,

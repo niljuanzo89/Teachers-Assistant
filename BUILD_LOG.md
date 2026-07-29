@@ -873,3 +873,24 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   XML content, and template-inspector inventory/frame-map behavior.
 - Verification: Swift build passed with the documented temp-cache/no-sandbox workaround; full
   Swift test suite passed 103 tests with 0 failures; real Xcode build succeeded.
+
+### 2026-07-29 — Subject-block scheduling fix
+
+- Fixed a weekly auto-population bug found during real use: after clearing prior sample
+  documents and importing a pacing guide, daily schedule, and math unit packet, lessons were
+  able to populate unrelated daily blocks instead of only the math block.
+- Clarified the import model in code: planning documents govern pacing/time, while content
+  documents supply the concrete lesson sequence. When lesson-material/content packets are
+  present, they now drive the starter lesson sequence instead of broad planning documents
+  creating every subject's lessons.
+- Improved daily schedule recognition so "daily schedule", "sample daily schedule", "class
+  schedule", and "instructional schedule" are classified as instructional-calendar documents
+  before generic lesson-material detection.
+- Improved schedule time parsing to handle AM/PM labels such as `9:45 AM - 10:45 AM`.
+- Added source-note subject matching so a math unit filename/source can match the Math block
+  even when individual lesson titles are "Place value review" or "Rounding in context."
+- Added a regression test mirroring the reported workflow: broad pacing guide + AM/PM daily
+  schedule + math unit packet produces five math lessons, one per day, all scheduled in the
+  9:45-10:45 Math block and not in other blocks.
+- Verification: full Swift test suite passed 104 tests with 0 failures; real Xcode build
+  succeeded.

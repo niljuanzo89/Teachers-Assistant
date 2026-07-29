@@ -1308,6 +1308,95 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertEqual(components.minute, 30)
     }
 
+    @MainActor
+    func testDocumentImportUsesContentPacketForLessonSequenceAndMatchingScheduleBlock() throws {
+        let repository = try makeRepository()
+        let workspace = repository.rootURL.appending(path: "workspace")
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Generic QA Workspace",
+            workspaceReference: FileReference(url: workspace)
+        ))
+        try repository.saveImportedSources([
+            ImportedSource(
+                id: UUID(),
+                reference: FileReference(url: URL(fileURLWithPath: "/tmp/01 School Pacing Guide Sep-Dec.pdf")),
+                setupRole: .pacingGuide,
+                extractionMethod: .embeddedText,
+                confidence: nil,
+                extractedText: """
+                Unit 1: Whole school pacing
+                Lesson 1: Reading foundations
+                Lesson 2: Art color choices
+                Lesson 3: Science observations
+                Lesson 4: Social studies communities
+                """,
+                reviewStatus: .reviewed,
+                importedAt: .now,
+                updatedAt: .now
+            ),
+            ImportedSource(
+                id: UUID(),
+                reference: FileReference(url: URL(fileURLWithPath: "/tmp/02 Sample Daily Schedule.docx")),
+                extractionMethod: .embeddedText,
+                confidence: nil,
+                extractedText: """
+                Sample Daily Schedule
+                8:35 AM - 9:35 AM
+                Reading
+                9:45 AM - 10:45 AM
+                Math
+                10:45 AM - 11:15 AM
+                Science
+                12:30 PM - 1:00 PM
+                Art
+                """,
+                reviewStatus: .reviewed,
+                importedAt: .now,
+                updatedAt: .now
+            ),
+            ImportedSource(
+                id: UUID(),
+                reference: FileReference(url: URL(fileURLWithPath: "/tmp/04 Math Unit Lessons.docx")),
+                extractionMethod: .embeddedText,
+                confidence: nil,
+                extractedText: """
+                Unit 1: Place Value
+                Monday: Place value review
+                Tuesday: Rounding in context
+                Wednesday: Addition strategies
+                Thursday: Problem solving
+                Friday: Subtraction strategies
+                """,
+                reviewStatus: .reviewed,
+                importedAt: .now,
+                updatedAt: .now
+            )
+        ])
+
+        let store = AppStore(repository: repository)
+        let calendar = Calendar.current
+
+        XCTAssertEqual(store.lessons.map(\.title), [
+            "Place value review",
+            "Rounding in context",
+            "Addition strategies",
+            "Problem solving",
+            "Subtraction strategies"
+        ])
+        XCTAssertEqual(store.weeklyPlan.assignments.count, 5)
+        XCTAssertTrue(store.weeklyPlan.assignments.allSatisfy { assignment in
+            calendar.component(.hour, from: assignment.start) == 9
+                && calendar.component(.minute, from: assignment.start) == 45
+                && calendar.component(.hour, from: assignment.end) == 10
+                && calendar.component(.minute, from: assignment.end) == 45
+        })
+        XCTAssertFalse(store.weeklyPlan.assignments.contains { assignment in
+            calendar.component(.hour, from: assignment.start) == 8
+                || calendar.component(.hour, from: assignment.start) == 10
+                || calendar.component(.hour, from: assignment.start) == 12
+        })
+    }
+
     func testWeeklyPlanningPromptStatusIsDueAfterPromptTime() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
