@@ -1,0 +1,508 @@
+LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
+Last updated: 2026-07-29
+
+PURPOSE OF THIS DOCUMENT
+
+Give this document, along with the LessonPlanner project folder, to another AI model or developer so they can continue work without rediscovering product intent, architecture, solved problems, known limitations, or recent implementation details.
+
+This is a product/development handoff, not legal advice. It should be read together with:
+
+- /Users/nils/Documents/Program Development Folder/LessonPlanner/CONTINUE_PROMPT.md
+- /Users/nils/Documents/Program Development Folder/LessonPlanner/CLAUDE.md
+- /Users/nils/Documents/Program Development Folder/LessonPlanner/CONTINUITY_LOG.md
+- /Users/nils/Documents/Program Development Folder/LessonPlanner/BUILD_LOG.md
+- /Users/nils/Documents/Program Development Folder/LessonPlanner/DEVELOPMENT_ROADMAP.md
+- /Users/nils/Documents/Program Development Folder/LessonPlanner/README.md
+
+READ ORDER FOR A MODEL JOINING THIS PROJECT
+
+1. CLAUDE.md — fastest orientation: environment, build/test commands, load-bearing rules,
+   traps, and current open items. Claude Code loads this automatically.
+2. This file — product intent, architecture, boundaries, current state in full.
+3. CONTINUITY_LOG.md — the operating protocol the owner expects you to follow, plus a
+   step-level running log of recent batches including dead ends that should not be retried.
+4. BUILD_LOG.md — long-form chronological milestones and capability inventory.
+
+MOVING THIS PROJECT INTO CLAUDE CODE
+
+FASTEST PATH: open CONTINUE_PROMPT.md and paste its body into a fresh Claude Code session.
+It is this handoff rewritten as a ready-to-use continuation prompt — orientation, working
+agreement, environment notes, known traps, current state, and the exact next three tasks in
+order. Everything below is the longer-form version of the same thing.
+
+The project is set up to be picked up in Claude Code with no re-briefing. Open the folder
+
+  /Users/nils/Documents/Program Development Folder/LessonPlanner
+
+as the working directory. CLAUDE.md is loaded automatically and carries the environment
+notes, build commands, the project.pbxproj trap, and the working agreement.
+
+The important environment difference: earlier work was done from a sandbox with NO Swift
+toolchain and NO GUI, so every build, test, and screenshot had to be delegated to Codex,
+and git operations were blocked outright. Claude Code has a real shell on the owner's Mac
+and can build, test, run git, and launch the app directly. Do not carry the Codex-for-
+everything habit across; use a second model only when an independent opinion is genuinely
+wanted.
+
+Three things are unverified and should be settled in the first Claude Code session:
+git is not yet initialized, the hand-edited project.pbxproj has not been validated with a
+real xcodebuild run, and the weekly grid changes have never been confirmed visually.
+
+The owner's standing working agreement is recorded in CONTINUITY_LOG.md: work in batches of
+up to 20 numbered steps, stop and notify when human intervention is required, and declare
+compute level and single-vs-dual model shape before each batch. Claude has file access but
+no Swift toolchain and no GUI; Codex runs on the owner's Mac and performs all builds, tests,
+and screen captures. Any claim that code works must be backed by a Codex run.
+
+
+1. CURRENT PRODUCT GOAL
+
+LessonPlanner is a local-first native macOS teacher-planning application. It is a generic product shell, not a curriculum-specific repository.
+
+The intended teacher workflow is:
+
+1. The teacher chooses a local planning workspace.
+2. The teacher imports all setup/planning documents in one place. Import should accept multiple files, DOCX/PDF, and whole folders.
+3. The app identifies and sorts imported documents into likely roles on the back end: pacing guide, curriculum map, instructional calendar, assessment schedule, daily schedule, lesson materials, template, or other.
+4. Readable content should be used automatically where possible. If a field cannot be read, the app should leave it blank or use a safe generic placeholder, then allow optional manual filling.
+5. The app builds governing pacing/timing parameters from setup documents.
+6. The app creates a weekly planning schedule for a set week.
+7. Each scheduled lesson should link to the three main outputs:
+   - lesson plan;
+   - slide deck / PowerPoint;
+   - differentiation guide.
+8. A weekly check-in prompt/conversation should help the teacher adjust pacing naturally. If AI features are enabled later, this weekly check-in is the preferred place for conversational pacing refinement.
+
+The long-term app must remain useful without generative AI. AI is an optional enrichment path, not the foundation.
+
+
+2. PRODUCT AND IP BOUNDARIES
+
+The generic product must not contain school-owned curriculum, proprietary templates, student data, confidential material, or employer-owned test fixtures.
+
+Keep these categories separate:
+
+- Generic product code, generic examples, generic templates, and non-sensitive sample data: personal product work.
+- School-specific curriculum, guides, templates, classroom adaptations, or confidential documents: external/local user data only.
+
+Do not copy proprietary curriculum, student data, school templates, or confidential documents into source code, tests, screenshots, public documentation, or distributable fixtures.
+
+The sellable product must not depend on Codex, Claude, or the developer's locally installed runtime. Any personal development bridge is for owner QA only.
+
+
+3. CURRENT WORKSPACE
+
+Primary project folder:
+
+/Users/nils/Documents/Program Development Folder/LessonPlanner
+
+Main files:
+
+- Package.swift
+  Swift package manifest used by SwiftPM builds/tests.
+
+- LessonPlanner.xcodeproj/
+  Xcode project for normal macOS app launch.
+
+- Sources/LessonPlanner/Models/AppModels.swift
+  Domain models: configuration, imported sources, local teacher profiles, course pacing, weekly plans, lessons, generated outputs, readiness reports, and template metadata.
+
+- Sources/LessonPlanner/AppStore.swift
+  Main local app state and workflow logic: import, extraction, source role inference, pacing creation, weekly auto-planning, lesson/output generation, local profile scoping, and persistence.
+
+- Sources/LessonPlanner/Views/WorkspaceView.swift
+  Main SwiftUI workspace. Contains tabs for Today, This Week, Planning Preview, Document Intake, and Workspace. Recent weekly planner UI changes are here.
+
+- Sources/LessonPlanner/LessonPlanRenderer.swift
+  Deterministic HTML renderers for lesson plan, weekly hub, and differentiation guide outputs.
+
+- Sources/LessonPlanner/SlideDeckBridge.swift
+  Slide-deck generation bridge. Native OpenXML export is the default path; personal bridge remains owner-local QA only.
+
+- Resources/SlideDeckGenerator.mjs
+  Personal/development deck generator resource. Do not treat as sellable dependency.
+
+- Tests/LessonPlannerTests/LessonPlannerTests.swift
+  Test suite. Last verified: 85 tests passing.
+
+- BUILD_LOG.md
+  Chronological development log. Keep updating after material changes.
+
+- MODEL_HANDOFF.txt
+  This document.
+
+Version control:
+
+THIS PROJECT IS NOT UNDER GIT. There is no repository in the project folder, so
+there is no commit history, no diff review, and no rollback path other than
+manual copies. Initializing a local git repository is recommended before the
+next substantial change.
+
+Design screenshot folder:
+
+/Users/nils/Documents/Program Development Folder/LessonPlanner/Design Screenshots/2026-07-28
+
+Important current screenshots:
+
+- 00-main-screens-contact-sheet.png
+- 01-today.png
+- 02-this-week.png
+- 03-planning-preview.png
+- 04-document-intake.png
+- 05-workspace.png
+- 07-this-week-cell-flow-compact.png
+
+
+4. CURRENT APP CAPABILITIES
+
+Local app shell:
+
+- Native SwiftUI macOS application.
+- Local-first storage.
+- Local workspace folder references.
+- Local testing profiles to simulate multiple users without real login/cloud infrastructure.
+- Active local profile banner to reduce testing confusion.
+- Local profile creation/switching panel.
+
+Document intake:
+
+- One document intake area.
+- Accepts PDF and DOCX.
+- Accepts multiple files in one picker.
+- Accepts folders and scans supported files inside them.
+- Sorts imported files into likely setup/planning roles.
+- Readable imports are usable by default.
+- Manual text edits/fill-ins remain optional for unreadable or blank content.
+- Document-level teacher approval was intentionally removed because it was too cumbersome.
+
+Pacing and schedule:
+
+- Can create starter course pacing from readable setup documents.
+- Prefers pacing guides, curriculum maps, calendars, and assessment schedules for governing timing.
+- Daily schedule documents can drive weekly planner time rows.
+- Existing stale 9:00 AM auto-created assignments can be repaired on reload after a daily schedule is imported.
+- Daily schedule and assessment documents shape timing but should not create lesson placeholder cards by themselves.
+- Course pacing supports units, modules, lessons, date ranges, assessment windows, skipped days, and notes.
+- Unit/module/lesson date range validation is in place.
+- Weekly suggestions use the most specific available date.
+
+Weekly planner:
+
+- Weekly schedule uses a compact table-style layout based on the user-provided weekly lesson plan reference.
+- Weekly planner can auto-populate from approved course pacing and imported setup documents.
+- Weekly cells are interactive:
+  - clicking a lesson card opens the scheduled-lesson edit panel;
+  - Plan / Deck / Guide controls generate missing outputs or open existing ones;
+  - Edit and Remove controls are available directly on cards.
+- Weekly package generation creates/links the three outputs for scheduled approved lessons.
+- Weekly planning brief fields are saved and included in generated weekly hub output.
+- Per-scheduled-lesson planning notes are supported.
+- Weekly prompt preference stores day/time and shows next target.
+- In-app weekly prompt banner appears when due.
+- Weekly pacing check-in can draft pacing refinements from teacher notes; accepted refinements update pacing notes/date ranges.
+
+Lesson and outputs:
+
+- Draft/review/approved lesson states exist.
+- Approved lessons can produce:
+  - HTML lesson plan;
+  - HTML differentiation guide;
+  - PowerPoint deck.
+- Native PowerPoint OpenXML export is the default app path.
+- Generated outputs are tracked locally and can be revealed/opened.
+- Generated weekly hub links each lesson to its plan, deck, and guide.
+
+Template/export groundwork:
+
+- Output records can carry active template provenance.
+- Presentation template registration exists with default lesson-field mappings.
+- Template readiness guidance distinguishes metadata/provenance from true visual layout fidelity.
+- Template layout-plan records can store source-slide inventory, output frame mapping, and fidelity-review status.
+- Basic `.pptx` template inspection can read slide XML and create first-pass candidates.
+
+QA/support screens:
+
+- Workspace includes release-readiness checklist.
+- Workspace includes local workflow QA checklist for phase-exit testing.
+
+
+5. IMPORTANT DESIGN DECISIONS AND WORKFLOW CORRECTIONS
+
+Document intake should be streamlined:
+
+- Previous direction had too much teacher review and approval per document.
+- User feedback: this is cumbersome and unsustainable.
+- Current direction: import documents and automatically port readable information into pacing and weekly planning.
+- Missing/unreadable fields should be omitted, left blank, or safely autofilled where generic placeholders are acceptable.
+- Manual fill-in should be available but not mandatory between import and weekly planner preview.
+
+Weekly schedule is the central container:
+
+- Final app should not produce isolated outputs only.
+- The weekly planning document/hub is the container for the week.
+- Each scheduled lesson should link to the three outputs: slide deck, lesson plan, differentiation guide.
+
+Weekly check-in is the pacing adjustment surface:
+
+- User specifically wants natural, conversational weekly check-in prompts.
+- If AI is enabled later, the weekly check-in should modify/refine pacing through teacher conversation.
+- The app should not silently rewrite governing pacing without teacher-visible acceptance.
+
+Local testing profiles are for QA only:
+
+- They simulate multiple users locally.
+- They do not represent production accounts, cloud identity, sync, permissions, or admin infrastructure.
+- Real login/user assignment will require larger infrastructure later.
+
+
+6. PROBLEMS ENCOUNTERED, ATTEMPTED SOLUTIONS, AND WORKABLE SOLUTIONS
+
+Problem: User could not select multiple files during import.
+
+- Attempted/identified issue: file picker was too restrictive and did not support the real setup workflow.
+- Workable solution: document intake now accepts multiple files and folders, including PDF and DOCX.
+
+Problem: DOCX files were not permissible.
+
+- Workable solution: DOCX import was added and tested.
+
+Problem: Document-by-document teacher approval was too cumbersome.
+
+- Attempted direction: approval/readiness gating around imported documents.
+- User feedback: process is unsustainable.
+- Workable solution: remove document approval gate; use readable documents automatically; allow optional manual correction/fill-in for blanks.
+
+Problem: 29 imported documents appeared imported, but only one science lesson appeared in planning preview.
+
+- Cause direction: imports were not fully auto-syncing into course pacing / weekly planner.
+- Workable solution: readable setup documents now create starter course pacing, approved lesson placeholders, and weekly planner assignments; existing readable imports can backfill on app/profile load.
+
+Problem: Weekly planner showed non-obvious setup requirements and no scheduled lessons.
+
+- Workable solution: document intake and readable imports now auto-build more of the planning scaffold; weekly planner messages were adjusted away from requiring hidden setup steps.
+
+Problem: Weekly planner initially used a long list layout instead of a true weekly schedule.
+
+- User provided a desired weekly lesson plan layout/reference.
+- Workable solution: weekly planner was changed to a compact table with time rows and weekday columns.
+
+Problem: Only the 9:00 AM block initially populated.
+
+- Cause direction: daily schedule information was not governing placement strongly enough.
+- Workable solution: imported daily schedule documents now map lesson subjects to schedule-derived blocks.
+- Current observed/default mappings from sample packet:
+  - English -> 8:35 AM–9:35 AM
+  - Math -> 9:45 AM–10:45 AM
+  - Science / Social Studies -> 10:45 AM–11:15 AM
+  - Art / Specials -> 12:30 PM–1:10 PM
+- Existing stale 9:00 AM assignments can be repaired on reload after schedule import.
+
+Problem: Weekly cells looked noninteractive.
+
+- Workable solution: lesson cards are clickable; Plan/Deck/Guide controls generate/open outputs; Edit/Remove actions appear on each card.
+
+Problem: Weekly planner cell-flow problems and huge blank bands.
+
+- Cause direction: time rows expanded based on the busiest cell, creating awkward whitespace across the grid.
+- First attempted fix: bounded weekly table cells with internal vertical scroll areas.
+- Second attempt, 2026-07-28: fixed-height time rows (176pt), internal scrolling for
+  overloaded cells, wider day columns, compact lesson cards, and Plan/Deck/Guide/Edit/
+  Remove controls on a tighter row.
+- Why the 2026-07-28 fix was not sufficient: a fixed row height trades one problem for
+  two. Cells holding two or more lesson cards clipped the second card mid-way, cutting
+  off its Plan/Deck/Guide controls, while rows holding zero or one card still consumed
+  the full 176pt and left large empty bands. The nested per-cell ScrollView also captured
+  scroll-wheel events away from the surrounding grid and hid the clipped content with no
+  visible affordance. Both effects are visible in the 2026-07-28 screenshot below.
+- Workable solution as of 2026-07-29 — INTRINSIC ROW HEIGHT:
+  - Metrics.rowHeight (fixed 176) became Metrics.minRowHeight (a floor of 88);
+  - each row's HStack takes intrinsic height via .fixedSize(horizontal: false, vertical: true),
+    so the row is exactly as tall as its tallest cell;
+  - WeeklyPlanningTimeCell and WeeklyPlanningTableCell take a minHeight instead of a
+    height and use .frame(minHeight:maxHeight:.infinity), so every cell border stretches
+    to the row height and the grid lines stay aligned;
+  - the nested per-cell ScrollView and LazyVStack were replaced with a plain VStack, so
+    nothing is clipped and the scroll wheel reaches the surrounding grid again.
+  All changes are in Sources/LessonPlanner/Views/WorkspaceView.swift.
+  Compiles clean; 85/85 tests pass. HUMAN VISUAL CONFIRMATION IS STILL OUTSTANDING.
+- Visual QA screenshot (shows the superseded 2026-07-28 behavior, useful as a before/after
+  baseline):
+  /Users/nils/Documents/Program Development Folder/LessonPlanner/Design Screenshots/2026-07-28/07-this-week-cell-flow-compact.png
+
+Problem: the weekly grid creates a separate time row for every distinct start time.
+
+- Not yet addressed. Slot matching is on exact hour AND minute, so days whose blocks start
+  at slightly different times produce extra near-empty rows. The intrinsic-height fix
+  collapses those rows so they cost little space, but the row count is still higher than
+  a teacher would draw by hand. Consider tolerance-based slot grouping if the grid still
+  feels sparse after visual review.
+
+Problem: Screenshot capture of whole display was unsafe.
+
+- Attempted solution rejected: full-screen `screencapture`.
+- Reason: could capture unrelated sensitive screen content.
+- Workable solution: window-only screenshot capture using the LessonPlanner window ID. This produced safe app-only screenshots.
+
+Problem: macOS UI automation through System Events failed.
+
+- Error: `osascript is not allowed assistive access. (-1719)`.
+- Workable solution: add capture-only launch environment flags so the app opens directly to a selected tab without UI clicking.
+- Relevant environment flags:
+  - LESSONPLANNER_DESIGN_CAPTURE=1
+  - LESSONPLANNER_INITIAL_TAB=today|week|planning|intake|workspace
+
+Problem: scripted app executable launch sometimes did not appear in the window list after rebuild.
+
+- Workable solution: launch via macOS `open -n ... --env ...`, then capture the window-only screenshot once Quartz lists the LessonPlanner window.
+
+
+7. CURRENT LIMITATIONS
+
+- Visual PDF content, handwriting, diagrams, and some fraction/equation formatting are not reliably extracted.
+- OCR/math/diagram understanding remains a future source-quality pipeline.
+- Weekly package generation can create/link missing outputs, but OS-level notifications are not implemented.
+- UI is functionally improving but not final visual design. User wants screenshots/visuals to run through a design tool.
+- Weekly planner rows now size to their tallest cell, so nothing is clipped and sparse rows collapse. Very dense cells will make a row tall; if that becomes a problem the answer is a different overflow pattern (collapsed cards with click-to-expand, a detail drawer, or an agenda view), NOT a return to fixed row heights.
+- Local teacher profiles are test scaffolding only, not real accounts.
+- Real login, user assignment, cloud sync, permissions, and admin roles are future infrastructure work.
+- Native PowerPoint exporter is functional but generic/minimal. It does not yet preserve or fill real customer-owned PowerPoint layouts.
+- Template inspection reads slide-level XML and proposes candidates; it does not resolve inherited placeholders from masters/layouts or perform visual fidelity QA.
+- Google Slides is supported through PowerPoint upload/conversion testing, not a native Google Slides API integration.
+- No school curriculum, student data, or proprietary templates should be embedded in product code or tests.
+
+
+8. VERIFICATION STATUS
+
+Last verified 2026-07-29, after the weekly planner intrinsic-row-height change:
+
+- `swift test`: 85 tests passed, 0 failures.
+- No compile errors introduced by the change.
+- NOT YET DONE: visual confirmation of the new grid. An automated screenshot capture was
+  attempted and did not complete. Before considering this change finished, capture a fresh
+  "This Week" screenshot and compare it against
+  Design Screenshots/2026-07-28/07-this-week-cell-flow-compact.png, confirming that
+  (a) cards in crowded cells are fully visible rather than clipped,
+  (b) sparse and empty rows have collapsed instead of holding a tall blank band,
+  (c) row borders still align across the Time column and all day columns.
+
+Previously verified 2026-07-28, after the weekly planner cell-flow cleanup:
+
+- Xcode command-line build: passed.
+- `swift test`: 85 tests passed, 0 failures.
+
+Known environment gotchas:
+
+- `swift test` can fail during dSYM generation with "generate-dSYM command failed with
+  exit code 1 / Operation not permitted" and report ZERO tests run. This is a sandbox
+  permission issue, not a code failure. Adding `-Xswiftc -gnone` skips debug-info
+  generation and the suite then runs normally.
+- Xcode may warn that traditional headermap style is no longer supported and recommends
+  changing `ALWAYS_SEARCH_USER_PATHS`. This warning has not blocked the build.
+
+
+9. HOW TO RUN
+
+Preferred manual workflow:
+
+1. Open:
+   /Users/nils/Documents/Program Development Folder/LessonPlanner/LessonPlanner.xcodeproj
+2. Run the macOS target from Xcode.
+3. Use or create a local testing profile.
+4. Open Document Intake.
+5. Import the sample planning packet or a folder of supported documents.
+6. Confirm the Weekly Planner auto-populates.
+7. Use the weekly cells to generate/open Plan, Deck, and Guide outputs.
+8. Generate the weekly package/hub and inspect the resulting files.
+
+Command-line test:
+
+swift test
+
+If that fails at the dSYM step (see section 8), use:
+
+CLANG_MODULE_CACHE_PATH=/private/tmp/lessonplanner-clang-cache \
+SWIFTPM_CACHE_PATH=/private/tmp/lessonplanner-swiftpm-cache \
+swift test --disable-sandbox --scratch-path /private/tmp/lessonplanner-build -Xswiftc -gnone
+
+Command-line Xcode build:
+
+xcodebuild -quiet -project LessonPlanner.xcodeproj -scheme LessonPlanner -configuration Debug -derivedDataPath /private/tmp/LessonPlannerDerivedData build CODE_SIGNING_ALLOWED=NO
+
+Design-review launch examples:
+
+LESSONPLANNER_DESIGN_CAPTURE=1 LESSONPLANNER_INITIAL_TAB=week open -n /private/tmp/LessonPlannerDerivedData/Build/Products/Debug/LessonPlanner.app
+
+If `open --env` is available/preferred:
+
+open -n /private/tmp/LessonPlannerDerivedData/Build/Products/Debug/LessonPlanner.app --env LESSONPLANNER_DESIGN_CAPTURE=1 --env LESSONPLANNER_INITIAL_TAB=week
+
+
+10. NEXT HUMAN NEEDED ACTIONS
+
+The project is now at a point where human-guided QA and design feedback are the most valuable next steps.
+
+Recommended next actions:
+
+1. Run the app with a local test profile.
+2. Import the full sample planning packet folder.
+3. Confirm weekly planner population feels automatic from import to schedule.
+4. Check whether the new intrinsic-height weekly cells read well in a real teacher workflow — nothing clipped, no wasted vertical space, grid lines aligned.
+5. Open generated lesson plans, differentiation guides, and decks.
+6. Inspect a generated PowerPoint deck in Microsoft PowerPoint.
+7. Upload/open a generated deck in Google Slides for compatibility review.
+8. Use the captured screenshots in a design tool to define the desired visual style.
+9. Decide whether the weekly planner still needs a dedicated overflow pattern for very
+   dense blocks now that rows grow to fit:
+   - compact collapsed cards with click-to-expand;
+   - day/time detail drawer;
+   - separate agenda view for dense blocks.
+   (Internal per-cell scroll has been tried and removed; do not reach for it again.)
+10. Decide whether OS-level notifications are required beyond the in-app weekly prompt.
+
+
+11. NEXT IMPLEMENTATION STEPS
+
+Likely next development sequence:
+
+1. Continue UI polish of Weekly Planner based on human feedback.
+2. Reassess dense-cell behavior after visual review of the intrinsic-row-height change.
+3. Refine Document Intake copy and status indicators so import-to-weekly-plan feels obvious.
+4. Add an explicit "import complete -> weekly plan ready" success path.
+5. Improve generated weekly hub visual layout.
+6. Run full end-to-end QA from import through weekly hub generation.
+7. Record QA findings in BUILD_LOG.md.
+8. Perform PowerPoint and Google Slides compatibility review.
+9. Extend template inspection to resolve inherited placeholders from slide layouts/masters.
+10. Begin visual redesign implementation once design-tool mockups are available.
+
+
+12. WHAT NOT TO REDO
+
+- Do not replace the native SwiftUI app with a web app.
+- Do not reintroduce required document-by-document approval.
+- Do not make AI mandatory for import, pacing, weekly planning, or output generation.
+- Do not embed real school curriculum, student data, proprietary templates, or confidential documents in the repo.
+- Do not treat local testing profiles as production login/account infrastructure.
+- Do not treat the personal PowerPoint bridge or local Codex-related runtime as sellable product architecture.
+- Do not remove the weekly schedule as the central container for the three outputs.
+- Do not reintroduce a fixed row height or a nested per-cell ScrollView in the weekly
+  planning grid. Both were tried and both caused the clipping and blank-band problems
+  described in section 6.
+- Do not record a documentation change in BUILD_LOG.md without confirming the file
+  actually landed on disk. A prior session logged a handoff refresh that was never saved,
+  leaving the log and the handoff out of sync for a day.
+
+
+13. CURRENT STOPPING POINT
+
+As of 2026-07-29, the app has a working local-first prototype path:
+
+document/folder import -> automatic role sorting and pacing scaffold -> weekly planner population -> interactive weekly lesson cells -> lesson plan/deck/differentiation guide outputs -> weekly hub package.
+
+The current focus should be hands-on QA and UI refinement, especially:
+
+- weekly planner density/overflow behavior;
+- document intake clarity;
+- visual redesign from screenshots;
+- PowerPoint/Google Slides output review;
+- making the import-to-weekly-plan path feel like "no steps between A and B."

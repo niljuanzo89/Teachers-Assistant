@@ -1,0 +1,84 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000001 /* LessonPlannerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* LessonPlannerApp.swift */; };
+		A00000000000000000000002 /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* AppModels.swift */; };
+		A00000000000000000000003 /* LocalRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* LocalRepository.swift */; };
+		A00000000000000000000004 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* AppStore.swift */; };
+		A00000000000000000000005 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* RootView.swift */; };
+		A00000000000000000000006 /* SetupWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000006 /* SetupWizardView.swift */; };
+		A00000000000000000000007 /* WorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* WorkspaceView.swift */; };
+		A00000000000000000000010 /* LessonPlanRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* LessonPlanRenderer.swift */; };
+		A00000000000000000000011 /* SlideDeckBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* SlideDeckBridge.swift */; };
+		A00000000000000000000012 /* SlideDeckGenerator.mjs in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* SlideDeckGenerator.mjs */; };
+		A00000000000000000000013 /* NativePowerPointExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* NativePowerPointExporter.swift */; };
+		A00000000000000000000014 /* PowerPointTemplateInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* PowerPointTemplateInspector.swift */; };
+		A00000000000000000000015 /* WeeklyGridLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* WeeklyGridLayout.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000001 /* LessonPlannerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LessonPlannerApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000002 /* AppModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModels.swift; sourceTree = "<group>"; };
+		A10000000000000000000003 /* LocalRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalRepository.swift; sourceTree = "<group>"; };
+		A10000000000000000000004 /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
+		A10000000000000000000005 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		A10000000000000000000006 /* SetupWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupWizardView.swift; sourceTree = "<group>"; };
+		A10000000000000000000007 /* WorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceView.swift; sourceTree = "<group>"; };
+		A10000000000000000000008 /* LessonPlanner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LessonPlanner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000010 /* LessonPlanRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LessonPlanRenderer.swift; sourceTree = "<group>"; };
+		A10000000000000000000011 /* SlideDeckBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideDeckBridge.swift; sourceTree = "<group>"; };
+		A10000000000000000000012 /* SlideDeckGenerator.mjs */ = {isa = PBXFileReference; lastKnownFileType = text.script.js; path = ../../Resources/SlideDeckGenerator.mjs; sourceTree = "<group>"; };
+		A10000000000000000000013 /* NativePowerPointExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativePowerPointExporter.swift; sourceTree = "<group>"; };
+		A10000000000000000000014 /* PowerPointTemplateInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerPointTemplateInspector.swift; sourceTree = "<group>"; };
+		A10000000000000000000015 /* WeeklyGridLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyGridLayout.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		A20000000000000000000001 = {isa = PBXGroup; children = (A20000000000000000000002 /* LessonPlanner */, A20000000000000000000006 /* Products */, ); sourceTree = "<group>"; };
+		A20000000000000000000002 /* LessonPlanner */ = {isa = PBXGroup; children = (A10000000000000000000001 /* LessonPlannerApp.swift */, A10000000000000000000004 /* AppStore.swift */, A10000000000000000000010 /* LessonPlanRenderer.swift */, A10000000000000000000011 /* SlideDeckBridge.swift */, A10000000000000000000013 /* NativePowerPointExporter.swift */, A10000000000000000000014 /* PowerPointTemplateInspector.swift */, A10000000000000000000015 /* WeeklyGridLayout.swift */, A10000000000000000000012 /* SlideDeckGenerator.mjs */, A20000000000000000000003 /* Models */, A20000000000000000000004 /* Persistence */, A20000000000000000000005 /* Views */, A10000000000000000000009 /* Info.plist */, ); path = Sources/LessonPlanner; sourceTree = "<group>"; };
+		A20000000000000000000003 /* Models */ = {isa = PBXGroup; children = (A10000000000000000000002 /* AppModels.swift */, ); path = Models; sourceTree = "<group>"; };
+		A20000000000000000000004 /* Persistence */ = {isa = PBXGroup; children = (A10000000000000000000003 /* LocalRepository.swift */, ); path = Persistence; sourceTree = "<group>"; };
+		A20000000000000000000005 /* Views */ = {isa = PBXGroup; children = (A10000000000000000000005 /* RootView.swift */, A10000000000000000000006 /* SetupWizardView.swift */, A10000000000000000000007 /* WorkspaceView.swift */, ); path = Views; sourceTree = "<group>"; };
+		A20000000000000000000006 /* Products */ = {isa = PBXGroup; children = (A10000000000000000000008 /* LessonPlanner.app */, ); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A30000000000000000000001 /* LessonPlanner */ = {isa = PBXNativeTarget; buildConfigurationList = A40000000000000000000002 /* Build configuration list for PBXNativeTarget "LessonPlanner" */; buildPhases = (A50000000000000000000001 /* Sources */, A50000000000000000000002 /* Frameworks */, A50000000000000000000003 /* Resources */, ); buildRules = (); dependencies = (); name = LessonPlanner; productName = LessonPlanner; productReference = A10000000000000000000008 /* LessonPlanner.app */; productType = "com.apple.product-type.application"; };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A60000000000000000000001 /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2600; LastUpgradeCheck = 2600; TargetAttributes = {A30000000000000000000001 = {CreatedOnToolsVersion = 26.0; }; }; }; buildConfigurationList = A40000000000000000000001 /* Build configuration list for PBXProject "LessonPlanner" */; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, ); mainGroup = A20000000000000000000001; productRefGroup = A20000000000000000000006 /* Products */; projectDirPath = ""; projectRoot = ""; targets = (A30000000000000000000001 /* LessonPlanner */, ); };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A50000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000012 /* SlideDeckGenerator.mjs in Resources */, ); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A50000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001 /* LessonPlannerApp.swift in Sources */, A00000000000000000000002 /* AppModels.swift in Sources */, A00000000000000000000003 /* LocalRepository.swift in Sources */, A00000000000000000000004 /* AppStore.swift in Sources */, A00000000000000000000005 /* RootView.swift in Sources */, A00000000000000000000006 /* SetupWizardView.swift in Sources */, A00000000000000000000007 /* WorkspaceView.swift in Sources */, A00000000000000000000010 /* LessonPlanRenderer.swift in Sources */, A00000000000000000000011 /* SlideDeckBridge.swift in Sources */, A00000000000000000000013 /* NativePowerPointExporter.swift in Sources */, A00000000000000000000014 /* PowerPointTemplateInspector.swift in Sources */, A00000000000000000000015 /* WeeklyGridLayout.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A50000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A70000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {MACOSX_DEPLOYMENT_TARGET = 14.0; }; name = Debug; };
+		A70000000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {MACOSX_DEPLOYMENT_TARGET = 14.0; }; name = Release; };
+		A70000000000000000000003 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = ""; CODE_SIGN_IDENTITY = "-"; CODE_SIGNING_ALLOWED = YES; CODE_SIGN_STYLE = Manual; DEVELOPMENT_TEAM = ""; INFOPLIST_FILE = AppBundle/Info.plist; MACOSX_DEPLOYMENT_TARGET = 14.0; PRODUCT_BUNDLE_IDENTIFIER = com.nils.lessonplanner; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 6.0; }; name = Debug; };
+		A70000000000000000000004 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = ""; CODE_SIGN_IDENTITY = "-"; CODE_SIGNING_ALLOWED = YES; CODE_SIGN_STYLE = Manual; DEVELOPMENT_TEAM = ""; INFOPLIST_FILE = AppBundle/Info.plist; MACOSX_DEPLOYMENT_TARGET = 14.0; PRODUCT_BUNDLE_IDENTIFIER = com.nils.lessonplanner; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 6.0; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A40000000000000000000001 /* Build configuration list for PBXProject "LessonPlanner" */ = {isa = XCConfigurationList; buildConfigurations = (A70000000000000000000001 /* Debug */, A70000000000000000000002 /* Release */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A40000000000000000000002 /* Build configuration list for PBXNativeTarget "LessonPlanner" */ = {isa = XCConfigurationList; buildConfigurations = (A70000000000000000000003 /* Debug */, A70000000000000000000004 /* Release */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = A60000000000000000000001 /* Project object */;
+}

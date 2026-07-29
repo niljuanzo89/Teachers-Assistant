@@ -1,0 +1,31 @@
+# Build products
+.build/
+.build-test/
+Build/
+DerivedData/
+*.o
+*.dSYM/
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# SwiftPM
+.swiftpm/xcode/package.xcworkspace/xcuserdata/
+Package.resolved
+
+# Temporary export scratch
+.tmp-slide-export/
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Generated QA output — regenerate rather than commit.
+# Keep Design Screenshots/ tracked: they are the visual QA record.
+*.pptx
+Native PowerPoint Exporter QA Deck/
