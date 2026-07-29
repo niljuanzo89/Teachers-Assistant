@@ -300,3 +300,68 @@ does what Batch 001/003 intended.
    — owner priority #2, medium-to-high compute, dual helpful.
 3. Document Intake polish — owner priority #3, low-to-medium compute, single sufficient.
 4. PowerPoint/Google Slides round-trip review of a generated deck — needs the owner directly.
+
+---
+
+### Batch 005 — 2026-07-29 — Template layout/master placeholder inheritance
+
+**Compute:** high. **Model shape:** dual recommended — Claude authored and implemented;
+Codex (only, per owner's session-scoped instruction — Gemini/Grok not used) gave an
+independent read on the ECMA-376 inheritance/matching rules before implementation and a
+correctness-only review of the actual diff afterward.
+
+**Goal.** Close owner priority #1: extend `PowerPointTemplateInspector` to resolve
+placeholder shapes inherited from slide layouts and masters, for arbitrary customer-owned
+`.pptx` templates a teacher might import (not our own generated decks — `NativePowerPointExporter`
+uses plain absolutely-positioned text boxes, no `<p:ph>` placeholders at all).
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Read `PowerPointTemplateInspector.swift`, the ADR, and `AppModels.swift`'s template types | Current inspector only string-counts `<p:ph` occurrences on the slide XML; never reads `_rels`, layouts, or masters |
+| 2 | Read `NativePowerPointExporter.swift`'s slide/layout/master output | Confirmed: our own decks don't use placeholders — this work is entirely about reading arbitrary imported templates |
+| 3 | Read existing `PowerPointTemplateInspector` tests and the `runZip` fixture-building helper | Established the test pattern to follow |
+| 4 | Codex consult #1 (new thread, no repo access — first attempt with `cwd` set timed out) — ECMA-376 `<p:ph>` defaults, idx/type matching rules, spPr inheritance granularity, Keynote/Google-Slides export quirks | Missing `type` defaults to `obj`; missing `idx` defaults to `0`; idx-preferred matching with type fallback; `title`/`ctrTitle` compatible for matching; geometry inherits independently of other spPr properties; Google Slides exports tend to flatten placeholders to `obj` with explicit slide-level geometry |
+| 5 | Codex consult #2 (same thread) — resolution algorithm pseudocode, layout/master relationship cardinality | Idx-first-then-type-fallback algorithm with same-type tiebreak among idx duplicates; slide's layout is only ever chosen via its own `_rels` relationship (no positional fallback); a layout has exactly one master |
+| 6 | Design decision: keep new types (`ResolvedPlaceholder`, `OOXMLPlaceholderShape`, etc.) additive, not merged into the persisted `PresentationTemplateSlideInventoryItem`/`PresentationTemplateLayoutPlan` Codable models | Avoids any persistence/migration risk to already-saved local app state; ships the real capability as a new inspector API (`resolvePlaceholders(url:)`) without touching what's already wired into the UI |
+| 7 | Implement `OOXMLPlaceholderShape`, `OOXMLFrame`, `PlaceholderFrameSource`, `ResolvedPlaceholder`, `PresentationTemplatePlaceholderResolution` | Done, in `PowerPointTemplateInspector.swift` |
+| 8 | Implement `OOXMLPlaceholderResolution.resolve`/`matchIndex` (the matching algorithm) | Done, following Codex's pseudocode |
+| 9 | Implement `OOXMLRelationshipParser` and `OOXMLPlaceholderParser` (XMLParser-based, not string-scanning — first use of `XMLParser` in this codebase, chosen over hand-rolled scanning because correctness on nested/multi-shape XML matters here) | Done |
+| 10 | Implement relationship-target path resolution (`resolvedRelationshipTarget`, `relationshipsEntryName`, `normalizedPackagePath`) — OPC `Target` paths are relative to the referencing part's directory | Done; first draft of `relationshipsEntryName` had a broken self-referential `replacingOccurrences` hack, caught on review and rewritten cleanly before it was ever tested |
+| 11 | Add `optionalXML(named:)` to `PowerPointPackageReader` for optional parts (a slide/layout may not have a `.rels`, layout, or master) | Done — degrades gracefully instead of throwing |
+| 12 | Refactor: extract `sortedSlideEntryNames(in:)` out of `inspect()` for reuse by `resolvePlaceholders(url:)` | Done, no behavior change to `inspect()` |
+| 13 | `swift build -Xswiftc -gnone` | Compiled clean on first full attempt after the pbxproj-irrelevant refactor (no new files, no pbxproj edit needed) |
+| 14 | Write 6 pure-algorithm unit tests against `OOXMLPlaceholderResolution.resolve` directly (full chain inheritance, slide-overrides-inheritance, idx-unmatched type fallback, duplicate-idx tiebreak, ctrTitle/title equivalence, fully-unmatched placeholder) | All pass |
+| 15 | Write 1 full ZIP-based integration test (`testPowerPointTemplateInspectorResolvesPlaceholdersAcrossSlideLayoutAndMaster`) building a real multi-part slide+layout+master+rels package, exercising the actual relationship/path-resolution plumbing end-to-end | Passes — proves the wiring, not just the isolated algorithm |
+| 16 | `swift test -Xswiftc -gnone` | 100 tests passed (93 baseline + 7 new), 0 failures |
+| 17 | Real `xcodebuild` | BUILD SUCCEEDED |
+| 18 | Codex correctness review of the actual implementation (self-contained code pasted into the prompt after a `cwd`-based attempt timed out and the thread was lost) | No correctness findings against the stated rules; confirmed the deliberate `<p:sp>`-only scope (no `<p:pic>`/`<p:graphicFrame>` placeholder resolution) is a documented limitation, not a bug |
+| 19 | Update `MODEL_HANDOFF.txt` limitations section | Done |
+| 20 | Log this batch, commit | This entry |
+
+**Outcome.** `PowerPointTemplateInspector.resolvePlaceholders(url:)` is a new, tested,
+Codex-reviewed capability that correctly resolves placeholder type/idx/geometry across the
+slide -> layout -> master inheritance chain for arbitrary imported `.pptx` templates. Not yet
+wired into the existing `inspect()` output, the persisted layout plan, or any UI — that's the
+natural next increment once the owner wants to see it surfaced.
+
+**Dead ends confirmed still valid.**
+
+- Codex MCP calls that set `cwd` and expect Codex to explore/read repo files can time out
+  even for a single, well-scoped ask — this happened twice in this batch (once for the rules
+  consult, once for the diff review). Pasting the relevant code/question directly into the
+  prompt (no file access needed) succeeded both times it was tried. **Prefer self-contained
+  prompts over `cwd`-based repo exploration for Codex consults in this project.**
+- A Codex thread can go stale/be lost between calls (`"Session not found for thread_id"`) —
+  don't assume a `threadId` from an earlier turn is still valid; be ready to start fresh.
+
+**Still open.**
+
+1. Wire `resolvePlaceholders(url:)` into the inspector's user-visible output (`inspect()`'s
+   `PresentationTemplateSlideInventoryItem`/frame map, or a new UI surface) and, eventually,
+   into a layout-preserving exporter path that places lesson content at each placeholder's
+   resolved frame.
+2. Extend resolution to `<p:pic>`/`<p:graphicFrame>` placeholders if a real customer template
+   needs it (currently out of scope by design, not a gap discovered in testing).
+3. Source-readiness screen — owner priority #2, medium-to-high compute, dual helpful.
+4. Document Intake polish — owner priority #3, low-to-medium compute, single sufficient.
+5. PowerPoint/Google Slides round-trip review of a generated deck — needs the owner directly.

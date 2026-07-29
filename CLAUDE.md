@@ -141,8 +141,13 @@ needed) brings it forward first; `System Events` window enumeration still fails 
 `-1728` (assistive access not granted) — use `CGWindowListCopyWindowInfo` via a small Swift
 script instead.
 
+**Done and verified (Batch 005):** `PowerPointTemplateInspector.resolvePlaceholders(url:)`
+resolves placeholder type/idx/geometry across slide -> layout -> master inheritance for
+arbitrary imported `.pptx` templates, per ECMA-376 rules. Codex-reviewed for correctness
+(clean). Not yet wired into `inspect()`'s output, the persisted layout plan, or any UI.
+
 **Open — needs the owner:**
 
 1. PowerPoint and Google Slides round-trip review of a generated deck (needs a human account/eyes).
-2. Template layout/master inheritance in `PowerPointTemplateInspector` — the largest remaining
-   gap before the exporter meets its release gates.
+2. Wire the new placeholder resolution into a user-visible surface and, eventually, a
+   layout-preserving exporter path.

@@ -641,3 +641,27 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   sparse rows no longer hold a fixed-height blank band, and grid lines still align across
   columns.
 - `swift test -Xswiftc -gnone`: 93 tests passed, 0 failures.
+
+### 2026-07-29 — Template layout/master placeholder inheritance
+
+- Added `PowerPointTemplateInspector.resolvePlaceholders(url:)`: resolves each slide
+  placeholder shape's effective type, index, and geometry by walking slide -> slideLayout ->
+  slideMaster, per ECMA-376 inheritance rules (idx-first matching with type-fallback and
+  same-type tiebreak among duplicate idx values; `title`/`ctrTitle` treated as one slot for
+  matching only; missing type defaults to `obj`, missing idx to `0`; geometry inherits from
+  the nearest part that specifies `<a:xfrm>`).
+- Scoped to `<p:sp>` text placeholders — picture/graphicFrame placeholders are not resolved,
+  a documented limitation rather than a silent gap.
+- New OPC relationship-path resolution (`resolvedRelationshipTarget`, `normalizedPackagePath`)
+  correctly collapses `..` segments relative to the referencing part's directory, and the new
+  XML parsing (`OOXMLPlaceholderParser`, `OOXMLRelationshipParser`) is the first use of
+  Foundation's `XMLParser` in this codebase, chosen over hand-rolled string scanning because
+  correctness on nested, multi-shape XML matters here.
+- This is a new, additive inspector capability — not yet wired into `inspect()`'s existing
+  output, the persisted `PresentationTemplateLayoutPlan`, or any UI, to avoid any persistence/
+  migration risk to already-saved local app state. Wiring it in is the natural next step.
+- Design (ECMA-376 rules, matching algorithm) and a post-implementation correctness review
+  were done with an independent second opinion from Codex; no correctness issues found.
+- 7 new tests (6 pure-algorithm, 1 full ZIP-package integration test exercising the actual
+  relationship/path-resolution plumbing end-to-end). `swift test -Xswiftc -gnone`: 100 tests
+  passed, 0 failures. Real `xcodebuild`: BUILD SUCCEEDED.

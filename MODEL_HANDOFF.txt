@@ -365,7 +365,14 @@ Problem: scripted app executable launch sometimes did not appear in the window l
 - Local teacher profiles are test scaffolding only, not real accounts.
 - Real login, user assignment, cloud sync, permissions, and admin roles are future infrastructure work.
 - Native PowerPoint exporter is functional but generic/minimal. It does not yet preserve or fill real customer-owned PowerPoint layouts.
-- Template inspection reads slide-level XML and proposes candidates; it does not resolve inherited placeholders from masters/layouts or perform visual fidelity QA.
+- Template inspection reads slide-level XML and proposes candidates. As of 2026-07-29 (Batch
+  005), `PowerPointTemplateInspector.resolvePlaceholders(url:)` can additionally resolve each
+  slide placeholder's effective type/idx/geometry by walking slide -> slideLayout ->
+  slideMaster (ECMA-376 inheritance rules; idx-first matching with type fallback; title/
+  ctrTitle treated as the same slot). This is a new, tested, additive capability — it is not
+  yet wired into `inspect()`'s output, the persisted `PresentationTemplateLayoutPlan`, or any
+  UI, and it does not yet perform visual fidelity QA. Scoped to `<p:sp>` text placeholders;
+  picture/graphicFrame placeholders are not resolved (documented, not a bug).
 - Google Slides is supported through PowerPoint upload/conversion testing, not a native Google Slides API integration.
 - No school curriculum, student data, or proprietary templates should be embedded in product code or tests.
 

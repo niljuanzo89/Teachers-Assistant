@@ -1390,6 +1390,165 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertEqual(result.frameMap.first?.sourceSlideNumber, 1)
     }
 
+    func testOOXMLPlaceholderResolutionInheritsGeometryThroughFullChain() {
+        let slide = [OOXMLPlaceholderShape(shapeID: 2, shapeName: "Title", type: "title", idx: 0, frame: nil)]
+        let layout = [OOXMLPlaceholderShape(shapeID: 4, shapeName: "Title Placeholder", type: "title", idx: 0, frame: nil)]
+        let master = [OOXMLPlaceholderShape(shapeID: 6, shapeName: "Title Style", type: "title", idx: 0, frame: OOXMLFrame(x: 111, y: 222, cx: 333, cy: 444))]
+
+        let resolved = OOXMLPlaceholderResolution.resolve(slideShapes: slide, layoutShapes: layout, masterShapes: master)
+
+        XCTAssertEqual(resolved.count, 1)
+        XCTAssertEqual(resolved[0].frameSource, .master)
+        XCTAssertEqual(resolved[0].effectiveFrame, OOXMLFrame(x: 111, y: 222, cx: 333, cy: 444))
+    }
+
+    func testOOXMLPlaceholderResolutionSlideGeometryOverridesInheritance() {
+        let slide = [OOXMLPlaceholderShape(shapeID: 2, shapeName: "Title", type: "title", idx: 0, frame: OOXMLFrame(x: 1, y: 2, cx: 3, cy: 4))]
+        let layout = [OOXMLPlaceholderShape(shapeID: 4, shapeName: "Title Placeholder", type: "title", idx: 0, frame: OOXMLFrame(x: 100, y: 200, cx: 300, cy: 400))]
+
+        let resolved = OOXMLPlaceholderResolution.resolve(slideShapes: slide, layoutShapes: layout, masterShapes: [])
+
+        XCTAssertEqual(resolved[0].frameSource, .slide)
+        XCTAssertEqual(resolved[0].effectiveFrame, OOXMLFrame(x: 1, y: 2, cx: 3, cy: 4))
+    }
+
+    func testOOXMLPlaceholderResolutionFallsBackToTypeMatchWhenIdxUnmatched() {
+        // Mirrors a real Google-Slides-export quirk: the slide references an idx the
+        // layout doesn't have, so matching must fall back to placeholder type.
+        let slide = [OOXMLPlaceholderShape(shapeID: 2, shapeName: "Body", type: "body", idx: 5, frame: nil)]
+        let layout = [OOXMLPlaceholderShape(shapeID: 3, shapeName: "Content Placeholder", type: "body", idx: 1, frame: OOXMLFrame(x: 10, y: 20, cx: 30, cy: 40))]
+
+        let resolved = OOXMLPlaceholderResolution.resolve(slideShapes: slide, layoutShapes: layout, masterShapes: [])
+
+        XCTAssertEqual(resolved[0].frameSource, .layout)
+        XCTAssertEqual(resolved[0].effectiveFrame, OOXMLFrame(x: 10, y: 20, cx: 30, cy: 40))
+        XCTAssertEqual(resolved[0].effectiveIdx, 5, "the slide's own declared idx is preserved even though the match came via type")
+    }
+
+    func testOOXMLPlaceholderResolutionBreaksDuplicateIdxTiesByType() {
+        // A layout that reuses idx="1" across two different placeholder types (a real,
+        // if malformed, pattern) should not resolve to whichever shape happens first.
+        let slide = [OOXMLPlaceholderShape(shapeID: 2, shapeName: "Body", type: "body", idx: 1, frame: nil)]
+        let layout = [
+            OOXMLPlaceholderShape(shapeID: 5, shapeName: "Date Placeholder", type: "dt", idx: 1, frame: OOXMLFrame(x: 1, y: 1, cx: 1, cy: 1)),
+            OOXMLPlaceholderShape(shapeID: 6, shapeName: "Body Placeholder", type: "body", idx: 1, frame: OOXMLFrame(x: 50, y: 60, cx: 70, cy: 80))
+        ]
+
+        let resolved = OOXMLPlaceholderResolution.resolve(slideShapes: slide, layoutShapes: layout, masterShapes: [])
+
+        XCTAssertEqual(resolved[0].effectiveFrame, OOXMLFrame(x: 50, y: 60, cx: 70, cy: 80))
+    }
+
+    func testOOXMLPlaceholderResolutionTreatsCtrTitleAndTitleAsSameSlot() {
+        let slide = [OOXMLPlaceholderShape(shapeID: 2, shapeName: "Title", type: "ctrTitle", idx: nil, frame: nil)]
+        let layout = [OOXMLPlaceholderShape(shapeID: 5, shapeName: "Title Placeholder", type: "title", idx: 0, frame: OOXMLFrame(x: 7, y: 8, cx: 9, cy: 10))]
+
+        let resolved = OOXMLPlaceholderResolution.resolve(slideShapes: slide, layoutShapes: layout, masterShapes: [])
+
+        XCTAssertEqual(resolved[0].frameSource, .layout)
+        XCTAssertEqual(resolved[0].effectiveFrame, OOXMLFrame(x: 7, y: 8, cx: 9, cy: 10))
+        XCTAssertEqual(resolved[0].effectiveType, "ctrTitle", "the slide's own declared type is preserved, not normalized")
+    }
+
+    func testOOXMLPlaceholderResolutionUnmatchedPlaceholderHasNoFrame() {
+        let slide = [OOXMLPlaceholderShape(shapeID: 2, shapeName: "Body", type: "body", idx: 1, frame: nil)]
+
+        let resolved = OOXMLPlaceholderResolution.resolve(slideShapes: slide, layoutShapes: [], masterShapes: [])
+
+        XCTAssertEqual(resolved[0].frameSource, .none)
+        XCTAssertNil(resolved[0].effectiveFrame)
+        XCTAssertEqual(resolved[0].effectiveType, "body")
+        XCTAssertEqual(resolved[0].effectiveIdx, 1)
+    }
+
+    func testPowerPointTemplateInspectorResolvesPlaceholdersAcrossSlideLayoutAndMaster() throws {
+        let repository = try makeRepository()
+        let packageRoot = repository.rootURL.appending(path: "template-package")
+        let pptFolder = packageRoot.appending(path: "ppt")
+        let slidesFolder = pptFolder.appending(path: "slides")
+        let slideRelsFolder = slidesFolder.appending(path: "_rels")
+        let layoutsFolder = pptFolder.appending(path: "slideLayouts")
+        let layoutRelsFolder = layoutsFolder.appending(path: "_rels")
+        let mastersFolder = pptFolder.appending(path: "slideMasters")
+        for folder in [slidesFolder, slideRelsFolder, layoutsFolder, layoutRelsFolder, mastersFolder] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+
+        // Slide declares a title placeholder with no geometry of its own (must fall all
+        // the way through to the master, since the layout below doesn't redefine title)
+        // and a body placeholder with no geometry (must inherit from the layout's override).
+        try """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+          <p:cSld><p:spTree>
+            <p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr/><p:nvPr><p:ph type="title" idx="0"/></p:nvPr></p:nvSpPr><p:spPr/></p:sp>
+            <p:sp><p:nvSpPr><p:cNvPr id="3" name="Body 1"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr/></p:sp>
+          </p:spTree></p:cSld>
+        </p:sld>
+        """.write(to: slidesFolder.appending(path: "slide1.xml"), atomically: true, encoding: .utf8)
+
+        try """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+        </Relationships>
+        """.write(to: slideRelsFolder.appending(path: "slide1.xml.rels"), atomically: true, encoding: .utf8)
+
+        // Layout redefines only the body placeholder's geometry; title is left to the master.
+        try """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+          <p:cSld><p:spTree>
+            <p:sp><p:nvSpPr><p:cNvPr id="2" name="Body Placeholder"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
+              <p:spPr><a:xfrm><a:off x="500000" y="1800000"/><a:ext cx="8000000" cy="4000000"/></a:xfrm></p:spPr>
+            </p:sp>
+          </p:spTree></p:cSld>
+        </p:sldLayout>
+        """.write(to: layoutsFolder.appending(path: "slideLayout1.xml"), atomically: true, encoding: .utf8)
+
+        try """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>
+        </Relationships>
+        """.write(to: layoutRelsFolder.appending(path: "slideLayout1.xml.rels"), atomically: true, encoding: .utf8)
+
+        // Master defines geometry for both the title and body placeholders; only the
+        // title's should surface, since the layout overrides body itself.
+        try """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+          <p:cSld><p:spTree>
+            <p:sp><p:nvSpPr><p:cNvPr id="2" name="Title Placeholder"/><p:cNvSpPr/><p:nvPr><p:ph type="title" idx="0"/></p:nvPr></p:nvSpPr>
+              <p:spPr><a:xfrm><a:off x="1000000" y="1000000"/><a:ext cx="8000000" cy="1200000"/></a:xfrm></p:spPr>
+            </p:sp>
+            <p:sp><p:nvSpPr><p:cNvPr id="3" name="Body Placeholder"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
+              <p:spPr><a:xfrm><a:off x="1000000" y="2500000"/><a:ext cx="8000000" cy="3000000"/></a:xfrm></p:spPr>
+            </p:sp>
+          </p:spTree></p:cSld>
+        </p:sldMaster>
+        """.write(to: mastersFolder.appending(path: "slideMaster1.xml"), atomically: true, encoding: .utf8)
+
+        let destination = repository.rootURL.appending(path: "layout-inheritance-template.pptx")
+        try runZip(cwd: packageRoot, destination: destination)
+
+        let result = try PowerPointTemplateInspector.resolvePlaceholders(url: destination)
+
+        XCTAssertEqual(result.count, 1)
+        let placeholders = result[0].placeholders
+        XCTAssertEqual(placeholders.count, 2)
+
+        let title = try XCTUnwrap(placeholders.first { $0.effectiveType == "title" })
+        XCTAssertEqual(title.shapeID, 2)
+        XCTAssertEqual(title.frameSource, .master)
+        XCTAssertEqual(title.effectiveFrame, OOXMLFrame(x: 1_000_000, y: 1_000_000, cx: 8_000_000, cy: 1_200_000))
+
+        let body = try XCTUnwrap(placeholders.first { $0.effectiveType == "body" })
+        XCTAssertEqual(body.shapeID, 3)
+        XCTAssertEqual(body.frameSource, .layout)
+        XCTAssertEqual(body.effectiveFrame, OOXMLFrame(x: 500_000, y: 1_800_000, cx: 8_000_000, cy: 4_000_000))
+    }
+
     @MainActor
     func testAppStorePersistsPresentationTemplateLayoutPlan() throws {
         let repository = try makeRepository()
