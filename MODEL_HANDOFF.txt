@@ -1,5 +1,5 @@
 LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
-Last updated: 2026-07-29 (through Batch 019, local commits ahead of GitHub)
+Last updated: 2026-07-29 (through Batch 022, synced to GitHub)
 
 PURPOSE OF THIS DOCUMENT
 
@@ -147,7 +147,7 @@ Main files:
   Personal/development deck generator resource. Do not treat as sellable dependency.
 
 - Tests/LessonPlannerTests/LessonPlannerTests.swift
-  Test suite. Current baseline: 101 tests passing, 0 failures.
+  Test suite. Current baseline: 112 tests passing, 0 failures (as of Batch 022).
 
 - BUILD_LOG.md
   Chronological development log. Keep updating after material changes.
@@ -157,8 +157,10 @@ Main files:
 
 Version control:
 
-Initialized 2026-07-29 (Batch 004), root commit 1c38146. As of Batch 007 the branch is at
-commit f7f921a (7 batch commits total — see `git log --oneline` for the full list).
+Initialized 2026-07-29 (Batch 004), root commit 1c38146. As of Batch 021 the branch was at
+commit a8d39d0, synced with `origin/main` on GitHub (see "GitHub sync policy" above) —
+Batch 022's commit follows it; run `git log --oneline` for the current full list rather than
+trusting a specific hash in this document, since it goes stale the moment a new batch lands.
 .gitignore excludes .build/, DerivedData/, xcuserdata/, .DS_Store, and generated .pptx files;
 Design Screenshots/ and Design Reference/ are tracked.
 
@@ -501,9 +503,9 @@ something else ("Id a task") in a screenshot.
 
 8. VERIFICATION STATUS
 
-Current baseline (as of Batch 008): `swift test -Xswiftc -gnone` — 101 tests passed, 0
+Current baseline (as of Batch 022): `swift test -Xswiftc -gnone` — 112 tests passed, 0
 failures. Real `xcodebuild` (not just SwiftPM) also passes and has been re-confirmed after
-every new source file added this session (WeeklyGridLayout.swift, DesignSystem.swift).
+every new source file added (WeeklyGridLayout.swift, DesignSystem.swift).
 
 Full batch-by-batch verification history (what was tested, how, and what's still
 unconfirmed) lives in CONTINUITY_LOG.md — that is the authoritative source, not a duplicate
@@ -522,6 +524,24 @@ summary here. Headlines:
 - Batch 008: This Week redesign code pass; 101/101 tests passed and real `xcodebuild`
   succeeded, but visual confirmation is blocked by stale PID 23296 owning the visible app
   window.
+- Batches 009-021 (see CONTINUITY_LOG.md for full detail, not duplicated here): This Week,
+  Planning Preview, and Document Intake redesigns completed and owner-reviewed; progress
+  save/reload/clear safety controls added; native PowerPoint slide decks enriched from a
+  bare 5-slide skeleton to a 7-slide sequence; the two-stage Planning/Content document
+  intake gate added (content import locked until a daily schedule exists); a visible weekly
+  schedule scaffold added so planning-only imports show empty subject-block placeholders.
+- Batch 022: fixed a real content-to-scaffold scheduling bug — `bestScheduleBlock`'s subject
+  matching only recognized a lesson's subject if the literal subject name (e.g. "math")
+  appeared in its short title fields or source filename, which realistic content (e.g. a
+  "Fractions Unit Packet.docx" with lessons titled "Equivalent fractions") often doesn't.
+  Broadened the keyword vocabulary to topic words and added a fallback that scans the
+  originating source document's full extracted text. Codex reviewed the fix and found that
+  full-body-text matching plus a fixed subject check-order was fragile (an incidental word
+  from one subject's vocabulary could win over another subject's much stronger signal) and
+  that raw substring matching let some keywords ("art", "map") match inside unrelated words;
+  matching was rewritten to word-boundary keywords scored by match count, not first-match-wins.
+  4 new regression tests. See CONTINUITY_LOG.md's Batch 022 entry and BUILD_LOG.md for full
+  detail.
 
 Known environment gotchas:
 

@@ -1198,3 +1198,80 @@ opening, learning goal, warm-up, build understanding, practice, supports, and ex
 - Swift build passed with the documented temp-cache / no-SwiftPM-sandbox workaround.
 - Full Swift test suite passed: 103 tests, 0 failures.
 - Real Xcode build succeeded.
+
+---
+
+### Batch 022 — 2026-07-29 — Fix content-to-scaffold subject matching (Math content not filling Math block)
+
+**Compute:** medium. **Model shape:** single sufficient — a focused scheduling bug with a
+clear, testable root cause, same shape as Batches 018/019 which were also single-model work.
+
+**Goal.** Owner (relaying a Codex diagnosis) reported that after Batch 021's visible schedule
+scaffold, uploaded Math content was not populating the Math schedule block. Investigate the
+six specific points raised and fix the actual root cause with regression coverage.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Re-oriented from scratch — read `CLAUDE.md` (found stale, still Batch 007 state), `CONTINUITY_LOG.md`, `BUILD_LOG.md` tails, and `git log`/`git status`/`git fetch` | Confirmed local `main` clean and synced with `origin/main` at `a8d39d0` (Batch 021); real work had landed through Batch 021 across sessions not reflected in this conversation |
+| 2 | Located the four named functions from the bug report (`importContentDocumentItems`, `syncReadableDocumentsIntoWeeklyPlanner`, `CoursePacingPlan.starter(from:)`, `bestScheduleBlock`) | All exist as named; confirmed `swift test -Xswiftc -gnone` baseline at 108 tests before touching anything |
+| 3 | Read `importPlanningDocumentItems`/`importContentDocumentItems`/`syncReadableDocumentsIntoWeeklyPlanner` in full | Content import correctly forces `.lessonMaterial` role and correctly triggers `rebuildExistingPacing: true` — items 1-2 of the bug report's investigation list are NOT the cause |
+| 4 | Wrote a diagnostic test using the real two-stage flow (`importPlanningDocumentItems` then `importContentDocumentItems`, not the older direct-repository-seed pattern some pre-Batch-020 tests use) | Result: 0 lessons, 0 assignments, no error — reproduced *something*, but the fixture never called `saveConfiguration` first |
+| 5 | Added `saveConfiguration` to the fixture and re-ran | Same content now produced 2 lessons and 2 correctly-scheduled (9:45, Math block) assignments — the missing configuration was fully masking the real behavior |
+| 6 | Checked whether `configuration == nil` is reachable in real usage | No — `RootView` shows `SetupWizardView` instead of `WorkspaceView` (which contains Document Intake) whenever `configuration == nil`; ruled this out as the production bug, though it's a real silent-no-op code smell |
+| 7 | Noted a genuine test-coverage gap | Batch 020's `testPlanningImportUnlocksContentImportAfterScheduleDetection` and Batch 021's `testPlanningImportBuildsVisibleScheduleScaffoldBlocks` never call `saveConfiguration` and never assert on `lessons`/`weeklyPlan.assignments` — they only check import roles and scaffold-block listings, so neither actually exercised (or could have caught a regression in) the scheduling outcome |
+| 8 | Re-ran the diagnostic test with realistic content — filename "Fractions Unit Packet.docx", lesson titles "Equivalent fractions" / "Comparing fractions", no literal "math" anywhere | **Reproduced the real bug**: lessons created, but scheduled at a generic 9:00 AM default instead of the Math block's declared 9:45-10:45 — exactly matches the reported symptom from the teacher's point of view |
+| 9 | Read `bestScheduleBlock` in full | Subject matching checks a narrow, mostly-just-the-subject-name keyword list against only `unitTitle`/`moduleTitle`/`pacingLessonTitle`/`sourceNotes` (source *filename* only, not full text) — realistic content frequently doesn't contain the literal subject word anywhere in those short fields |
+| 10 | Designed the fix: (a) broaden each subject's keyword list to topic vocabulary, not just the subject name; (b) add a fallback that scans the *full extracted text* of the originating `ImportedSource` (found by parsing `sourceNotes`'s "Proposed from X" filename back against `importedSources`) when the short-field match finds nothing | — |
+| 11 | Implemented `matchedScheduleBlock(forSubjectText:in:)` and `sourceDocumentText(referencedIn:)`, rewired `bestScheduleBlock` to try title-based matching first, then the full-text fallback | Done, in `AppStore.swift` |
+| 12 | `swift build -Xswiftc -gnone` | Compiled clean |
+| 13 | Re-ran the reproduction test | Fixed — "Equivalent fractions"/"Comparing fractions" now schedule at 9:45, matching the Math block |
+| 14 | Ran full Swift test suite | 109 tests passed (108 baseline + the still-in-progress diagnostic test), 0 failures — no regressions from the broadened keyword lists |
+| 15 | Converted the diagnostic test into a proper regression test (removed prints, added real assertions) and added two more: a reverse/negative case (topical Reading content schedules into Reading, not Math) and a case dedicated to the full-source-text fallback specifically (lesson titles as generic as "Day 1"/"Day 2", subject only in the document body) | 3 tests total: `testContentImportSchedulesTopicalMathLessonsIntoMathBlockOnlyViaTwoStageFlow`, `testContentImportSchedulesReadingLessonsIntoReadingBlockNotMath`, `testContentImportFallsBackToSourceBodyTextWhenLessonTitlesAreGeneric` |
+| 16 | Ran full Swift test suite | 111 tests passed, 0 failures |
+| 17 | Ran real Xcode build | BUILD SUCCEEDED; binary timestamp checked against wall clock |
+| 18 | Owner asked for a Codex review before finalizing. Sent the full diff to Codex (self-contained prompt, no `cwd` — matches the documented gotcha that `cwd`-based exploration times out in this project) | Codex found a real, High-severity issue: once the *full source-document body* is searched (not just short titles), a fixed "check English first, then Math, then Art..." order is fragile — a math worksheet's body can easily contain one incidental English-flavored word before the text ever reaches its much stronger math vocabulary, so whichever subject happens to be checked first can silently win. Also flagged that raw substring matching let "art" match inside "chart"/"partial" and "map" match inside "concept map" regardless of actual subject |
+| 19 | Rewrote `matchedScheduleBlock` in response: word-boundary keyword matching (tokenize the text, check exact-word set membership) instead of raw substring `contains`, plus a short multi-word-phrase list for phrases tokenizing can't catch ("word problem", "language arts"); the winning subject is now the one with the *highest keyword-match count*, not the first one checked. Removed a few keywords too generic to be a reliable signal in full body text ("map", "color", "story") rather than special-casing around them | Done, in `AppStore.swift` |
+| 20 | `swift build`, full test suite (112 tests, 0 failures — the 4th new test added to prove the ambiguous-signal case), real `xcodebuild` (BUILD SUCCEEDED, fresh binary confirmed), updated `BUILD_LOG.md`/`MODEL_HANDOFF.txt`/this entry, confirmed all doc edits landed on disk | Pending final commit + GitHub sync as the close of this batch |
+
+**Outcome.** Content-to-scaffold population now works for realistic content that doesn't
+happen to contain the literal subject-name keyword anywhere in its filename or lesson titles
+— which is the common case, not an edge case. Verified in both directions (Math content stays
+out of Reading, Reading content stays out of Math), for the full-source-text fallback path
+specifically, and — after the Codex review round — for content whose body contains an
+incidental word from a different subject's vocabulary alongside a much stronger true signal.
+
+**Dead ends / notes.**
+
+- The bug report's investigation points 1, 2, 3, 5, and 6 (content-role forcing, sync
+  triggering, pacing-plan extraction, scaffold-placeholder bridging, and the visible-scaffold
+  rendering path) were all individually verified correct and are NOT where the bug lived.
+  Only point 4 (`bestScheduleBlock`'s matching) was the actual root cause. Don't re-investigate
+  the other five without new evidence.
+- `configuration == nil` silently no-ops `syncReadableDocumentsIntoWeeklyPlanner` with no
+  error shown. Confirmed unreachable in production (`RootView` gates `WorkspaceView` behind a
+  non-nil configuration), so left unfixed rather than adding defensive code for an
+  unreachable path — but any new test that seeds `AppStore` state directly must remember to
+  call `saveConfiguration` first, or it will silently exercise nothing downstream of intake
+  and falsely appear to pass.
+- Two existing tests (`testPlanningImportUnlocksContentImportAfterScheduleDetection`,
+  `testPlanningImportBuildsVisibleScheduleScaffoldBlocks`) still don't assert on scheduling
+  outcomes — left as-is since they're testing a different, narrower concern (the import gate
+  and the scaffold listing respectively) and the new tests now cover the scheduling outcome
+  via the same real entry points. Worth strengthening later if this area breaks again.
+- **First-draft-only mistake, caught by review, worth remembering:** a fixed if/else-if check
+  order over keyword categories is fine when matching only short, curated titles, but becomes
+  a real correctness risk the moment the match scope widens to full free-text document bodies
+  — free text is far more likely to contain an incidental word from the "wrong" category. Any
+  future free-text classification in this codebase should score/count matches per category
+  rather than stopping at the first category with any hit.
+
+**Still open.**
+
+1. Workspace screen still needs the "Sunrise Planner" visual treatment (owner's UI-redesign
+   track, separate from this bug fix).
+2. Weekly planner cell/word-wrapping — owner flagged "minor visual issues" as still possibly
+   present; not investigated this batch since it wasn't the reported problem.
+3. Output-enrichment roadmap (`OUTPUT_ENRICHMENT_PLAN.md`) — lesson-plan/differentiation-guide
+   template expansion, per Batch 015/016's next-steps list.
+4. `CLAUDE.md` is stale (still describes Batch 007 state) — should be refreshed in a
+   documentation-focused batch; not done here to keep this batch scoped to the actual bug fix.

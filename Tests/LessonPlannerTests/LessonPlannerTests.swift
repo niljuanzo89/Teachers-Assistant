@@ -2271,6 +2271,172 @@ final class LessonPlannerTests: XCTestCase {
     }
 
     @MainActor
+    func testContentImportSchedulesTopicalMathLessonsIntoMathBlockOnlyViaTwoStageFlow() throws {
+        // Realistic case: the content packet's filename and lesson titles never say the word
+        // "math" anywhere — only topic vocabulary ("fractions"). Planning establishes a Reading
+        // block and a Math block; content import must place these lessons in the Math block by
+        // topic, and must leave the Reading block empty rather than touching it.
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Diagnostic Workspace",
+            workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        let scheduleURL = repository.rootURL.appending(path: "Daily Schedule.docx")
+        let contentURL = repository.rootURL.appending(path: "Fractions Unit Packet.docx")
+        try makeDOCX(at: scheduleURL, paragraphs: [
+            "Sample Daily Schedule",
+            "8:35 AM - 9:35 AM",
+            "Reading",
+            "9:45 AM - 10:45 AM",
+            "Math"
+        ])
+        try makeDOCX(at: contentURL, paragraphs: [
+            "Unit 1: Fractions",
+            "Monday: Equivalent fractions",
+            "Tuesday: Comparing fractions"
+        ])
+        let store = AppStore(repository: repository)
+
+        store.importPlanningDocumentItems([scheduleURL])
+        XCTAssertTrue(store.hasImportedScheduleScaffold)
+        store.importContentDocumentItems([contentURL])
+
+        XCTAssertEqual(store.lessons.map(\.title), ["Equivalent fractions", "Comparing fractions"])
+        XCTAssertEqual(store.weeklyPlan.assignments.count, 2)
+        let calendar = Calendar.current
+        XCTAssertTrue(store.weeklyPlan.assignments.allSatisfy { assignment in
+            calendar.component(.hour, from: assignment.start) == 9
+                && calendar.component(.minute, from: assignment.start) == 45
+                && calendar.component(.hour, from: assignment.end) == 10
+                && calendar.component(.minute, from: assignment.end) == 45
+        })
+        XCTAssertFalse(store.weeklyPlan.assignments.contains { assignment in
+            calendar.component(.hour, from: assignment.start) == 8
+        })
+    }
+
+    @MainActor
+    func testContentImportSchedulesReadingLessonsIntoReadingBlockNotMath() throws {
+        // The reverse direction of the same guarantee: non-math content, again with no literal
+        // subject keyword in filename or lesson titles, must land in the Reading block and must
+        // not touch the Math block.
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Diagnostic Workspace",
+            workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        let scheduleURL = repository.rootURL.appending(path: "Daily Schedule.docx")
+        let contentURL = repository.rootURL.appending(path: "Decoding Packet.docx")
+        try makeDOCX(at: scheduleURL, paragraphs: [
+            "Sample Daily Schedule",
+            "8:35 AM - 9:35 AM",
+            "Reading",
+            "9:45 AM - 10:45 AM",
+            "Math"
+        ])
+        try makeDOCX(at: contentURL, paragraphs: [
+            "Unit 1: Decoding",
+            "Monday: Short vowel phonics",
+            "Tuesday: Blending consonant sounds"
+        ])
+        let store = AppStore(repository: repository)
+
+        store.importPlanningDocumentItems([scheduleURL])
+        store.importContentDocumentItems([contentURL])
+
+        XCTAssertEqual(store.weeklyPlan.assignments.count, 2)
+        let calendar = Calendar.current
+        XCTAssertTrue(store.weeklyPlan.assignments.allSatisfy { assignment in
+            calendar.component(.hour, from: assignment.start) == 8
+                && calendar.component(.minute, from: assignment.start) == 35
+        })
+        XCTAssertFalse(store.weeklyPlan.assignments.contains { assignment in
+            calendar.component(.hour, from: assignment.start) == 9
+        })
+    }
+
+    @MainActor
+    func testContentImportFallsBackToSourceBodyTextWhenLessonTitlesAreGeneric() throws {
+        // Lesson titles can be as bare as "Day 1"/"Day 2" with no topic word at all. The unit
+        // title and filename are equally generic. Only the document body reveals the subject
+        // ("fractions"), so this exercises the full-source-text fallback specifically, not the
+        // title-based keyword match covered by the test above.
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Diagnostic Workspace",
+            workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        let scheduleURL = repository.rootURL.appending(path: "Daily Schedule.docx")
+        let contentURL = repository.rootURL.appending(path: "Week 3 Packet.docx")
+        try makeDOCX(at: scheduleURL, paragraphs: [
+            "Sample Daily Schedule",
+            "8:35 AM - 9:35 AM",
+            "Reading",
+            "9:45 AM - 10:45 AM",
+            "Math"
+        ])
+        try makeDOCX(at: contentURL, paragraphs: [
+            "Unit 1: Week 3 Content",
+            "This packet covers fractions concepts for the week.",
+            "Monday: Day 1",
+            "Tuesday: Day 2"
+        ])
+        let store = AppStore(repository: repository)
+
+        store.importPlanningDocumentItems([scheduleURL])
+        store.importContentDocumentItems([contentURL])
+
+        XCTAssertEqual(store.lessons.map(\.title), ["Day 1", "Day 2"])
+        XCTAssertEqual(store.weeklyPlan.assignments.count, 2)
+        let calendar = Calendar.current
+        XCTAssertTrue(store.weeklyPlan.assignments.allSatisfy { assignment in
+            calendar.component(.hour, from: assignment.start) == 9
+                && calendar.component(.minute, from: assignment.start) == 45
+        })
+    }
+
+    @MainActor
+    func testContentImportPrefersStrongerSubjectSignalOverAmbiguousOverlap() throws {
+        // The full-source-text fallback means a math packet's body can easily contain a
+        // word ("reading") that also happens to be an English keyword — e.g. "Students will
+        // read and solve word problems." A fixed first-match-wins check order would let a
+        // single incidental English hit beat overwhelming math vocabulary. Matching must be
+        // scored by keyword-match strength, not decided by which subject happens to be
+        // checked first.
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Diagnostic Workspace",
+            workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        let scheduleURL = repository.rootURL.appending(path: "Daily Schedule.docx")
+        let contentURL = repository.rootURL.appending(path: "Reading Word Problems Packet.docx")
+        try makeDOCX(at: scheduleURL, paragraphs: [
+            "Sample Daily Schedule",
+            "8:35 AM - 9:35 AM",
+            "Reading",
+            "9:45 AM - 10:45 AM",
+            "Math"
+        ])
+        try makeDOCX(at: contentURL, paragraphs: [
+            "Unit 1: Reading Word Problems",
+            "Overview: Students will read and solve math word problems about fractions and geometry.",
+            "Monday: Fraction word problems",
+            "Tuesday: Geometry word problems"
+        ])
+        let store = AppStore(repository: repository)
+
+        store.importPlanningDocumentItems([scheduleURL])
+        store.importContentDocumentItems([contentURL])
+
+        XCTAssertEqual(store.weeklyPlan.assignments.count, 2)
+        let calendar = Calendar.current
+        XCTAssertTrue(store.weeklyPlan.assignments.allSatisfy { assignment in
+            calendar.component(.hour, from: assignment.start) == 9
+                && calendar.component(.minute, from: assignment.start) == 45
+        }, "content with one incidental English word but strong math vocabulary should still schedule into the Math block")
+    }
+
+    @MainActor
     func testDocumentImportAutomaticallyBuildsWeeklyPlanningScaffold() throws {
         let repository = try makeRepository()
         try repository.saveConfiguration(AppConfiguration(

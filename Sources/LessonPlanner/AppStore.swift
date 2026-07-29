@@ -1062,25 +1062,103 @@ final class AppStore: ObservableObject {
         for suggestion: WeeklyPacingSuggestion,
         in blocks: [ImportedDailyScheduleBlock]
     ) -> ImportedDailyScheduleBlock? {
-        let subjectText = "\(suggestion.unitTitle) \(suggestion.moduleTitle) \(suggestion.pacingLessonTitle) \(suggestion.sourceNotes)".lowercased()
-        let candidates: [String]
-        if subjectText.contains("english") || subjectText.contains("ela") || subjectText.contains("reading") || subjectText.contains("writing") {
-            candidates = ["english", "ela", "language arts", "reading", "writing"]
-        } else if subjectText.contains("math") {
-            candidates = ["math"]
-        } else if subjectText.contains("art") || subjectText.contains("sketchbook") || subjectText.contains("color") {
-            candidates = ["art", "specials"]
-        } else if subjectText.contains("science") {
-            candidates = ["science"]
-        } else if subjectText.contains("social studies") || subjectText.contains("community") || subjectText.contains("map") {
-            candidates = ["social studies"]
-        } else {
-            candidates = []
+        let titleText = "\(suggestion.unitTitle) \(suggestion.moduleTitle) \(suggestion.pacingLessonTitle) \(suggestion.sourceNotes)".lowercased()
+        if let match = Self.matchedScheduleBlock(forSubjectText: titleText, in: blocks) {
+            return match
         }
-        guard !candidates.isEmpty else { return nil }
+        // Lesson titles are often terse ("Equivalent fractions", "Day 3") and carry no
+        // recognizable subject keyword on their own. Fall back to the full extracted text
+        // of the source document the lesson was proposed from, which usually does.
+        if let sourceText = sourceDocumentText(referencedIn: suggestion.sourceNotes) {
+            return Self.matchedScheduleBlock(forSubjectText: sourceText.lowercased(), in: blocks)
+        }
+        return nil
+    }
+
+    private func sourceDocumentText(referencedIn sourceNotes: String) -> String? {
+        let prefix = "Proposed from "
+        guard sourceNotes.hasPrefix(prefix) else { return nil }
+        let displayName = String(sourceNotes.dropFirst(prefix.count))
+        return importedSources.first { $0.reference.displayName == displayName }?.extractedText
+    }
+
+    private struct SubjectVocabulary {
+        var candidates: [String]
+        /// Matched as whole words only, so e.g. "art" cannot match inside "chart" or
+        /// "partial", and "map" cannot match inside "concept map" for an unrelated subject.
+        var wordKeywords: Set<String>
+        /// Matched as raw substrings, for keywords that are themselves multi-word phrases
+        /// (word-boundary tokenizing would never find "language arts" as one token).
+        var phraseKeywords: [String]
+    }
+
+    /// Subject-keyword vocabulary used to match a lesson to its schedule block. Deliberately
+    /// broader than just the subject's own name — real lesson titles and unit names describe
+    /// a *topic* ("Equivalent fractions", "Ecosystems") far more often than they say "Math" or
+    /// "Science" outright, so matching on subject name alone misses most realistic content.
+    ///
+    /// Excludes keywords that are common outside their "home" subject (e.g. "story", "color")
+    /// — since the full source-document body is now searched (not just short titles), a
+    /// generic keyword is likely to appear somewhere in content about a different subject too.
+    private static let subjectVocabularies: [SubjectVocabulary] = [
+        SubjectVocabulary(
+            candidates: ["english", "ela", "language arts", "reading", "writing"],
+            wordKeywords: ["english", "ela", "reading", "writing", "phonics", "vocabulary",
+                           "comprehension", "grammar", "spelling", "literacy", "narrative"],
+            phraseKeywords: ["language arts"]
+        ),
+        SubjectVocabulary(
+            candidates: ["math"],
+            wordKeywords: ["math", "fraction", "fractions", "decimal", "decimals",
+                           "multiplication", "division", "addition", "subtraction", "geometry",
+                           "algebra", "rounding", "equation", "equations", "measurement",
+                           "arithmetic", "counting", "numerator", "denominator"],
+            phraseKeywords: ["place value", "word problem", "number sense"]
+        ),
+        SubjectVocabulary(
+            candidates: ["art", "specials"],
+            wordKeywords: ["art", "sketchbook", "drawing", "painting", "sculpture", "specials"],
+            phraseKeywords: []
+        ),
+        SubjectVocabulary(
+            candidates: ["science"],
+            wordKeywords: ["science", "experiment", "observation", "ecosystem", "matter", "energy", "lab"],
+            phraseKeywords: []
+        ),
+        SubjectVocabulary(
+            candidates: ["social studies"],
+            wordKeywords: ["community", "history", "geography", "government", "culture"],
+            phraseKeywords: ["social studies"]
+        )
+    ]
+
+    /// Scores every subject by keyword-match count and returns the block for the strongest
+    /// match, rather than the first category whose *any* keyword appears. A fixed check order
+    /// is fragile once the full source-document body is searched: e.g. a math packet that
+    /// happens to mention "read the problem" would wrongly win English under first-match-wins
+    /// if English were checked first, even though the document is overwhelmingly about
+    /// fractions and word problems. Scoring lets the stronger, more specific signal win.
+    private static func matchedScheduleBlock(
+        forSubjectText subjectText: String,
+        in blocks: [ImportedDailyScheduleBlock]
+    ) -> ImportedDailyScheduleBlock? {
+        let words = Set(subjectText.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty })
+
+        var bestVocabulary: SubjectVocabulary?
+        var bestScore = 0
+        for vocabulary in subjectVocabularies {
+            let wordScore = vocabulary.wordKeywords.intersection(words).count
+            let phraseScore = vocabulary.phraseKeywords.filter { subjectText.contains($0) }.count
+            let score = wordScore + phraseScore
+            if score > bestScore {
+                bestScore = score
+                bestVocabulary = vocabulary
+            }
+        }
+        guard let bestVocabulary else { return nil }
         return blocks.first { block in
             let label = block.label.lowercased()
-            return candidates.contains { label.contains($0) }
+            return bestVocabulary.candidates.contains { label.contains($0) }
         }
     }
 

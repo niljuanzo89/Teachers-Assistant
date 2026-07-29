@@ -940,3 +940,61 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   with the expected labels and times.
 - Verification: full Swift test suite passed 108 tests with 0 failures; real Xcode build
   succeeded.
+
+### 2026-07-29 — Fix subject-matching false negatives in content-to-scaffold population
+
+- Fixed the reported bug: uploaded Math content was not filling the Math schedule block
+  after the Batch 020/021 two-stage intake flow. Root cause was in `bestScheduleBlock`'s
+  subject-matching, not in the two-stage gate, the pacing-plan rebuild, or the visible
+  scaffold rendering (all four were individually verified correct with a diagnostic test
+  before changing any code).
+- `bestScheduleBlock` matched a lesson to its schedule block only by checking a narrow,
+  hardcoded keyword list (mostly just the subject's own name, e.g. "math") against the
+  lesson's unit/module/lesson title and its source filename. Realistic content very often
+  never contains that literal word — a "Fractions Unit Packet.docx" with lessons titled
+  "Equivalent fractions" and "Comparing fractions" contains no substring "math" anywhere in
+  any of those fields. When no keyword matched, the lesson silently fell back to a generic
+  9:00 AM slot instead of the schedule's declared 9:45-10:45 Math block — visually
+  indistinguishable, from the teacher's side, from "my content didn't populate the block."
+- Fix has two parts: (1) broadened each subject's keyword list to include realistic topic
+  vocabulary, not just the subject name itself (math: fraction, decimal, multiplication,
+  division, geometry, algebra, place value, rounding, equation, measurement, word problem,
+  etc.; similar breadth added for English/reading, art, science, and social studies); (2)
+  added a fallback that, when title-based matching still finds nothing, looks up the
+  original imported source's full extracted text (not just its filename or short lesson
+  titles) and matches against that instead — covering cases as generic as lesson titles
+  literally named "Day 1"/"Day 2" where the actual subject only appears in the document body.
+- Also confirmed, and left as-is: `configuration` being nil would independently short-circuit
+  `syncReadableDocumentsIntoWeeklyPlanner` silently (no error shown). This is real but not
+  reachable in production — `RootView` never shows `WorkspaceView`/Document Intake at all
+  while `configuration == nil`. It's noted because two of Batch 020/021's own regression
+  tests never saved a configuration and therefore never actually exercised the
+  scheduling/lesson-creation outcome, only the import-gate and scaffold-listing mechanics —
+  a real coverage gap that let this bug ship unnoticed through two batches.
+- Added 4 new regression tests exercising the real two-stage production entry points
+  (`importPlanningDocumentItems` then `importContentDocumentItems`, not the pre-Batch-020
+  direct-repository-seed pattern some earlier tests use): topical math content schedules
+  into the Math block and leaves Reading untouched; topical reading content schedules into
+  Reading and leaves Math untouched; a dedicated case for the full-source-text fallback
+  path specifically (generic "Day 1"/"Day 2" lesson titles, subject only in the document
+  body); and an ambiguous-signal case (see below).
+- Codex reviewed the fix before it was finalized and found a real problem with the first
+  draft: once the full source-document body is searched (not just short titles), a fixed
+  "check English, then Math, then Art..." order becomes fragile — a math worksheet's body
+  can easily contain an incidental English-flavored word ("read", "story") before the text
+  ever reaches its much stronger math vocabulary, so whichever subject was checked *first*
+  could silently win regardless of which subject the content actually was. Codex also flagged
+  that raw substring matching let "art" match inside "chart"/"partial" and "map" match inside
+  "concept map" for any subject.
+- Rewrote matching in response: each subject now has a word-boundary keyword set (so "art"
+  can no longer match inside "chart") plus a short multi-word-phrase list, and the winning
+  subject is the one with the *highest keyword-match count*, not the first one checked.
+  Removed a few keywords that were too generic to be a reliable signal from body text  ("map",
+  "color", "story") rather than trying to special-case around them.
+- Added a fourth regression test for exactly the scenario Codex identified: content whose
+  body contains one incidental English-flavored word ("Reading") alongside much stronger,
+  specific math vocabulary (fractions, geometry, "word problem" x2) — confirmed this still
+  schedules into the Math block. Verified by tracing that this test would have failed under
+  the pre-review, first-match-wins implementation.
+- Verification: full Swift test suite passed 112 tests with 0 failures (108 baseline + 4
+  new); real Xcode build succeeded after the rewrite.
