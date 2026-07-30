@@ -276,3 +276,70 @@ actually matters is not *which files the app may read* but *what it does with th
 **Net:** the app should keep reading everything the teacher gives it, place only real lessons,
 cite materials rather than reproduce them, and require an explicit teacher decision before any
 source content is embedded. No file needs to be ignored to get there.
+
+### Routing design: divert non-lesson material to differentiation instead of ignoring it
+
+Clarified with the owner 2026-07-29. Their "non-compliant" meant *material that does not fit
+cleanly into a lesson format* — a structural question, not the IP one investigated above. Two
+corrections and then the design.
+
+**Correction 1: this material can absolutely be cached.** The earlier caching caveat was narrow —
+do not store a second copy of whole licensed files, because they already exist as
+`ImportedSource` records with extracted text. Caching an *excerpt plus a page reference* per
+attachment is exactly what the differentiation design proposes and there is no obstacle to it.
+
+**Correction 2: ignoring is unnecessary.** Nothing has to be discarded to keep the weekly planner
+clean. The fix is routing, not exclusion.
+
+**The core idea: these are three independent decisions, currently collapsed into one.**
+
+Today a single classification (`ImportedSourceRole`) implicitly decides everything, which is why
+a practice worksheet becomes a scheduled lesson. Separate them:
+
+| Decision | Question | Consequence |
+|---|---|---|
+| Placement eligibility | Does this have the shape of a teachable lesson? | Gates the weekly-planner pathway only |
+| Differentiation role | Which support category does it serve? | Feeds the differentiation guide + printables |
+| Attachment key | Which lesson does it belong to? | Links material to lesson |
+
+A document can be *not placeable* and *valuable differentiation material* at the same time. That
+combination is the pathway split the owner is asking for, and it is unrepresentable today.
+
+**Four routing outcomes, nothing thrown away:**
+
+1. **Placeable lesson** — lesson shape present (objective and/or instructional sequence).
+   Proceeds to the weekly planner. Only this pathway may occupy a schedule block.
+2. **Supporting material** — reteach, challenge, practice, vocabulary, assessment. Routed to the
+   differentiation guide for its attached lesson and cached for printables. **Never enters the
+   planner pathway at all** — it is not a lesson candidate, so it cannot be mis-scheduled.
+3. **Planning document** — pacing guide, calendar, map. Existing pathway, already works.
+4. **Inert** — genuinely unusable for either purpose (cover page, index, blank, unreadable).
+   Imported and visible so the teacher can see it was received, referenced by nothing. This is
+   the honest version of "ignore": not deleted, not hidden, just not used.
+
+**The attachment key, measured against the owner's real import.** For material to inform *the
+right* lesson's differentiation guide, it needs a link. Curriculum artifacts commonly carry a
+module/lesson identifier, so that is a far stronger key than the subject-keyword scoring that
+failed in the planner. Measured coverage across the 316 documents:
+
+- 48 have a module/lesson identifier inferable from the **filename**
+- 142 from the **document text** (first 3,000 characters)
+- **143 (45%) from either** — usable auto-attachment coverage
+
+45% is a genuine, honest number, not a solved problem. It is also far better than the current
+behavior, where such documents become phantom scheduled lessons. Plan for it explicitly:
+
+- Auto-attach where an identifier resolves to a known lesson, marked `attachedAutomatically`.
+- Where no identifier resolves, leave the material **unattached but available**, listed for the
+  teacher to attach in one click. Do not guess by subject or filename similarity — guessing is
+  what produced the original scatter.
+- Never let a failed attachment promote a material into the planner pathway.
+
+**Why routing beats ignoring.** Ignoring loses ~55% of the folder's real value: those reteach and
+challenge sheets are exactly what makes a differentiation guide worth printing. Routing keeps
+them, keeps the planner clean, and leaves the teacher in control of the ambiguous remainder.
+
+**Where this lands in the build order.** Decision 1 (placement eligibility) is already the
+revised step 1 in CONTINUITY_LOG.md. Decisions 2 and 3 belong with the
+`LessonMaterialAttachment` work in the section above, and should reuse the same artifact-type
+signals the gate computes rather than recomputing them.
