@@ -1849,3 +1849,19 @@ struct DailyPlan: Codable, Equatable {
         DailyPlan(date: date, scheduleBlocks: [], tasks: [], dailyNotes: "", updatedAt: .now)
     }
 }
+
+/// What the last automatic placement pass actually did. Reported so a teacher is never left to
+/// infer from an empty planner whether the app found nothing, placed nothing, or declined to guess.
+struct AutoPlacementSummary: Equatable {
+    var placedCount: Int
+    var unplacedForMissingBlockMatch: Int
+
+    var hasUnplaced: Bool { unplacedForMissingBlockMatch > 0 }
+
+    var summaryLine: String {
+        let placed = "\(placedCount) lesson\(placedCount == 1 ? "" : "s") scheduled."
+        guard hasUnplaced else { return placed }
+        return placed + " \(unplacedForMissingBlockMatch) left unscheduled because no matching "
+            + "subject block was found — those blocks were left unchanged."
+    }
+}

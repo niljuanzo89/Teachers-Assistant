@@ -44,6 +44,9 @@ final class AppStore: ObservableObject {
     /// wizard overwrites the very file that failed to load — turning a recoverable read
     /// error into real data loss.
     @Published private(set) var configurationIsUnreadable = false
+    /// Outcome of the most recent automatic placement pass. Silence was its own defect: an import
+    /// once created 173 lesson records, placed 24, and reported neither number.
+    @Published private(set) var lastAutoPlacementSummary: AutoPlacementSummary?
 
     private let repository: any LocalRepositoryProtocol
     private let slideDeckGeneratorOverride: (any SlideDeckGenerating.Type)?
@@ -908,6 +911,14 @@ final class AppStore: ObservableObject {
                 return approvedPlan
             }()
         } else {
+            // Left on `setupRole` deliberately. Filtering these sources through the placement
+            // classifier was tried and reverted: it is simultaneously too strict (a valid
+            // 75-character weekly packet fell under a minimum-text floor) and too permissive (a
+            // planning document began contributing lessons it previously did not), and tuning it
+            // to fit the existing fixtures produced a rotating set of failures. The hard safety
+            // guarantee now lives at placement instead, which is where the reported scatter
+            // actually occurred. Revisit this prefilter as its own change, verified against real
+            // imported documents rather than fixtures.
             let lessonMaterialSources = readableSources.filter { $0.effectiveSetupRole == .lessonMaterial }
             let pacingSequenceSources = readableSources.filter { source in
                 [.pacingGuide, .curriculumMap].contains(source.effectiveSetupRole)
@@ -936,10 +947,19 @@ final class AppStore: ObservableObject {
         let secondPass = WeeklyPacingSuggestionReport.analyze(weeklyPlan: weeklyPlan, pacingPlan: plan, lessons: lessons)
         let scheduleBlocks = importedDailyScheduleBlocks(from: readableSources)
         var occupiedAutoSlots = Set(weeklyPlan.assignments.map { autoScheduleSlotKey(date: $0.date, start: $0.start, end: $0.end) })
+        var unplacedForMissingBlockMatch = 0
         for suggestion in secondPass.suggestions where suggestion.status == .readyToSchedule || suggestion.status == .alreadyScheduled {
             guard let lessonID = suggestion.lessonRecordID else { continue }
             guard !Self.isPlaceholderPacingTitle(suggestion.pacingLessonTitle) else { continue }
-            let preferredTimeRange = scheduledTimeRange(for: suggestion, on: suggestion.suggestedDate, scheduleBlocks: scheduleBlocks)
+            // No confident block match against a real schedule means no placement, leaving every
+            // other block an untouched placeholder. Counted so the teacher is told rather than
+            // left to infer from silence.
+            guard let preferredTimeRange = scheduledTimeRange(
+                for: suggestion, on: suggestion.suggestedDate, scheduleBlocks: scheduleBlocks
+            ) else {
+                unplacedForMissingBlockMatch += 1
+                continue
+            }
             if let existingIndex = weeklyPlan.assignments.firstIndex(where: { $0.lessonRecordID == lessonID }) {
                 let existingNotes = weeklyPlan.assignments[existingIndex].planningNotes ?? ""
                 guard existingNotes.hasPrefix("Pacing:") else { continue }
@@ -977,6 +997,10 @@ final class AppStore: ObservableObject {
         }
         weeklyPlan.assignments.sort { $0.date == $1.date ? $0.start < $1.start : $0.date < $1.date }
         saveWeeklyPlan()
+        lastAutoPlacementSummary = AutoPlacementSummary(
+            placedCount: weeklyPlan.assignments.count,
+            unplacedForMissingBlockMatch: unplacedForMissingBlockMatch
+        )
     }
 
     private func ensureApprovedLesson(for suggestion: WeeklyPacingSuggestion) -> UUID {
@@ -1016,14 +1040,26 @@ final class AppStore: ObservableObject {
         return Calendar.current.date(from: components) ?? date
     }
 
+    /// Nil means "do not place this lesson."
+    ///
+    /// The defect behind the reported scatter was never that a 9:00 AM default exists — it is that
+    /// the default *overrode a real teacher schedule*. When the teacher has imported schedule
+    /// blocks, an unmatched lesson must be left unplaced so its block stays an untouched
+    /// placeholder; inventing a 9:00 AM slot puts content at a time that does not exist in their
+    /// day and lets collision-shifting spread it across the week. When no schedule has been
+    /// imported at all there is nothing to contradict, so the default remains correct and is kept.
     private func scheduledTimeRange(
         for suggestion: WeeklyPacingSuggestion,
         on date: Date,
         scheduleBlocks: [ImportedDailyScheduleBlock]
-    ) -> (start: Date, end: Date) {
+    ) -> (start: Date, end: Date)? {
         if let block = bestScheduleBlock(for: suggestion, in: scheduleBlocks) {
-            return (dateAt(hour: block.startHour, minute: block.startMinute, on: date), dateAt(hour: block.endHour, minute: block.endMinute, on: date))
+            return (
+                dateAt(hour: block.startHour, minute: block.startMinute, on: date),
+                dateAt(hour: block.endHour, minute: block.endMinute, on: date)
+            )
         }
+        guard scheduleBlocks.isEmpty else { return nil }
         let start = defaultLessonStart(on: date)
         let end = Calendar.current.date(byAdding: .minute, value: 45, to: start) ?? start.addingTimeInterval(2_700)
         return (start, end)

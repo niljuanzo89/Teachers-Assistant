@@ -186,3 +186,89 @@ final class DocumentPlacementClassifierTests: XCTestCase {
         XCTAssertEqual(source.effectivePlacementEligibility, .inert, "short placeholder text has no lesson shape")
     }
 }
+
+/// Placement guarantees. Separate from classification: the hard rule the owner asked for is
+/// enforced at placement time, not by document classification.
+final class StrictPlacementTests: XCTestCase {
+    @MainActor
+    func testLessonWithNoMatchingBlockIsLeftUnplacedWhenTeacherHasARealSchedule() async throws {
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Strict Placement",
+            workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        let scheduleURL = repository.rootURL.appending(path: "Daily Schedule.docx")
+        let contentURL = repository.rootURL.appending(path: "Music Unit Packet.docx")
+        try makeDOCX(at: scheduleURL, paragraphs: [
+            "Sample Daily Schedule", "8:35 AM - 9:35 AM", "Reading", "9:45 AM - 10:45 AM", "Math"
+        ])
+        // Recorder and rhythm belong to no imported block. Previously these were forced into an
+        // invented 9:00 AM slot that exists nowhere in this teacher's day, and collision-shifting
+        // spread them across the week — the reported scatter.
+        try makeDOCX(at: contentURL, paragraphs: [
+            "Unit 1: Rhythm", "Monday: Recorder fingering", "Tuesday: Rhythm patterns"
+        ])
+        let store = AppStore(repository: repository)
+
+        store.importPlanningDocumentItems([scheduleURL])
+        XCTAssertTrue(store.hasImportedScheduleScaffold)
+        store.importContentDocumentItems([contentURL])
+
+        let calendar = Calendar.current
+        XCTAssertFalse(
+            store.weeklyPlan.assignments.contains { calendar.component(.hour, from: $0.start) == 9 && calendar.component(.minute, from: $0.start) == 0 },
+            "no lesson may be placed at the invented 9:00 AM default while a real schedule exists"
+        )
+        XCTAssertTrue(
+            store.weeklyPlan.assignments.allSatisfy { assignment in
+                let hour = calendar.component(.hour, from: assignment.start)
+                let minute = calendar.component(.minute, from: assignment.start)
+                return (hour == 8 && minute == 35) || (hour == 9 && minute == 45)
+            },
+            "every placement must land in one of the teacher's own imported blocks"
+        )
+    }
+
+    @MainActor
+    func testDefaultTimeIsStillUsedWhenNoScheduleHasBeenImported() throws {
+        // The defect was never that a default exists — it is that the default overrode a real
+        // schedule. With no schedule imported there is nothing to contradict, so it must remain.
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "No Schedule",
+            workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        let docxURL = repository.rootURL.appending(path: "Scope and Sequence.docx")
+        try makeDOCX(at: docxURL, paragraphs: [
+            "Scope and Sequence", "Unit 1: Fractions", "Lesson 1: Equivalent fractions", "Lesson 2: Compare fractions"
+        ])
+        let store = AppStore(repository: repository)
+
+        store.importDocumentItems([docxURL])
+
+        XCTAssertFalse(store.weeklyPlan.assignments.isEmpty, "default placement must still work with no imported schedule")
+    }
+
+    private func makeRepository() throws -> LocalRepository {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return LocalRepository(rootURL: directory)
+    }
+
+    private func makeDOCX(at destination: URL, paragraphs: [String]) throws {
+        let packageRoot = destination.deletingLastPathComponent().appending(path: "\(UUID().uuidString)-docx")
+        let wordFolder = packageRoot.appending(path: "word")
+        try FileManager.default.createDirectory(at: wordFolder, withIntermediateDirectories: true)
+        let body = paragraphs.map { "<w:p><w:r><w:t>\($0)</w:t></w:r></w:p>" }.joined()
+        try """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>\(body)</w:body></w:document>
+        """.write(to: wordFolder.appending(path: "document.xml"), atomically: true, encoding: .utf8)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        process.currentDirectoryURL = packageRoot
+        process.arguments = ["-qr", destination.path, "word"]
+        try process.run()
+        process.waitUntilExit()
+    }
+}

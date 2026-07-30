@@ -2068,3 +2068,70 @@ delete or weaken those tests to make a gate pass — decide the rule first, then
 deliberately with a recorded reason.
 
 **Still open.** Unchanged from Batch 031, plus the strictness decision above, which blocks step 2.
+
+### Batch 033 — 2026-07-29 — Strict placement (Codex-reviewed); the scatter bug is fixed
+
+**Compute:** high. **Model shape:** Claude-native implementation + **Codex design review**, at the
+owner's request, after this batch's first two attempts failed to converge.
+
+**Owner's decision:** strict. A high bar for occupying a block, with a separate, more permissive
+test for contributing a lesson sequence.
+
+**What Codex caught that three of my own attempts had missed.** I had made `scheduledTimeRange`
+return nil unconditionally when no block matched. Codex's decisive observation:
+
+> "The bad behavior is not 'default 9:00 exists'; it is 'default 9:00 overrides a real teacher
+> schedule.'"
+
+Every fixture that flipped had **no imported schedule** and legitimately relied on the 9:00 AM
+default. My rule broke them because it was unconditional. The correct rule is conditional: return
+nil only when the teacher *has* imported schedule blocks and none of them match. Codex also
+correctly judged all five flipping tests as encoding behavior worth preserving, not stale
+behavior — which is why weakening them would have been wrong.
+
+**What shipped.**
+
+1. `scheduledTimeRange` returns `(start, end)?`. Nil when imported schedule blocks exist and none
+   confidently match; the 9:00 AM default is retained only when no schedule has been imported at
+   all, where there is nothing to contradict.
+2. The caller skips a nil placement and counts it, so unmatched lessons leave their blocks as
+   untouched placeholders — the owner's stated requirement.
+3. `AutoPlacementSummary` on `AppStore` reports placed and unplaced counts. Silence was its own
+   defect: an import once created 173 records, placed 24, and reported neither number.
+
+**What was deliberately NOT shipped, and why.** Filtering pacing sources through the placement
+classifier (`canContributeLessonSequence`) was implemented and reverted twice. It is
+simultaneously too strict — a valid 75-character weekly packet fell under the classifier's
+120-character minimum-text floor before the lesson-list check ran — and too permissive, since
+planning documents began contributing lessons they previously did not. Tuning it to fit the
+fixtures produced a rotating set of failures across three attempts. Per Codex, the hard safety
+guarantee belongs at placement, which is where the scatter actually occurred, so the prefilter is
+left on `setupRole` with an in-code note. Revisit it as its own change, verified against real
+imported documents rather than fixtures.
+
+**Verification.** 162/162 tests passed (160 + 2 new placement-guarantee tests, in a separate
+`StrictPlacementTests` suite). Real `xcodebuild` succeeded. The new tests assert both halves of the
+rule: with a real schedule, nothing may be placed at the invented 9:00 AM default and every
+placement must land in one of the teacher's own blocks; with no schedule imported, default
+placement still works.
+
+**Dead ends / notes.**
+
+- Three self-directed attempts at this converged on nothing; one外部 review found the flaw in
+  minutes. The tell was rotating fixture failures — when the same change fixes some tests and
+  breaks others across several iterations, the design is wrong, not the constants. Escalate at
+  the second oscillation, not the fourth.
+- Codex's other recommendation, not yet acted on: `CoursePacingPlan.starter(from:)` manufactures a
+  placeholder lesson for every readable source with no extractable lesson titles. That is the
+  upstream source of the 173 fragments, and no document-level gate can fully compensate for it.
+  This is likely the highest-value next change.
+
+**Still open.**
+
+1. **Verify against the owner's real re-import.** Unit tests do not exercise the real import path;
+   this must be confirmed by re-importing the real curriculum folder against a throwaway profile
+   (`LESSONPLANNER_DATA_ROOT`) before the bug is called closed.
+2. `CoursePacingPlan.starter` placeholder manufacturing (above).
+3. Revisit the classifier prefilter as its own verified change.
+4. Surface `AutoPlacementSummary` in the UI — it is populated but not yet displayed.
+5. Everything else still open from Batches 031-032.
