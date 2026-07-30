@@ -1943,7 +1943,13 @@ that supports one?" Those are different questions and need different fields.
 6. Report import outcomes to the teacher (previously step 4), now including counts per
    classification: how many placeable lessons, how many materials, how many unknown.
 
-**Open question for the owner, worth answering before step 1 is built:** when a document is
-classified *supporting material*, what should the app do with it — attach it to a matching
-lesson automatically, list it as available material for the teacher to attach, or simply keep it
-importable but inert? This is a product decision, not a technical one.
+**Open question — ANSWERED by the owner the same day.** Supporting materials should feed the
+differentiation guide for their corresponding lesson, and be cached so they can be placed into
+that lesson's printable resources. The full design scaffold is in OUTPUT_ENRICHMENT_PLAN.md
+under "Design scaffold: supporting materials feed the differentiation guide and printable
+resources" — including the artifact-type-to-differentiation-role mapping, a proposed
+`LessonMaterialAttachment` model, what printable machinery already exists (the differentiation
+guide's print-aware practice section is the seed), and one IP decision the owner still needs to
+make: whether printables *cite* the publisher's pages (safer default, assumed) or *embed* their
+content. That work depends on this classification gate landing first, because the gate is what
+identifies a document as supporting material and produces the signal the role mapping reuses.

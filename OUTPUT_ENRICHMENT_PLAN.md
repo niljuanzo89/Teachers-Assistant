@@ -107,3 +107,115 @@ comparison:
    that actually improves sparse extracted `LessonRecord` fields from source text — this
    coding pass only improved the *rendering* of whatever a `LessonRecord` already has, not
    the underlying extraction quality. Still the biggest lever for genuinely richer output.
+
+## Design scaffold: supporting materials feed the differentiation guide and printable resources
+
+Added 2026-07-29 at the owner's direction, answering the open question about what should happen
+to documents classified as *supporting material* (see the PLAN REVISION entry in
+CONTINUITY_LOG.md). Design only — nothing here is implemented yet.
+
+**Owner's intent.** Supporting materials should not be discarded and should not occupy schedule
+blocks. They should feed the differentiation guide for their corresponding lesson, and be cached
+so they can be placed into that lesson's printable resources.
+
+This maps cleanly onto the artifact types found in a real curriculum folder:
+
+| Imported artifact | Differentiation role it serves |
+|---|---|
+| Reteach / intervention / tier sheets | Access and support |
+| Challenge / enrichment / extension sheets | Extension and challenge |
+| Practice / homework pages | Student practice, printable |
+| Vocabulary / glossary pages | Language and vocabulary |
+| Assessment / quiz / exit-ticket pages | Success check |
+
+It also resolves something flagged earlier: `LessonRecord.differentiationSummary` is a single
+free-text field, so the differentiation guide could not honestly split into categories. Attached
+materials supply that structure without inventing it from prose.
+
+### What exists today
+
+- `LessonRecord.printableResourcePrompt: String?` — a text prompt for a student task.
+- The differentiation guide already renders a genuinely print-aware printable section
+  ("Student Practice / Exit Ticket": name/date line, the prompt, ruled answer lines, with
+  `break-before: page` and taller lines under `@media print`). This is the seed of the
+  printable mechanism — it exists, it is just limited to one generated blank page.
+- `LessonRecord.sourceReferences: [String]` — untyped file paths, provenance only.
+
+### What does not exist
+
+- Any typed link between an `ImportedSource` and a `LessonRecord`. Nothing can express "this
+  worksheet is the reteach material for this lesson."
+- Any cache of a material's usable content for reuse in an output.
+- Any printable output beyond the single blank practice page.
+
+### Proposed model additions
+
+```
+enum DifferentiationRole { case support, extension, practice, vocabulary, assessment, other }
+
+struct LessonMaterialAttachment {
+    let id: UUID
+    var lessonRecordID: UUID
+    var importedSourceID: UUID
+    var role: DifferentiationRole
+    var attachedAutomatically: Bool   // false once a teacher confirms or changes it
+    var cachedExcerpt: String?        // extracted text kept for rendering, see caching note
+    var pageReference: String?        // e.g. "pp. 12-13", for cite-don't-copy rendering
+}
+```
+
+Persisted per profile like other records. Being a separate record rather than a field on
+`LessonRecord` keeps a material attachable to more than one lesson and keeps the attachment's
+own provenance (auto vs. teacher-confirmed) intact.
+
+**Note for whoever implements this:** every new persisted field needs backward-compatible
+decoding — see the CRITICAL PERSISTENCE RULE in MODEL_HANDOFF.txt. That rule exists because a
+field added without it made real saved workspaces unreadable.
+
+### Caching
+
+"Cache" here should mean *the extracted text and a page reference*, not a copy of the original
+file. The originals already live in the teacher's own folders and are already registered as
+`ImportedSource` records with `extractedText`. Storing a second copy inside app data would
+duplicate licensed material for no functional gain. Cache the excerpt actually needed for
+rendering, keyed by attachment, and re-derive it if the source is re-extracted.
+
+### An IP decision the owner should make before this is built
+
+There is a real difference between:
+
+1. **Citing** — the differentiation guide says "Reteach: print pages 12-13 of *[material name]*",
+   with the teacher printing from the publisher's own file.
+2. **Embedding** — the app copies the material's content into a new printable it generates.
+
+Option 1 is the safer default and is what this design assumes unless the owner says otherwise.
+The teacher's own licensed materials, used with their own class, are legitimate for them to
+print; but having the app assemble publisher content into new redistributable documents at scale
+is a different act, and it is the teacher's exposure rather than the app's. Worth a deliberate
+decision, not a default that emerges from implementation convenience. Either way this concerns
+the teacher's local output only — nothing licensed enters the repo, per the standing boundary.
+
+### Printable resources scaffold, staged
+
+1. **Attach and display.** Add the model above, auto-attach materials to lessons using the same
+   artifact-type signals the placement-eligibility gate uses, and render them in the
+   differentiation guide as grouped, cited lists under real category headings (Access and
+   support / Extension and challenge / Practice / Vocabulary). This alone makes the guide
+   substantially more useful and needs no new output plumbing.
+2. **Teacher control.** Let the teacher confirm, re-role, remove, or manually attach a material.
+   Auto-attachment must be a proposal, consistent with the app's existing stance that nothing is
+   approved automatically.
+3. **Printable pack.** Grow today's single printable section into an assembled pack: a cover
+   sheet naming the lesson, then one printable block per attached practice/assessment material,
+   each either cited (default) or embedded (if the owner chooses that route). Keep it inside the
+   differentiation guide's HTML at first — it already prints correctly — and only promote it to
+   its own `GeneratedOutputKind` if the owner wants it as a separately generated artifact.
+4. **Weekly rollup.** Optionally surface "materials to print this week" in the weekly package,
+   so preparation is one pass instead of per-lesson.
+
+### Dependencies
+
+Steps here depend on the placement-eligibility classification landing first (CONTINUITY_LOG.md,
+PLAN REVISION). That gate is what identifies a document as supporting material in the first
+place, and it produces the artifact-type signal this design reuses for `DifferentiationRole`.
+Building the attachment model before the gate would mean writing the classifier twice.
