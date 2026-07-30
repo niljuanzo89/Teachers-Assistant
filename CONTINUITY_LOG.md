@@ -2015,3 +2015,56 @@ that let Batch 025's regression reach the owner.
 3. `ImportedSourceRole.infer` substring over-matching ("benchmark", "holiday", "break") — its own
    change, with its own verification.
 4. `LessonMaterialAttachment` + printable pack, per OUTPUT_ENRICHMENT_PLAN.md.
+
+### Batch 032 — 2026-07-29 — Attempted to wire the gate; stopped deliberately, kept the classifier
+
+**Outcome: the reported scatter bug is still NOT fixed.** This batch attempted step 2 (wiring the
+gate into lesson proposal), hit a genuine design conflict, and stopped rather than force it.
+
+**What was attempted.** Two changes: filter pacing-plan sources on the placement gate instead of
+`effectiveSetupRole == .lessonMaterial`, and make `scheduledTimeRange` return nil instead of
+falling back to a hard-coded 9:00 AM slot, so an unmatched lesson is skipped and its block is left
+untouched. Both compiled and both are clearly right in principle.
+
+**Why it did not converge.** Existing tests began failing in a rotating set as thresholds moved:
+
+- A weekly content packet ("Monday: Place value review") is neither a lesson page nor supporting
+  material. The classifier had no category for it and binned it `inert`, which would have disabled
+  the app's primary content-import path. Fixed properly by adding a `lessonSequence` category.
+- A scope-and-sequence classifies as `planningDocument`, yet it is *the* canonical lesson list.
+  Fixed by expressing sequence-contribution as an exclusion (`!supportingMaterial && !inert`)
+  rather than an allowlist.
+- Then the Batch 022 content-import tests failed: their fixtures are terse two-lesson packets with
+  no objective and fewer entries than the `lessonSequence` detector's minimum, so they fall to
+  `inert` and yield nothing.
+
+At that point each threshold change was fixing some fixtures and breaking others — fixture
+chasing, which is the exact failure mode called out earlier in this session. Continuing would have
+tuned the classifier to the test suite rather than to reality.
+
+**Decision.** Reverted the behavioral wiring (`AppStore.swift`, `AppModels.swift`) and kept the
+classifier improvements, which are additive and consulted by nothing yet. Full suite green at
+160/160. `main` is left in a working state with no half-tuned gate.
+
+**The real blocker, which is a product decision and not a coding problem.** How strict should
+"this is a lesson" be? Two defensible answers, and they conflict:
+
+- **Strict** (what this batch built): require an objective or a multi-phase sequence. Correct for
+  real teacher-edition pages, and it is what keeps 174 worksheets out of the planner. But it
+  rejects terse lesson lists, which the app's existing content lane depends on.
+- **Permissive**: accept any document that yields plausible lesson titles. Preserves today's
+  import path but readmits much of what caused the scatter.
+
+Probable resolution, for the owner to confirm: keep the strict bar for whether a document may
+*itself* occupy a block, and treat "yields lesson titles" as a separate, more permissive test for
+whether it may *contribute a sequence*. The two concepts are already separated in code
+(`canOccupyScheduleBlock` vs `canContributeLessonSequence`); what is unresolved is how permissive
+the second should be, and that determines whether the Batch 022 fixtures represent behavior worth
+preserving or behavior that was always wrong.
+
+**Also worth noting:** the Batch 022 fixtures encode the assumption that a two-line content packet
+should produce scheduled lessons. Whether that is correct is precisely the open question. Do not
+delete or weaken those tests to make a gate pass — decide the rule first, then update them
+deliberately with a recorded reason.
+
+**Still open.** Unchanged from Batch 031, plus the strictness decision above, which blocks step 2.

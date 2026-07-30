@@ -7,8 +7,14 @@ import Foundation
 /// documents in a real curriculum folder classified as `lessonMaterial`, and every one of them
 /// then became its own schedulable lesson record.
 enum LessonPlacementEligibility: String, Codable, CaseIterable, Identifiable {
-    /// Has the shape of a teachable lesson. The ONLY value that may enter the planner.
+    /// Has the shape of a teachable lesson.
     case placeableLesson
+    /// Does not teach a lesson but *enumerates* several — a weekly content packet or unit lesson
+    /// list ("Monday: Place value review"). Central to how the content lane learns a sequence, so
+    /// it must be able to contribute lessons even though it is not itself a lesson page. An
+    /// earlier version of this classifier omitted this category and wrongly binned such packets
+    /// as `inert`, which broke the app's primary import path.
+    case lessonSequence
     /// Real instructional value, but supports a lesson rather than being one — reteach,
     /// challenge, practice, vocabulary, assessment. Feeds the differentiation guide.
     case supportingMaterial
@@ -23,6 +29,7 @@ enum LessonPlacementEligibility: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .placeableLesson: "Lesson"
+        case .lessonSequence: "Lesson list"
         case .supportingMaterial: "Supporting material"
         case .planningDocument: "Planning document"
         case .inert: "Not used"
@@ -30,6 +37,16 @@ enum LessonPlacementEligibility: String, Codable, CaseIterable, Identifiable {
     }
 
     var canOccupyScheduleBlock: Bool { self == .placeableLesson }
+
+    /// Whether this document may contribute lessons to the course pacing sequence. Broader than
+    /// `canOccupyScheduleBlock`, and deliberately expressed as an exclusion: a lesson page, a
+    /// lesson list, and a planning document (a scope-and-sequence *is* the canonical lesson list)
+    /// all legitimately yield a sequence. What must never yield one is supporting material — the
+    /// answer keys and practice pages that turned 316 documents into 173 fragment lessons — or a
+    /// document with nothing usable in it.
+    var canContributeLessonSequence: Bool {
+        self != .supportingMaterial && self != .inert
+    }
 }
 
 /// Which differentiation category a supporting material serves. Gives the differentiation guide
@@ -138,7 +155,17 @@ enum DocumentPlacementClassifier {
             )
         }
 
-        // 5. No lesson shape, but the body identifies a supporting purpose.
+        // 5. Not a lesson itself, but enumerates several — a content packet or unit lesson list.
+        if let count = enumeratedLessonCount(in: trimmedText) {
+            return DocumentPlacementClassification(
+                eligibility: .lessonSequence,
+                differentiationRole: nil,
+                lessonKey: lessonKey,
+                rationale: "Reads as a lesson list: found \(count) lesson entries, so it sets the sequence rather than filling a block itself."
+            )
+        }
+
+        // 6. No lesson shape, but the body identifies a supporting purpose.
         if let role = differentiationRole(inBodyText: trimmedText) {
             return DocumentPlacementClassification(
                 eligibility: .supportingMaterial,
@@ -148,7 +175,7 @@ enum DocumentPlacementClassifier {
             )
         }
 
-        // 6. Readable, but neither a lesson nor recognizable material.
+        // 7. Readable, but neither a lesson nor recognizable material.
         return DocumentPlacementClassification(
             eligibility: .inert,
             differentiationRole: nil,
@@ -244,6 +271,24 @@ enum DocumentPlacementClassifier {
             return role
         }
         return nil
+    }
+
+    /// A document enumerating several lesson titles — day-keyed ("Monday: Place value review"),
+    /// numbered ("Lesson 3: Rounding"), or a unit list. Requires at least this many entries so a
+    /// single incidental "Lesson 2:" line in prose cannot make a worksheet look like a sequence.
+    private static let minimumEnumeratedLessons = 3
+
+    private static func enumeratedLessonCount(in text: String) -> Int? {
+        let patterns = [
+            #"^\s*(?:mon|tues|wednes|thurs|fri|satur|sun)day\s*[:\-]\s*\S.*$"#,
+            #"^\s*(?:lesson|day)\s*\d{1,2}\s*[:\-]\s*\S.*$"#
+        ]
+        var total = 0
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .anchorsMatchLines]) else { continue }
+            total += regex.numberOfMatches(in: text, range: NSRange(text.startIndex..., in: text))
+        }
+        return total >= minimumEnumeratedLessons ? total : nil
     }
 
     /// Prefers the filename, which is usually a deliberate, compact identifier, then falls back

@@ -95,6 +95,32 @@ final class DocumentPlacementClassifierTests: XCTestCase {
         }
     }
 
+    func testLessonListIsRecognizedAsASequenceNotALessonOrJunk() {
+        // A weekly content packet teaches nothing itself but sets the sequence. An earlier
+        // version of this classifier had no such category and binned these as `inert`, which
+        // would have disabled the app's primary content-import path.
+        let result = classify("04 Math Unit Lessons.docx", """
+        Unit 1: Place Value
+        Monday: Place value review
+        Tuesday: Rounding in context
+        Wednesday: Addition strategies
+        Thursday: Problem solving
+        Friday: Subtraction strategies
+        """)
+        XCTAssertEqual(result.eligibility, .lessonSequence)
+        XCTAssertFalse(result.eligibility.canOccupyScheduleBlock, "a list of lessons is not itself a lesson")
+        XCTAssertTrue(result.eligibility.canContributeLessonSequence)
+    }
+
+    func testSupportingMaterialAndInertNeverContributeALessonSequence() {
+        XCTAssertFalse(classify("lesson5-reteach.pdf", lessonBody).eligibility.canContributeLessonSequence)
+        XCTAssertFalse(classify("scan.pdf", " ").eligibility.canContributeLessonSequence)
+        // A scope-and-sequence legitimately yields a sequence even though it fills no block.
+        let scope = classify("Scope and Sequence.docx", "Scope and Sequence\nUnit 1: Fractions\nLesson 1: Equivalent fractions")
+        XCTAssertEqual(scope.eligibility, .planningDocument)
+        XCTAssertTrue(scope.eligibility.canContributeLessonSequence)
+    }
+
     // MARK: - Attachment key
 
     func testLessonKeyParsesModuleAndLessonFromFileName() {
