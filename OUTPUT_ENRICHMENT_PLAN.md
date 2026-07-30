@@ -93,4 +93,17 @@ comparison:
 2. Done: make `NativePowerPointExporter` use the richer slide sequence from the old bridge.
 3. Done: add tests that inspect the generated `.pptx` package for expected slide count and
    key text.
-4. Next: apply the same helper to `LessonPlanRenderer` and the differentiation guide.
+4. Done (2026-07-29, Batch 028): applied `LessonOutputContent` to `LessonPlanRenderer`'s
+   two HTML renderers, with one deliberate exception — the "not specified" / empty-state
+   checks test the raw `LessonRecord` fields, not `LessonOutputContent`'s properties, since
+   that view model's own fallback text ("Explore the teacher-reviewed learning objective.")
+   is written for student-facing slides and would misrepresent a genuinely blank field as
+   reviewed content in a teacher-facing document. Added a "lesson snapshot" quick-stats strip
+   (step/material/source counts) to the lesson plan; added an explanatory hint caption to the
+   differentiation guide's notes section instead of splitting into fake sub-categories, since
+   `LessonRecord` only has one `differentiationSummary` string today — see "Still open" in
+   Batch 028's `CONTINUITY_LOG.md` entry for what a real category split would need.
+5. Not started: a deterministic lesson-content enrichment layer (Implementation Sequence #1)
+   that actually improves sparse extracted `LessonRecord` fields from source text — this
+   coding pass only improved the *rendering* of whatever a `LessonRecord` already has, not
+   the underlying extraction quality. Still the biggest lever for genuinely richer output.

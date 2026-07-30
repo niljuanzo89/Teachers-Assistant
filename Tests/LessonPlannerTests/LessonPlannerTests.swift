@@ -3395,6 +3395,78 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertTrue(html.contains("&lt;strategy&gt;"))
     }
 
+    func testRendererShowsLessonSnapshotCounts() {
+        var lesson = LessonRecord.draft(title: "Fractions Overview")
+        lesson.instructionalSequence = [
+            InstructionalStep(id: UUID(), title: "Launch", notes: "Review prior knowledge."),
+            InstructionalStep(id: UUID(), title: "Explore", notes: "")
+        ]
+        lesson.materials = ["Fraction strips"]
+        lesson.sourceReferences = ["unit1-lesson3.pdf"]
+        let html = LessonPlanRenderer.renderHTML(for: lesson)
+
+        XCTAssertTrue(html.contains("<div class=\"value\">2</div><div class=\"label\">Instructional steps</div>"))
+        XCTAssertTrue(html.contains("<div class=\"value\">1</div><div class=\"label\">Material</div>"))
+        XCTAssertTrue(html.contains("<div class=\"value\">1</div><div class=\"label\">Source</div>"))
+    }
+
+    func testRendererSkipsInstructionalStepsWithNoTitleOrNotes() {
+        var lesson = LessonRecord.draft(title: "Sparse Lesson")
+        lesson.instructionalSequence = [
+            InstructionalStep(id: UUID(), title: "Launch", notes: ""),
+            InstructionalStep(id: UUID(), title: "", notes: "")
+        ]
+        let html = LessonPlanRenderer.renderHTML(for: lesson)
+
+        // The real step renders; the fully-blank step is skipped rather than rendering an
+        // empty bullet — LessonOutputContent already filters steps with no title AND no notes.
+        XCTAssertTrue(html.contains("<strong>Launch</strong>"))
+        XCTAssertTrue(html.contains("<div class=\"value\">1</div><div class=\"label\">Instructional step</div>"))
+    }
+
+    func testRendererKeepsHonestNotSpecifiedForBlankFields() {
+        let lesson = LessonRecord.draft(title: "Blank Fields Lesson")
+        let html = LessonPlanRenderer.renderHTML(for: lesson)
+
+        // A blank objective/assessment/differentiation must read as genuinely unreviewed —
+        // never LessonOutputContent's own fallback text, which is written for student-facing
+        // slides ("Explore the teacher-reviewed learning objective.") and would misrepresent
+        // an unreviewed field as real content in this teacher-facing document.
+        XCTAssertTrue(html.contains("Not specified"))
+        XCTAssertFalse(html.contains("Explore the teacher-reviewed learning objective."))
+        XCTAssertFalse(html.contains("Be ready to explain your model, answer, or reasoning."))
+        XCTAssertFalse(html.contains("Use a teacher-selected support, challenge, or small-group activity."))
+    }
+
+    func testDifferentiationRendererKeepsHonestNotSpecifiedForBlankFields() {
+        let lesson = LessonRecord.draft(title: "Blank Fields Lesson")
+        let html = LessonPlanRenderer.renderDifferentiationGuideHTML(for: lesson)
+
+        XCTAssertTrue(html.contains("No differentiation notes have been entered yet."))
+        XCTAssertTrue(html.contains("Not specified"))
+        XCTAssertFalse(html.contains("Use a teacher-selected support, challenge, or small-group activity."))
+        XCTAssertFalse(html.contains("Be ready to explain your model, answer, or reasoning."))
+    }
+
+    func testDifferentiationRendererIncludesSubjectAndGradeSubtitleAndHint() {
+        var lesson = LessonRecord.draft(title: "Fractions")
+        lesson.subject = "Math"
+        lesson.gradeOrAgeRange = "Grade 5"
+        let html = LessonPlanRenderer.renderDifferentiationGuideHTML(for: lesson)
+
+        XCTAssertTrue(html.contains("Differentiation Guide · Math · Grade 5"))
+        XCTAssertTrue(html.contains("Access and support, language and vocabulary, extension and challenge"))
+    }
+
+    func testRendererFiltersBlankMaterialsEntries() {
+        var lesson = LessonRecord.draft(title: "Materials Check")
+        lesson.materials = ["Fraction strips", "   ", ""]
+        let html = LessonPlanRenderer.renderHTML(for: lesson)
+
+        XCTAssertTrue(html.contains("<li>Fraction strips</li>"))
+        XCTAssertTrue(html.contains("<div class=\"value\">1</div><div class=\"label\">Material</div>"))
+    }
+
     func testWeeklyRendererIncludesThreeOutputLinksForScheduledLesson() {
         var lesson = LessonRecord.draft(title: "Fraction Strategies")
         lesson.objective = "Compare equivalent fractions."

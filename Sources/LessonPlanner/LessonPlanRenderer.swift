@@ -2,11 +2,18 @@ import Foundation
 
 enum LessonPlanRenderer {
     static func renderHTML(for lesson: LessonRecord) -> String {
-        let steps = lesson.instructionalSequence.isEmpty
+        // LessonOutputContent's own fallback text (e.g. "Explore the teacher-reviewed
+        // learning objective.") is written for student-facing slides, where showing
+        // something reads better than a blank slide. This document is teacher-facing
+        // review material, so "not specified" checks below deliberately test the RAW
+        // lesson fields rather than `content`'s properties, which are never empty.
+        let content = LessonOutputContent(lesson: lesson)
+        let steps = content.steps.isEmpty
             ? "<p class=\"empty\">No instructional steps have been added.</p>"
-            : "<ol>\(lesson.instructionalSequence.map(stepHTML).joined())</ol>"
-        let materials = listHTML(lesson.materials, emptyMessage: "No materials listed.")
-        let sources = listHTML(lesson.sourceReferences.map { URL(fileURLWithPath: $0).lastPathComponent }, emptyMessage: "Manually created lesson record.")
+            : "<ol>\(content.steps.map(stepHTML).joined())</ol>"
+        let materials = listHTML(content.materials, emptyMessage: "No materials listed.")
+        let sources = listHTML(content.sourceReferences.map { URL(fileURLWithPath: $0).lastPathComponent }, emptyMessage: "Manually created lesson record.")
+        let snapshot = snapshotHTML(lesson: lesson, content: content)
 
         return """
         <!doctype html>
@@ -22,13 +29,16 @@ enum LessonPlanRenderer {
             header { display:flex; justify-content:space-between; gap:24px; align-items:flex-start; border-bottom:3px solid var(--accent); padding-bottom:24px; }
             h1 { font:700 38px/1.1 Georgia,serif; margin:0 0 8px; } h2 { font:700 20px/1.2 Georgia,serif; margin:0 0 10px; }
             .meta { color:var(--muted); font-size:13px; text-align:right; } .objective { font-size:18px; margin:26px 0; max-width:76ch; }
+            .snapshot { display:flex; flex-wrap:wrap; gap:14px; margin:22px 0; } .stat { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:12px 18px; min-width:120px; }
+            .stat .value { font:700 22px/1.1 Georgia,serif; } .stat .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
             .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; } section { background:var(--surface); padding:22px; border:1px solid var(--line); border-radius:8px; }
             section.wide { grid-column:1/-1; } ol,ul { margin:0; padding-left:22px; } li + li { margin-top:10px; } .step-notes { color:var(--muted); font-size:14px; } .empty { margin:0; color:var(--muted); font-style:italic; }
-            footer { margin-top:28px; color:var(--muted); font-size:12px; } @media print { body{background:white;} main{max-width:none;padding:0;} section{break-inside:avoid;} } @media(max-width:650px){ main{padding:28px 20px;} header{display:block;} .meta{text-align:left;margin-top:12px;} .grid{grid-template-columns:1fr;} }
+            footer { margin-top:28px; color:var(--muted); font-size:12px; } @media print { body{background:white;} main{max-width:none;padding:0;} section{break-inside:avoid;} } @media(max-width:650px){ main{padding:28px 20px;} header{display:block;} .meta{text-align:left;margin-top:12px;} .grid{grid-template-columns:1fr;} .snapshot{gap:10px;} }
           </style>
         </head>
         <body><main>
           <header><div><h1>\(escape(lesson.title))</h1><div>Lesson Plan</div></div><div class="meta">\(escape(lesson.subject.isEmpty ? "Subject not specified" : lesson.subject))<br>\(escape(lesson.gradeOrAgeRange.isEmpty ? "Grade not specified" : lesson.gradeOrAgeRange))</div></header>
+          \(snapshot)
           <p class="objective"><strong>Learning objective:</strong> \(escape(lesson.objective.isEmpty ? "Not specified" : lesson.objective))</p>
           <div class="grid">
             <section class="wide"><h2>Instructional sequence</h2>\(steps)</section>
@@ -42,7 +52,22 @@ enum LessonPlanRenderer {
         """
     }
 
-    private static func stepHTML(_ step: InstructionalStep) -> String {
+    /// A quick-glance strip so a teacher can orient to a lesson's scope before reading the
+    /// full sections below — subject/grade are already in the header, so this focuses on
+    /// what the header can't show: how much instructional content this lesson actually has.
+    private static func snapshotHTML(lesson: LessonRecord, content: LessonOutputContent) -> String {
+        let stepCount = content.steps.count
+        let materialCount = content.materials.count
+        return """
+        <div class="snapshot">
+          <div class="stat"><div class="value">\(stepCount)</div><div class="label">Instructional step\(stepCount == 1 ? "" : "s")</div></div>
+          <div class="stat"><div class="value">\(materialCount)</div><div class="label">Material\(materialCount == 1 ? "" : "s")</div></div>
+          <div class="stat"><div class="value">\(content.sourceReferences.count)</div><div class="label">Source\(content.sourceReferences.count == 1 ? "" : "s")</div></div>
+        </div>
+        """
+    }
+
+    private static func stepHTML(_ step: LessonOutputContent.Step) -> String {
         let notes = step.notes.isEmpty ? "" : "<div class=\"step-notes\">\(escape(step.notes))</div>"
         return "<li><strong>\(escape(step.title))</strong>\(notes)</li>"
     }
@@ -144,14 +169,21 @@ enum LessonPlanRenderer {
     }
 
     static func renderDifferentiationGuideHTML(for lesson: LessonRecord) -> String {
-        let summary = lesson.differentiationSummary.isEmpty ? "No differentiation notes have been entered yet." : escape(lesson.differentiationSummary)
+        // As in renderHTML: "not specified" checks below test the raw lesson fields, not
+        // LessonOutputContent's properties (which always carry a student-facing fallback
+        // string and would misrepresent a genuinely blank field as reviewed content).
+        let content = LessonOutputContent(lesson: lesson)
+        let summary = lesson.differentiationSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "No differentiation notes have been entered yet."
+            : escape(lesson.differentiationSummary)
         let prompt = lesson.printableResourcePrompt?.trimmingCharacters(in: .whitespacesAndNewlines)
         let studentPrompt = prompt?.isEmpty == false ? escape(prompt!) : escape(lesson.objective.isEmpty ? "Show what you learned in this lesson." : lesson.objective)
-        let materials = listHTML(lesson.materials, emptyMessage: "No materials listed.")
+        let materials = listHTML(content.materials, emptyMessage: "No materials listed.")
+        let subtitle = [lesson.subject, lesson.gradeOrAgeRange].filter { !$0.isEmpty }.joined(separator: " · ")
         return """
         <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>\(escape(lesson.title)) — Differentiation Guide</title><style>
-        :root{--ink:#201e1d;--muted:#6f6b69;--paper:#f3f2f2;--surface:#fff;--accent:#d6006c;--line:#d7d3d3}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:950px;margin:0 auto;padding:48px 56px}header{border-bottom:3px solid var(--accent);padding-bottom:22px;margin-bottom:24px}h1,h2{font-family:Georgia,serif}h1{font-size:36px;margin:0 0 8px}h2{font-size:21px;margin:0 0 10px}.sub,.muted{color:var(--muted)}section{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:22px;margin:18px 0}.printable{margin-top:36px;border:2px dashed var(--accent);background:white}.student-lines{height:210px;border-top:1px solid var(--line);background:repeating-linear-gradient(transparent,transparent 33px,#d7d3d3 34px)}ul{margin:0;padding-left:22px}@media print{body{background:white}main{max-width:none;padding:0}.printable{break-before:page;margin-top:0;border:0}.student-lines{height:420px}}
-        </style></head><body><main><header><h1>\(escape(lesson.title))</h1><div class="sub">Differentiation Guide · \(escape(lesson.subject.isEmpty ? "Subject not specified" : lesson.subject))</div></header><section><h2>Learning objective</h2><p>\(escape(lesson.objective.isEmpty ? "Not specified" : lesson.objective))</p></section><section><h2>Teacher differentiation notes</h2><p>\(summary)</p></section><section><h2>Materials and resource provenance</h2>\(materials)</section><section><h2>Success check</h2><p>\(escape(lesson.assessmentSummary.isEmpty ? "Not specified" : lesson.assessmentSummary))</p></section><section class="printable"><h2>Student Practice / Exit Ticket</h2><p><strong>Name:</strong> ________________________________ <strong>Date:</strong> __________________</p><p><strong>Prompt:</strong> \(studentPrompt)</p><div class="student-lines"></div></section></main></body></html>
+        :root{--ink:#201e1d;--muted:#6f6b69;--paper:#f3f2f2;--surface:#fff;--accent:#d6006c;--line:#d7d3d3}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:950px;margin:0 auto;padding:48px 56px}header{border-bottom:3px solid var(--accent);padding-bottom:22px;margin-bottom:24px}h1,h2{font-family:Georgia,serif}h1{font-size:36px;margin:0 0 8px}h2{font-size:21px;margin:0 0 10px}.sub,.muted{color:var(--muted)}.hint{color:var(--muted);font-size:13px;margin:-4px 0 14px}section{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:22px;margin:18px 0}.printable{margin-top:36px;border:2px dashed var(--accent);background:white}.student-lines{height:210px;border-top:1px solid var(--line);background:repeating-linear-gradient(transparent,transparent 33px,#d7d3d3 34px)}ul{margin:0;padding-left:22px}@media print{body{background:white}main{max-width:none;padding:0}.printable{break-before:page;margin-top:0;border:0}.student-lines{height:420px}}
+        </style></head><body><main><header><h1>\(escape(lesson.title))</h1><div class="sub">Differentiation Guide\(subtitle.isEmpty ? "" : " · \(escape(subtitle))")</div></header><section><h2>Learning objective</h2><p>\(escape(lesson.objective.isEmpty ? "Not specified" : lesson.objective))</p></section><section><h2>Teacher differentiation notes</h2><p class="hint">Access and support, language and vocabulary, extension and challenge, and small-group or partner structures — whatever applies to this lesson.</p><p>\(summary)</p></section><section><h2>Materials and resource provenance</h2>\(materials)</section><section><h2>Success check</h2><p>\(escape(lesson.assessmentSummary.isEmpty ? "Not specified" : lesson.assessmentSummary))</p></section><section class="printable"><h2>Student Practice / Exit Ticket</h2><p><strong>Name:</strong> ________________________________ <strong>Date:</strong> __________________</p><p><strong>Prompt:</strong> \(studentPrompt)</p><div class="student-lines"></div></section></main></body></html>
         """
     }
 

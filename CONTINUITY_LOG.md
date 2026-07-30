@@ -1635,3 +1635,73 @@ completely unbuilt.
    tracked, which doesn't say which mode was used) — deliberately deferred this batch to keep
    scope to the wiring itself; a reasonable next small polish item.
 5. Output-enrichment roadmap (`OUTPUT_ENRICHMENT_PLAN.md`) — still on the backlog.
+
+### Batch 028 — 2026-07-29 — Output enrichment: apply LessonOutputContent to the HTML renderers
+
+**Compute:** medium. **Model shape:** Claude-native — moderate code volume, but genuinely
+judgment-heavy (a fallback-text correctness issue found mid-design, plus a real product-scope
+decision about differentiation-guide structure), not a good Codex delegation candidate.
+
+**Goal.** Per `OUTPUT_ENRICHMENT_PLAN.md`'s "First Coding Pass" item 4: apply the shared
+`LessonOutputContent` view model (already used by `NativePowerPointExporter` since Batch 017)
+to `LessonPlanRenderer`'s lesson-plan and differentiation-guide HTML, and add the richer
+sections the plan's Implementation Sequence describes.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Read `OUTPUT_ENRICHMENT_PLAN.md` in full | Confirmed items 1-3 of "First Coding Pass" already done (Batch 017); item 4 (apply the helper to the two HTML renderers) was the next concrete, well-scoped step — not the more speculative Implementation Sequence #1 ("deterministic lesson enrichment layer" that improves extraction quality itself) |
+| 2 | Read `LessonPlanRenderer.swift`, `LessonOutputContent.swift`, and `LessonRecord`'s full model shape before writing any code | Found a real bug-in-waiting: `LessonOutputContent`'s constructor bakes in student-facing fallback text for empty fields (e.g. `"Explore the teacher-reviewed learning objective."` for a blank objective) — appropriate for a slide a student might see, but would misrepresent a genuinely unreviewed field as real content if used naively in a teacher-facing review document, directly violating the plan's own stated rule: "Keep unknown fields visibly blank or 'not specified' rather than pretending certainty." |
+| 3 | Also found: `LessonRecord.differentiationSummary` is a single free-text field — no separate `accessSupport`/`language`/`extension`/`grouping` fields exist. The plan's Implementation Sequence #4 asks to "separate supports by practical classroom use" into 4 categories, but doing that honestly would require new `LessonRecord` fields plus corresponding editing UI — a real data-model/product decision, not something to fake by parsing free text into categories | Scoped this batch to NOT invent that structure; flagged it explicitly as a future decision instead |
+| 4 | Design decision: use `LessonOutputContent` for its genuinely reusable formatting logic (blank-filtering on `materials`/`steps`, consistent trimming) but keep every "is this field specified?" check against the RAW `LessonRecord` field, never against `LessonOutputContent`'s (always-non-empty, fallback-injected) properties | The key correctness decision of this batch |
+| 5 | Rewrote `renderHTML(for lesson:)`: switched `Instructional sequence`/`Materials`/`Source provenance` to iterate `LessonOutputContent`'s cleaned `steps`/`materials`/`sourceReferences` (fixes a latent bug — a step with a blank title AND blank notes used to render an empty `<li><strong></strong></li>`, now correctly skipped); added a new "lesson snapshot" quick-stats strip (instructional step / material / source counts) right after the header, the one genuinely new section the plan calls for that wasn't already present and needs no new data | |
+| 6 | Rewrote `renderDifferentiationGuideHTML(for lesson:)`: switched materials to the same cleaned list; added grade to the header subtitle (previously subject-only); added a one-line explanatory hint under "Teacher differentiation notes" framing what belongs there (access/support, language/vocabulary, extension/challenge, small-group/partner structures) without splitting into fake sub-boxes | Delivers the plan's intent honestly given the real data shape |
+| 7 | `swift build -Xswiftc -gnone` | Compiled clean |
+| 8 | Ran the 2 pre-existing renderer tests unchanged | Both passed — confirms the refactor didn't alter escaping or the printable-prompt behavior |
+| 9 | Added 6 new tests: snapshot-counts, empty-step-skipping, honest "Not specified" behavior for both renderers (asserts `LessonOutputContent`'s fallback strings never leak into the output — directly tests the step-4 design decision), differentiation subtitle/hint text, and blank-materials-entry filtering | |
+| 10 | `swift test -Xswiftc -gnone` | 126/126 passed (120 baseline + 6 new) |
+| 11 | Added a temporary visual-QA-only test writing 4 realistic HTML samples (populated lesson-plan, populated differentiation-guide, and a blank-everything version of each) to the scratchpad | Ran via `swift test --filter` |
+| 12 | Rendered all 4 samples to full-page screenshots via headless Chrome (`google chrome --headless --screenshot`) rather than computer-use, since the in-app Browser preview pane doesn't support local `file://` URLs interactively and the owner's earlier no-screen-control constraint didn't need to be revisited for this — though the owner did separately confirm mid-batch that their Zoom call had ended | Produced 4 PNGs, read and visually reviewed each |
+| 13 | Visual QA: confirmed the populated samples render cleanly (snapshot strip, sections, hint caption all look right) and — critically — confirmed the blank-everything samples show "Not specified" / "No materials listed." / "No differentiation notes have been entered yet." throughout, with correct punctuation when subject/grade are both absent (no dangling "·" separator) | No fabricated-looking content anywhere in either state |
+| 14 | Removed the temporary visual-QA test | `git diff` on the test file now shows only the 6 permanent tests from step 9 |
+| 15 | `swift test -Xswiftc -gnone` and real `xcodebuild` again after removing the temp test | 126/126 passed; BUILD SUCCEEDED |
+| 16 | Updated `OUTPUT_ENRICHMENT_PLAN.md` to mark "First Coding Pass" item 4 done, with the fallback-text and differentiation-category scoping decisions recorded there too | |
+| 17 | Updated `CONTINUITY_LOG.md` (this entry) | |
+
+**Outcome.** The lesson-plan and differentiation-guide HTML outputs are now genuinely more
+useful without fabricating certainty the app doesn't have: a real bug (empty step bullets) is
+fixed, a new at-a-glance snapshot exists, and every blank field still honestly reads as
+"not specified" rather than silently picking up `LessonOutputContent`'s student-facing
+placeholder text. Verified visually via real rendered screenshots, not just string assertions.
+
+**Dead ends / notes.**
+
+- The in-app Browser preview pane (`mcp__Claude_Browser__*`) rendered a local `file://` URL
+  only as a static, non-interactive snapshot (no scrolling, no `get_page_text`/`screenshot`
+  support against it) — not useful for reviewing a tall document. The Claude-in-Chrome
+  extension also rejected the `file://` scheme outright (mangled it into an invalid
+  `https://file:///...` URL and hit an error page). `google chrome --headless --screenshot
+  --window-size=W,H "file://...*"` via Bash was the reliable fallback for a full-page capture
+  of a local HTML file, and is worth reaching for again for any future local-HTML visual QA.
+- Computer-use (Safari, tier "read") DID work for a quick top-of-page look, but can't scroll
+  without interaction access — fine for a fast sanity check, not for reviewing an entire tall
+  document. Headless Chrome was strictly better here once discovered.
+- Deliberately did NOT touch `LessonOutputContent.swift` itself (its fallback text is
+  correct and proven for its existing PPTX-exporter consumer) — the fix belongs in how the
+  HTML renderers *use* it, not in the shared view model itself. Worth remembering for any
+  future output-format work: `LessonOutputContent`'s properties are pre-filled with
+  presentation-ready (non-blank) text by design; a consumer that needs to distinguish
+  "genuinely blank" from "has content" must check the source `LessonRecord` field directly.
+
+**Still open.**
+
+1. Implementation Sequence #1 from `OUTPUT_ENRICHMENT_PLAN.md` — a deterministic content
+   enrichment layer that improves sparse EXTRACTED `LessonRecord` fields from source text
+   (this batch only improved rendering of whatever a record already has). Likely the biggest
+   remaining lever for genuinely richer output, and a bigger, more speculative piece of work.
+2. A true category-split differentiation guide (access/support, language, extension,
+   small-group, as separate structured sections) needs new `LessonRecord` fields plus
+   corresponding editing UI — a real product/data-model decision for the owner, not made
+   unilaterally this batch.
+3. GitHub sync — push this batch's commit.
+4. Everything still open from Batch 027 (Placeholder-assignments UI visual verification,
+   slide duplication/reordering, `GeneratedOutputRecord` provenance distinction).

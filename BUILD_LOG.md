@@ -1156,3 +1156,31 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   template text exactly.
 - Verification: `swift test -Xswiftc -gnone` — 120/120 passed (118 baseline + 2 new). Real
   `xcodebuild` succeeded (no new files, no `project.pbxproj` change needed).
+
+### 2026-07-29 — Output enrichment: LessonOutputContent applied to the HTML renderers
+
+- Applied `LessonOutputContent` (already used by the native PowerPoint exporter since
+  Batch 017) to `LessonPlanRenderer`'s lesson-plan and differentiation-guide HTML, per
+  `OUTPUT_ENRICHMENT_PLAN.md`'s next planned step.
+- Found and deliberately avoided a correctness trap: `LessonOutputContent`'s fallback text for
+  blank fields is written for student-facing slides ("Explore the teacher-reviewed learning
+  objective.") and would misrepresent a genuinely blank field as reviewed content if used
+  directly in a teacher-facing document. Fixed by using `LessonOutputContent` for its reusable
+  formatting/cleaning logic while keeping every "is this blank?" decision against the raw
+  `LessonRecord` field.
+- Declined to split the differentiation guide into 4 fake sub-categories (access/language/
+  extension/grouping) since `LessonRecord` only has one unstructured `differentiationSummary`
+  string today — real category support would need new model fields and editing UI, flagged as
+  a future product decision rather than faked via text parsing.
+- Added a "lesson snapshot" quick-stats strip (step/material/source counts) to the lesson
+  plan and a clarifying hint caption to the differentiation guide's notes section. Fixed a
+  latent bug in passing: an instructional step with both title and notes blank used to render
+  an empty bullet; now correctly skipped via `LessonOutputContent`'s existing filtering.
+- Verified visually, not just via string assertions: rendered 4 realistic HTML samples
+  (populated and blank-everything states of both documents) to full-page screenshots using
+  headless Chrome, after finding the in-app Browser preview pane doesn't support local
+  `file://` URLs interactively. Confirmed clean, honest rendering in both states — correct
+  "Not specified" language throughout the blank state, no dangling punctuation when
+  subject/grade are absent.
+- Verification: `swift test -Xswiftc -gnone` — 126/126 passed (120 baseline + 6 new). Real
+  `xcodebuild` succeeded.
