@@ -904,9 +904,31 @@ struct ImportedSource: Codable, Equatable, Identifiable {
     var reviewStatus: SourceReviewStatus
     var importedAt: Date
     var updatedAt: Date
+    /// Whether this document may occupy a planner block, and if not, which pathway it belongs
+    /// to. Optional on purpose — Swift decodes Optional properties with `decodeIfPresent`, so
+    /// documents imported before this field existed still load and simply fall back to being
+    /// classified on demand. See the CRITICAL PERSISTENCE RULE in MODEL_HANDOFF.txt.
+    var placementEligibility: LessonPlacementEligibility? = nil
+    /// Which differentiation category this serves, when it is supporting material.
+    var differentiationRole: DifferentiationRole? = nil
+    /// Module/lesson identifier used to attach supporting material to the right lesson.
+    var lessonKey: DocumentLessonKey? = nil
 
     var effectiveSetupRole: ImportedSourceRole {
         setupRole ?? ImportedSourceRole.infer(displayName: reference.displayName, extractedText: extractedText)
+    }
+
+    /// Classifies on demand when the stored value is absent, so previously-imported documents
+    /// behave correctly without a migration pass.
+    var effectivePlacementEligibility: LessonPlacementEligibility {
+        placementEligibility ?? DocumentPlacementClassifier.classify(
+            displayName: reference.displayName, extractedText: extractedText
+        ).eligibility
+    }
+
+    /// The single gate the planner must consult. Nothing but a placeable lesson may be scheduled.
+    var canProposeScheduledLesson: Bool {
+        effectivePlacementEligibility.canOccupyScheduleBlock
     }
 }
 

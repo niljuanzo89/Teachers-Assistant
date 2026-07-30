@@ -1953,3 +1953,65 @@ guide's print-aware practice section is the seed), and one IP decision the owner
 make: whether printables *cite* the publisher's pages (safer default, assumed) or *embed* their
 content. That work depends on this classification gate landing first, because the gate is what
 identifies a document as supporting material and produces the signal the role mapping reuses.
+
+### Batch 031 — 2026-07-29 — Placement-eligibility classifier (approved plan, step 1)
+
+**Compute:** medium-high. **Model shape:** Claude-native. Owner approved the routing design
+("lets go with your suggestion here"), so this is step 1 of that plan.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Marked the routing design APPROVED in OUTPUT_ENRICHMENT_PLAN.md | No longer a proposal |
+| 2 | Found that Batch 029's `LessonStructureInferencer` already detects lesson shape (objective, timed phases, standards codes) | Composed the gate from it rather than duplicating the logic, so the gate and the lesson editor can never disagree about what a lesson looks like |
+| 3 | New `DocumentPlacementClassifier.swift`: `LessonPlacementEligibility` (placeableLesson / supportingMaterial / planningDocument / inert), `DifferentiationRole`, `DocumentLessonKey`, and a classifier returning eligibility + role + attachment key + a plain-language rationale | Only `.placeableLesson` answers true to `canOccupyScheduleBlock` |
+| 4 | Ordered the classifier to encode the bias deliberately: planning phrase → unreadable → **filename artifact marker → lesson shape → body artifact marker** → inert. Filename markers outrank lesson shape (a reteach sheet may well say "Students will…"); body markers rank below it (a real lesson legitimately contains "Practice" as a heading) | |
+| 5 | Added `placementEligibility` / `differentiationRole` / `lessonKey` to `ImportedSource` as **Optionals**, so old files decode via `decodeIfPresent`, plus `effectivePlacementEligibility` that classifies on demand and `canProposeScheduledLesson` as the single gate | Follows the CRITICAL PERSISTENCE RULE from Batch 030 |
+| 6 | Measured against the owner's real 316-document import via a temporary probe | First pass: 154 of 316 classified `inert` |
+| 7 | **Sampled the inert bucket instead of accepting the number.** They were not junk — they were small-group option pages, exit tickets, and warm-up problems, i.e. the highest-value differentiation material in the folder. The body-marker list was far too narrow | The single most valuable check in this batch |
+| 8 | Broadened body markers to generic pedagogical section names (small-group options, exit ticket, problem of the day, guided/independent practice, ready for more, on track, vocabulary cards, family letter, video tutorials) | Same class of generic domain vocabulary `ImportedSourceRole.infer` already keys on; no publisher-proprietary content |
+| 9 | Wrote 15 tests using only hand-written generic fixtures | |
+| 10 | **A test failure exposed a real pre-existing bug**, rather than a bad fixture: a lesson fixture mentioning "benchmark fractions" was classified `planningDocument`, because `ImportedSourceRole.infer` matches the bare substring "benchmark" (also "holiday", "break"). An ordinary math lesson was being diverted out of the planner entirely | |
+| 11 | Fixed the cause, not the fixture: this classifier now requires a specific multi-word planning phrase instead of delegating to `infer`. Left `infer` itself alone — it is load bearing for the existing pacing pathway and deserves its own change with its own verification | Documented in-code |
+| 12 | Re-measured on real data | See outcome |
+| 13 | Removed the probe; registered the new file in `project.pbxproj` (4-entry pattern) | |
+| 14 | `swift test`; real `xcodebuild` | 158/158 passed; BUILD SUCCEEDED |
+
+**Outcome, measured on the owner's real 316-document import:**
+
+| Eligibility | Count | Share |
+|---|---|---|
+| supportingMaterial | 174 | 55% |
+| placeableLesson | **82** | 26% |
+| inert | 54 | 17% |
+| planningDocument | 6 | 2% |
+
+Differentiation roles found: 76 support, 52 practice, 24 extension/challenge, 22 assessment.
+Attachment key resolved for 143/316 (45%).
+
+**82 documents are now schedulable, where previously all 316 were** — 315 classified
+`lessonMaterial` and every one became a lesson candidate, which is what produced 173 fragment
+lessons scattered across the week. The mechanism to prevent that now exists and is measured.
+
+**IMPORTANT — the reported bug is NOT yet fixed in the running app.** This batch built and
+validated the gate; nothing yet consults it. `syncReadableDocumentsIntoWeeklyPlanner` still
+proposes lessons from every readable source. Wiring `canProposeScheduledLesson` into that path is
+the next increment, and it is a behavioral change that must be verified by relaunching the app
+and re-importing against a throwaway profile — not by unit tests alone, which is exactly the gap
+that let Batch 025's regression reach the owner.
+
+**Dead ends / notes.**
+
+- Trusting the first measured distribution would have shipped a classifier that discarded the
+  best differentiation material in the folder as "inert." Sampling a bucket beats counting it.
+- The 316 "documents" are per-page PDF extracts, not whole lessons. This reframes the
+  segmentation step still open in the plan: the task is **grouping** many small files into the
+  lesson they belong to (via `lessonKey`), not splitting large ones. Worth correcting in the plan.
+
+**Still open.**
+
+1. Wire the gate into lesson proposal, then verify by real re-import. This is what fixes the bug.
+2. Populate `subject` at import — `LessonStructureInferencer` already recovers it from standards
+   codes, so this is now nearly free.
+3. `ImportedSourceRole.infer` substring over-matching ("benchmark", "holiday", "break") — its own
+   change, with its own verification.
+4. `LessonMaterialAttachment` + printable pack, per OUTPUT_ENRICHMENT_PLAN.md.

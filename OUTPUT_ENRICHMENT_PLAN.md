@@ -279,6 +279,9 @@ source content is embedded. No file needs to be ignored to get there.
 
 ### Routing design: divert non-lesson material to differentiation instead of ignoring it
 
+**STATUS: APPROVED by the owner 2026-07-29** ("lets go with your suggestion here"). This is the
+accepted design, not a proposal. Build in the order given at the end of this section.
+
 Clarified with the owner 2026-07-29. Their "non-compliant" meant *material that does not fit
 cleanly into a lesson format* — a structural question, not the IP one investigated above. Two
 corrections and then the design.
