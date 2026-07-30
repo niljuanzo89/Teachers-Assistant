@@ -2135,3 +2135,63 @@ placement still works.
 3. Revisit the classifier prefilter as its own verified change.
 4. Surface `AutoPlacementSummary` in the UI — it is populated but not yet displayed.
 5. Everything else still open from Batches 031-032.
+
+### PLAN REVISION 2 (2026-07-29, end of session) — supersedes the earlier ordering
+
+Three things changed during Batches 031-033 that invalidate the original step order.
+
+**1. The placement guarantee, not classification, is what fixed the scatter.** The original plan
+made document classification step 1, on the theory that keeping non-lessons out of the candidate
+pool was the fix. It was not. The fix was refusing to place a lesson that does not match a real
+schedule block (Batch 033). Classification turned out to be neither necessary nor sufficient for
+that.
+
+**2. The classifier is currently inert in production.** `DocumentPlacementClassifier` and the
+`ImportedSource` fields are referenced only inside `AppModels.swift`. After the prefilter was
+reverted, no production path consults them. This is shipped, tested, measured code doing nothing.
+That is acceptable — it was built for a purpose that moved — but it must not be mistaken for
+working machinery. Its real value now sits in the differentiation pathway (`DifferentiationRole`,
+`DocumentLessonKey`), not in gating the planner.
+
+**3. Codex identified the actual upstream cause of the 173 fragments**, which no document-level
+gate can fully compensate for: `CoursePacingPlan.starter(from:)` creates a unit/module for every
+readable source and manufactures a placeholder lesson when it finds no lesson titles. That is the
+fragment factory. This was not in the original plan at all.
+
+**Revised order.**
+
+1. **Verify Batch 033 against a real re-import.** Nothing else should start first. Re-import the
+   real curriculum folder against a throwaway data root (`LESSONPLANNER_DATA_ROOT`) and compare
+   the resulting weekly planner against the reported failure. If the scatter persists, every
+   priority below is wrong and the diagnosis needs revisiting. This is the single highest-value
+   action remaining and it is cheap.
+2. **Stop `CoursePacingPlan.starter` manufacturing placeholder lessons** from sources with no
+   extractable lesson titles, at least on the automatic content-import path. Per Codex, this is
+   the highest-value code change left. Expect it to reduce 173 records substantially on its own.
+3. **Populate `subject` at import.** `LessonStructureInferencer` already recovers subject and
+   grade from standards codes, so this is close to free, and it strengthens block matching so
+   fewer genuine lessons end up unplaced by the new strict rule.
+4. **Surface `AutoPlacementSummary` in the UI.** Already populated by Batch 033, displayed
+   nowhere. Small, and it converts a silent outcome into a visible one.
+5. **Differentiation attachments and the printable pack** (OUTPUT_ENRICHMENT_PLAN.md). Now
+   unblocked: the classifier supplies `DifferentiationRole` and `DocumentLessonKey`, which is what
+   this work needed from it. Note the open owner decision recorded there — cite vs. embed — and
+   the 45% attachment-key coverage.
+6. **Revisit the classifier prefilter** as its own change, verified against real documents rather
+   than fixtures. Lower priority than it looks: with the placement guarantee in place, the
+   prefilter is an optimization, not a correctness requirement.
+7. `ImportedSourceRole.infer` substring over-matching ("benchmark", "holiday", "break").
+
+**Process adjustments earned this session, worth keeping.**
+
+- "Verified" must mean measured against the owner's real data. Fixture-only verification produced
+  at least two batches logged as fixed that were not (Batch 022 subject matching; Batch 025's
+  persistence regression). Every batch touching import, extraction, or placement should end with a
+  real-data check.
+- Relaunch the app after any change to a persisted model. Tests build their own fresh data and
+  structurally cannot catch a decoding-compatibility break.
+- Escalate to an external review at the **second** oscillation, not the fourth. Rotating fixture
+  failures mean the design is wrong, not the constants. Codex found in minutes what three
+  self-directed attempts missed.
+- Sample a bucket before trusting its count. "154 inert" looked like a clean result and was
+  actually the best differentiation material in the folder.
