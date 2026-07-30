@@ -1246,11 +1246,30 @@ final class AppStore: ObservableObject {
         syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: true)
     }
 
+    /// Creates a draft from a source, pre-filling every field the source text explicitly
+    /// labels. Anything the teacher typed into the title/objective fields wins over an
+    /// extracted value; anything the source doesn't explicitly label stays blank for the
+    /// teacher to fill in. Before this ran the extractor, a draft created here arrived with
+    /// only a title — the extractor existed but was reachable only from a separate button on
+    /// the lesson-editor screen, which a teacher had no reason to know they needed to press.
     func createDraftLesson(from source: ImportedSource, title: String, objective: String) {
-        var lesson = LessonRecord.draft(title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? source.reference.displayName : title)
-        lesson.objective = objective
+        let typedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let typedObjective = objective.trimmingCharacters(in: .whitespacesAndNewlines)
+        var lesson = LessonRecord.draft(title: typedTitle.isEmpty ? source.reference.displayName : typedTitle)
+        lesson.objective = typedObjective
         lesson.sourceReferences = [source.reference.path]
         lesson.sourceTextSnapshot = source.extractedText
+
+        let extracted = LessonFieldExtractor.extract(from: source.extractedText)
+        if lesson.objective.isEmpty { lesson.objective = extracted.objective ?? "" }
+        lesson.subject = extracted.subject ?? ""
+        lesson.gradeOrAgeRange = extracted.gradeOrAgeRange ?? ""
+        lesson.materials = extracted.materials
+        lesson.assessmentSummary = extracted.assessment ?? ""
+        lesson.differentiationSummary = extracted.differentiation ?? ""
+        lesson.instructionalSequence = extracted.steps.map { InstructionalStep(id: UUID(), title: $0, notes: "") }
+        lesson.aiReviewWarnings = LessonFieldExtractor.unextractedFieldWarnings(for: extracted)
+
         lessons.append(lesson)
         mostRecentLessonID = lesson.id
         saveLessons()
@@ -1752,8 +1771,13 @@ final class AppStore: ObservableObject {
     }
 }
 
+/// Deterministic, label-only source-text extraction — deliberately does not infer or invent
+/// content. A field is only ever filled when the source text has an explicit heading for it
+/// ("Objective:", "Materials:", etc.); everything else is left nil/empty for the teacher to
+/// fill in themselves. See the "Fill empty fields from labeled source text" button's own
+/// tooltip in WorkspaceView, which states this constraint directly to the teacher.
 enum LessonFieldExtractor {
-    struct Result {
+    struct Result: Equatable {
         var subject: String?
         var gradeOrAgeRange: String?
         var objective: String?
@@ -1763,30 +1787,146 @@ enum LessonFieldExtractor {
         var steps: [String] = []
     }
 
+    private static let subjectLabels = ["subject", "content area"]
+    private static let gradeLabels = ["grade level", "grade", "age range"]
+    private static let objectiveLabels = ["learning objective", "lesson objective", "learning goal", "objective", "goal"]
+    private static let materialsLabels = ["materials", "resources", "supplies", "what you'll need", "you will need"]
+    private static let assessmentLabels = ["formative assessment", "check for understanding", "success check", "exit ticket", "assessment"]
+    private static let differentiationLabels = ["differentiated support", "differentiation", "accommodations", "scaffolds", "extensions", "supports"]
+    private static let stepsLabels = ["instructional sequence", "instructional plan", "lesson sequence", "procedure", "activities", "steps"]
+
+    private static var allLabels: [String] {
+        subjectLabels + gradeLabels + objectiveLabels + materialsLabels + assessmentLabels + differentiationLabels + stepsLabels
+    }
+
     static func extract(from text: String) -> Result {
-        let lines = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-        func value(for labels: [String]) -> String? {
-            for (index, line) in lines.enumerated() {
-                let lower = line.lowercased()
-                for label in labels where lower.hasPrefix(label) {
-                    let remainder = line.dropFirst(label.count).trimmingCharacters(in: CharacterSet(charactersIn: ":- "))
-                    if !remainder.isEmpty { return remainder }
-                    if index + 1 < lines.count { return lines[index + 1] }
-                }
-            }
-            return nil
-        }
-        let materialText = value(for: ["materials", "resources"])
-        let stepText = value(for: ["procedure", "instructional sequence", "steps"])
+        // Blank lines are kept (not filtered) — they're the natural end-of-value boundary
+        // for a multi-line value under a heading, alongside the start of another label.
+        let lines = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
         return Result(
-            subject: value(for: ["subject"]),
-            gradeOrAgeRange: value(for: ["grade", "age range"]),
-            objective: value(for: ["learning objective", "objective", "goal"]),
-            materials: materialText?.split(whereSeparator: { $0 == "," || $0 == ";" }).map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } ?? [],
-            assessment: value(for: ["assessment", "success check", "exit ticket"]),
-            differentiation: value(for: ["differentiation", "supports", "accommodations"]),
-            steps: stepText?.split(whereSeparator: { $0 == ";" || $0 == "•" }).map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } ?? []
+            subject: scalarValue(for: subjectLabels, in: lines),
+            gradeOrAgeRange: scalarValue(for: gradeLabels, in: lines),
+            objective: scalarValue(for: objectiveLabels, in: lines),
+            materials: listValue(for: materialsLabels, in: lines),
+            assessment: scalarValue(for: assessmentLabels, in: lines),
+            differentiation: scalarValue(for: differentiationLabels, in: lines),
+            steps: listValue(for: stepsLabels, in: lines)
         )
+    }
+
+    /// The value for a prose field: the same line's remainder if the label has one, otherwise
+    /// every following line up to a blank line or the next recognized label, joined into one
+    /// paragraph — so an objective spanning 2-3 lines under its own heading is captured whole
+    /// instead of only its first line.
+    private static func scalarValue(for labels: [String], in lines: [String]) -> String? {
+        guard let (index, remainder) = firstLabelMatch(labels, in: lines) else { return nil }
+        if !remainder.isEmpty { return remainder }
+        let continuation = continuationLines(after: index, in: lines)
+        guard !continuation.isEmpty else { return nil }
+        return continuation.joined(separator: " ")
+    }
+
+    /// The value for a list field. A single dense line (same-line remainder, or exactly one
+    /// continuation line) is split on commas/semicolons, matching a "Materials: strips;
+    /// pencils" style list. Multiple continuation lines are each treated as one item instead
+    /// (bullet markers stripped, not further comma-split) — the natural shape of a bulleted
+    /// or numbered list under a heading, where an individual item can itself contain a comma
+    /// ("chart paper, any color").
+    private static func listValue(for labels: [String], in lines: [String]) -> [String] {
+        guard let (index, remainder) = firstLabelMatch(labels, in: lines) else { return [] }
+        if !remainder.isEmpty { return splitDenseList(remainder) }
+        let continuation = continuationLines(after: index, in: lines)
+        if continuation.count == 1 { return splitDenseList(continuation[0]) }
+        return continuation.map(stripBulletMarker).filter { !$0.isEmpty }
+    }
+
+    private static func splitDenseList(_ text: String) -> [String] {
+        text.split(whereSeparator: { $0 == "," || $0 == ";" })
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Finds the first line starting with one of `labels`, matched as a whole label rather
+    /// than a substring — "goal" must not match a line starting "Goals for this unit," only
+    /// "Goal:" / "Goal -" / "Goal " / a line that is exactly "Goal". Returns the line's index
+    /// and whatever follows the label and its separator (":", "-", or whitespace).
+    private static func firstLabelMatch(_ labels: [String], in lines: [String]) -> (index: Int, remainder: String)? {
+        for (index, rawLine) in lines.enumerated() {
+            let decorated = stripLeadingDecoration(rawLine)
+            guard !decorated.isEmpty else { continue }
+            let lower = decorated.lowercased()
+            for label in labels {
+                guard lower.hasPrefix(label) else { continue }
+                let afterLabel = decorated.index(decorated.startIndex, offsetBy: label.count)
+                let boundary = decorated[afterLabel...]
+                // The label must end here — at a separator or end of line — so "goal" doesn't
+                // match a line starting "Goals for this unit". "*" counts as a separator to
+                // allow a bolded heading's closing emphasis ("**Grade Level:** 5").
+                let isBoundary = boundary.isEmpty
+                    || boundary.first == ":" || boundary.first == "-" || boundary.first == "*"
+                    || boundary.first?.isWhitespace == true
+                guard isBoundary else { continue }
+                let remainder = boundary.trimmingCharacters(in: CharacterSet(charactersIn: ":-* \t"))
+                return (index, remainder)
+            }
+        }
+        return nil
+    }
+
+    /// Lines immediately after `index` up to (not including) a blank line or the next
+    /// recognized label — the natural extent of a value that continues past its heading line.
+    private static func continuationLines(after index: Int, in lines: [String]) -> [String] {
+        var collected: [String] = []
+        var cursor = index + 1
+        while cursor < lines.count {
+            let line = lines[cursor]
+            if line.isEmpty { break }
+            if firstLabelMatch(allLabels, in: [line]) != nil { break }
+            collected.append(line)
+            cursor += 1
+        }
+        return collected
+    }
+
+    /// Strips a leading bullet ("-", "*", "•") or numbered/lettered marker ("1.", "1)", "a)")
+    /// from one list-item line, leaving the item's actual text.
+    private static func stripBulletMarker(_ line: String) -> String {
+        var result = line
+        while let first = result.first, "-*•".contains(first) {
+            result.removeFirst()
+        }
+        result = result.trimmingCharacters(in: .whitespaces)
+        if let range = result.range(of: #"^\w[\.\)]\s+"#, options: .regularExpression) {
+            result.removeSubrange(range)
+        }
+        return result.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Strips leading markdown heading/emphasis marks ("#", "##", "**") so "## Materials" or
+    /// "**Materials:**" still matches the plain "materials" label.
+    private static func stripLeadingDecoration(_ line: String) -> String {
+        var result = line
+        while let first = result.first, first == "#" || first == "*" {
+            result.removeFirst()
+        }
+        return result.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Names the fields the source text didn't explicitly label, so a teacher looking at a
+    /// half-filled draft knows the app found nothing to copy rather than wondering whether it
+    /// silently dropped something. Deliberately phrased as "no labeled X was found" — this
+    /// extractor never infers, so a blank field means "not labeled," not "not present."
+    static func unextractedFieldWarnings(for result: Result) -> [String]? {
+        var warnings: [String] = []
+        if result.objective == nil { warnings.append("No labeled learning objective was found in the source text.") }
+        if result.steps.isEmpty { warnings.append("No labeled instructional sequence was found in the source text.") }
+        if result.materials.isEmpty { warnings.append("No labeled materials list was found in the source text.") }
+        if result.assessment == nil { warnings.append("No labeled assessment or success check was found in the source text.") }
+        if result.differentiation == nil { warnings.append("No labeled differentiation notes were found in the source text.") }
+        guard !warnings.isEmpty else { return nil }
+        warnings.append("Fields the source did not explicitly label were left blank rather than guessed. Fill them in as needed.")
+        return warnings
     }
 }
 

@@ -493,9 +493,12 @@ struct SourceImportView: View {
                                     Text("Optional lesson draft")
                                         .font(DS.font(17, weight: .semibold))
                                         .foregroundStyle(DS.text)
+                                    Text("Fields the source text explicitly labels (Objective, Materials, Assessment, Differentiation, and similar) are filled in automatically. Anything it does not label is left blank for you rather than guessed.")
+                                        .font(DS.font(13))
+                                        .foregroundStyle(DS.neutral700)
                                     TextField("Lesson title", text: $lessonTitle)
                                         .textFieldStyle(.ds)
-                                    TextField("Learning objective (optional)", text: $lessonObjective)
+                                    TextField("Learning objective (optional — overrides the source)", text: $lessonObjective)
                                         .textFieldStyle(.ds)
                                     Button("Create draft lesson from source") {
                                         store.createDraftLesson(from: source, title: lessonTitle, objective: lessonObjective)

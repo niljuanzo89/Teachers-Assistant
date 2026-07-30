@@ -3701,6 +3701,174 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertNil(result.differentiation)
     }
 
+    func testExtractorCapturesMultiLineValueUnderItsHeading() {
+        let result = LessonFieldExtractor.extract(from: """
+        Learning Objective
+        Students will compare fractions with unlike denominators
+        using visual models and reasoning about size.
+
+        Materials
+        fraction strips
+        """)
+
+        // The old single-line extractor captured only "Students will compare fractions with
+        // unlike denominators" and silently dropped the rest of the sentence.
+        XCTAssertEqual(
+            result.objective,
+            "Students will compare fractions with unlike denominators using visual models and reasoning about size."
+        )
+        XCTAssertEqual(result.materials, ["fraction strips"])
+    }
+
+    func testExtractorReadsBulletedListsUnderAHeading() {
+        let result = LessonFieldExtractor.extract(from: """
+        Materials:
+        - Fraction strips
+        - Chart paper, any color
+        • Dry-erase markers
+
+        Instructional Sequence:
+        1. Launch with a number talk
+        2. Model comparing 2/3 and 3/5
+        """)
+
+        // Each bullet is one item: "Chart paper, any color" must not be comma-split into two.
+        XCTAssertEqual(result.materials, ["Fraction strips", "Chart paper, any color", "Dry-erase markers"])
+        XCTAssertEqual(result.steps, ["Launch with a number talk", "Model comparing 2/3 and 3/5"])
+    }
+
+    func testExtractorMatchesLabelSynonymsAndMarkdownHeadings() {
+        let result = LessonFieldExtractor.extract(from: """
+        ## Content Area
+        Mathematics
+
+        **Grade Level:** 5
+
+        ### What You'll Need
+        rulers; protractors
+
+        Check for Understanding: Exit ticket with two problems.
+
+        Scaffolds: Sentence frames for English learners.
+        """)
+
+        XCTAssertEqual(result.subject, "Mathematics")
+        XCTAssertEqual(result.gradeOrAgeRange, "5")
+        XCTAssertEqual(result.materials, ["rulers", "protractors"])
+        XCTAssertEqual(result.assessment, "Exit ticket with two problems.")
+        XCTAssertEqual(result.differentiation, "Sentence frames for English learners.")
+    }
+
+    func testExtractorRequiresWholeLabelNotSubstringPrefix() {
+        let result = LessonFieldExtractor.extract(from: """
+        Goals for this unit are described in the pacing guide.
+        Objective: Compare fractions.
+        """)
+
+        // "Goals for this unit..." starts with the "goal" label text but isn't a Goal heading.
+        // Matching it would have captured a sentence about the pacing guide as the objective.
+        XCTAssertEqual(result.objective, "Compare fractions.")
+    }
+
+    func testExtractorStopsAValueAtTheNextLabel() {
+        let result = LessonFieldExtractor.extract(from: """
+        Objective
+        Compare fractions with unlike denominators.
+        Materials
+        fraction strips
+        """)
+
+        // With no blank line between them, the objective must still stop at "Materials"
+        // rather than swallowing the next section's heading and contents.
+        XCTAssertEqual(result.objective, "Compare fractions with unlike denominators.")
+        XCTAssertEqual(result.materials, ["fraction strips"])
+    }
+
+    @MainActor
+    func testCreateDraftLessonFromSourcePrefillsLabeledFields() throws {
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Generic QA Workspace",
+            workspaceReference: FileReference(url: repository.rootURL.appending(path: "workspace"))
+        ))
+        let store = AppStore(repository: repository)
+        let source = ImportedSource(
+            id: UUID(),
+            reference: FileReference(url: repository.rootURL.appending(path: "lesson5.pdf")),
+            setupRole: .lessonMaterial,
+            extractionMethod: .embeddedText,
+            confidence: nil,
+            extractedText: """
+            Subject: Math
+            Grade Level: 5
+
+            Objective:
+            Compare fractions with unlike denominators using models.
+
+            Materials:
+            - Fraction strips
+            - Whiteboards
+
+            Instructional Sequence:
+            1. Launch with a number talk
+            2. Model with fraction strips
+
+            Assessment: Exit ticket comparing 2/5 and 3/10.
+            Differentiation: Pre-cut strips for students who need them.
+            """,
+            reviewStatus: .reviewed,
+            importedAt: .now,
+            updatedAt: .now
+        )
+
+        store.createDraftLesson(from: source, title: "Comparing Fractions", objective: "")
+
+        let lesson = try XCTUnwrap(store.lessons.first)
+        XCTAssertEqual(lesson.title, "Comparing Fractions")
+        XCTAssertEqual(lesson.subject, "Math")
+        XCTAssertEqual(lesson.gradeOrAgeRange, "5")
+        XCTAssertEqual(lesson.objective, "Compare fractions with unlike denominators using models.")
+        XCTAssertEqual(lesson.materials, ["Fraction strips", "Whiteboards"])
+        XCTAssertEqual(lesson.instructionalSequence.map(\.title), ["Launch with a number talk", "Model with fraction strips"])
+        XCTAssertEqual(lesson.assessmentSummary, "Exit ticket comparing 2/5 and 3/10.")
+        XCTAssertEqual(lesson.differentiationSummary, "Pre-cut strips for students who need them.")
+        // Everything was labeled, so there's nothing to warn about.
+        XCTAssertNil(lesson.aiReviewWarnings)
+    }
+
+    @MainActor
+    func testCreateDraftLessonKeepsTypedObjectiveAndWarnsAboutUnlabeledFields() throws {
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Generic QA Workspace",
+            workspaceReference: FileReference(url: repository.rootURL.appending(path: "workspace"))
+        ))
+        let store = AppStore(repository: repository)
+        let source = ImportedSource(
+            id: UUID(),
+            reference: FileReference(url: repository.rootURL.appending(path: "sparse.pdf")),
+            setupRole: .lessonMaterial,
+            extractionMethod: .embeddedText,
+            confidence: nil,
+            extractedText: "Objective: Compare fractions.\n\nSome unlabeled prose about the lesson.",
+            reviewStatus: .reviewed,
+            importedAt: .now,
+            updatedAt: .now
+        )
+
+        store.createDraftLesson(from: source, title: "Fractions", objective: "Teacher's own objective")
+
+        let lesson = try XCTUnwrap(store.lessons.first)
+        // A typed objective wins over the extracted one.
+        XCTAssertEqual(lesson.objective, "Teacher's own objective")
+        XCTAssertTrue(lesson.materials.isEmpty)
+        XCTAssertTrue(lesson.instructionalSequence.isEmpty)
+        let warnings = try XCTUnwrap(lesson.aiReviewWarnings)
+        XCTAssertTrue(warnings.contains("No labeled materials list was found in the source text."))
+        XCTAssertTrue(warnings.contains("No labeled instructional sequence was found in the source text."))
+        XCTAssertFalse(warnings.contains("No labeled learning objective was found in the source text."))
+    }
+
     func testLessonDraftProposalDecodesStrictJSONContract() throws {
         let json = """
         {"title":"Fraction comparison","subject":"Math","gradeOrAgeRange":"4","objective":"Compare fractions","instructionalSteps":["Model","Practice"],"materials":["strips"],"differentiationSummary":"Use visuals","printableResourcePrompt":"Compare two fractions.","assessmentSummary":"Exit ticket"}
