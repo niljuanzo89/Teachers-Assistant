@@ -347,9 +347,25 @@ struct PresentationTemplateFrameMapEntry: Codable, Equatable, Identifiable {
     var notes: String
 }
 
+/// One resolved placeholder shape (from `PowerPointTemplateInspector.resolvePlaceholders`)
+/// addressed structurally by `shapeID`, so layout-preserving export can locate exactly
+/// which shape to write content into without re-deriving placeholder geometry. Distinct
+/// from `PresentationTemplateFrameMapEntry.mappedSlotNames`, which is a heuristic guess at
+/// the slide's narrative role — this is the real, ECMA-376-accurate placeholder identity.
+struct PresentationTemplatePlaceholderAssignment: Codable, Equatable, Identifiable {
+    let id: UUID
+    var sourceSlideNumber: Int
+    var shapeID: Int
+    var shapeName: String?
+    var effectiveType: String
+    var effectiveIdx: Int
+    var lessonField: LessonTemplateField?
+}
+
 struct PresentationTemplateLayoutPlan: Codable, Equatable {
     var slideInventory: [PresentationTemplateSlideInventoryItem]
     var frameMap: [PresentationTemplateFrameMapEntry]
+    var placeholderAssignments: [PresentationTemplatePlaceholderAssignment]
     var fidelityReviewCompleted: Bool
     var updatedAt: Date
 }
@@ -1417,7 +1433,7 @@ enum PresentationTemplateReadinessIssue: String, Equatable, Identifiable {
         case .frameMapPending:
             "Map each intended output slide to a source template slide before copying and editing template structure."
         case .fidelityQAPending:
-            "Complete template fidelity QA after inventory and frame mapping, including inherited-placeholder handling."
+            "Assign a template placeholder to every required lesson field, then confirm the frame map."
         }
     }
 }
@@ -1436,6 +1452,15 @@ struct PresentationTemplateReadinessReport: Equatable {
 
     var canUseTemplateMetadata: Bool { blockingMetadataIssues.isEmpty }
     var isReadyForLayoutPreservation: Bool { canUseTemplateMetadata && issues.isEmpty }
+
+    /// Required lesson fields (title, objective, instructional sequence, assessment) that
+    /// don't yet have a template placeholder assigned to them — drives both the "Confirm
+    /// frame map" action's guard and the read-only summary shown in the Workspace UI.
+    var unassignedRequiredFields: [LessonTemplateField] {
+        let requiredFields = TemplateSlotMapping.defaultPresentationMappings.filter(\.required).map(\.lessonField)
+        let assignedFields = Set((template?.layoutPlan?.placeholderAssignments ?? []).compactMap(\.lessonField))
+        return requiredFields.filter { !assignedFields.contains($0) }
+    }
 
     var title: String {
         if isReadyForLayoutPreservation { return "Template layout preservation ready" }

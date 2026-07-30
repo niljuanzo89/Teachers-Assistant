@@ -1516,10 +1516,24 @@ final class AppStore: ObservableObject {
         let url = URL(fileURLWithPath: template.reference.path)
         do {
             let result = try PowerPointTemplateInspector.inspect(url: url)
+            // Re-inspecting (e.g. after the template file changed) must not silently discard
+            // a teacher's prior placeholder-to-field choices: carry forward the lessonField
+            // for any (sourceSlideNumber, shapeID) pair that still exists in the fresh result.
+            let previousAssignments = template.layoutPlan?.placeholderAssignments ?? []
+            let mergedAssignments = result.placeholderAssignments.map { assignment -> PresentationTemplatePlaceholderAssignment in
+                var merged = assignment
+                if let previous = previousAssignments.first(where: {
+                    $0.sourceSlideNumber == assignment.sourceSlideNumber && $0.shapeID == assignment.shapeID
+                }) {
+                    merged.lessonField = previous.lessonField
+                }
+                return merged
+            }
             updatePresentationTemplateLayoutPlan(
                 templateID: templateID,
                 slideInventory: result.slideInventory,
                 frameMap: result.frameMap,
+                placeholderAssignments: mergedAssignments,
                 fidelityReviewCompleted: false
             )
             // Best-effort enrichment: a template that fails placeholder resolution (no
@@ -1536,6 +1550,7 @@ final class AppStore: ObservableObject {
         templateID: UUID,
         slideInventory: [PresentationTemplateSlideInventoryItem],
         frameMap: [PresentationTemplateFrameMapEntry],
+        placeholderAssignments: [PresentationTemplatePlaceholderAssignment],
         fidelityReviewCompleted: Bool
     ) {
         guard var configuration,
@@ -1544,11 +1559,60 @@ final class AppStore: ObservableObject {
         configuration.outputTemplates[index].layoutPlan = PresentationTemplateLayoutPlan(
             slideInventory: slideInventory.sorted { $0.sourceSlideNumber < $1.sourceSlideNumber },
             frameMap: frameMap.sorted { $0.outputSlideNumber < $1.outputSlideNumber },
+            placeholderAssignments: placeholderAssignments.sorted {
+                $0.sourceSlideNumber == $1.sourceSlideNumber
+                    ? $0.shapeID < $1.shapeID
+                    : $0.sourceSlideNumber < $1.sourceSlideNumber
+            },
             fidelityReviewCompleted: fidelityReviewCompleted,
             updatedAt: .now
         )
         self.configuration = configuration
         saveConfiguration()
+    }
+
+    /// Assigns (or clears, via `nil`) a lesson field on one resolved template placeholder.
+    /// Any change invalidates a prior fidelity-QA confirmation, since that confirmation
+    /// reflects a specific mapping state that no longer holds once it's edited.
+    func assignPlaceholder(templateID: UUID, assignmentID: UUID, lessonField: LessonTemplateField?) {
+        guard var configuration,
+              let templateIndex = configuration.outputTemplates.firstIndex(where: { $0.id == templateID && $0.kind == .presentation }),
+              var layoutPlan = configuration.outputTemplates[templateIndex].layoutPlan,
+              let assignmentIndex = layoutPlan.placeholderAssignments.firstIndex(where: { $0.id == assignmentID })
+        else { return }
+        layoutPlan.placeholderAssignments[assignmentIndex].lessonField = lessonField
+        layoutPlan.fidelityReviewCompleted = false
+        layoutPlan.updatedAt = .now
+        configuration.outputTemplates[templateIndex].layoutPlan = layoutPlan
+        self.configuration = configuration
+        saveConfiguration()
+    }
+
+    /// The one real, user-completable path to `fidelityReviewCompleted = true`: succeeds
+    /// only once every required lesson field (title, objective, instructional sequence,
+    /// assessment) has a placeholder assigned to it. Otherwise reports exactly which fields
+    /// are still unassigned via `lastError`, rather than silently doing nothing.
+    func confirmPresentationTemplateFrameMap(templateID: UUID) {
+        guard var configuration,
+              let templateIndex = configuration.outputTemplates.firstIndex(where: { $0.id == templateID && $0.kind == .presentation }),
+              var layoutPlan = configuration.outputTemplates[templateIndex].layoutPlan
+        else { return }
+
+        let requiredFields = Set(TemplateSlotMapping.defaultPresentationMappings.filter(\.required).map(\.lessonField))
+        let assignedFields = Set(layoutPlan.placeholderAssignments.compactMap(\.lessonField))
+        let missingFields = requiredFields.subtracting(assignedFields)
+        guard missingFields.isEmpty else {
+            let names = missingFields.map(\.displayName).sorted().joined(separator: ", ")
+            lastError = "Assign a template placeholder to every required lesson field before confirming the frame map: \(names)."
+            return
+        }
+
+        layoutPlan.fidelityReviewCompleted = true
+        layoutPlan.updatedAt = .now
+        configuration.outputTemplates[templateIndex].layoutPlan = layoutPlan
+        self.configuration = configuration
+        saveConfiguration()
+        lastError = nil
     }
 
     private func saveConfiguration() {

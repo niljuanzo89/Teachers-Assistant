@@ -1,5 +1,5 @@
 LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
-Last updated: 2026-07-29 (through Batch 024, ahead of GitHub — see "Version control")
+Last updated: 2026-07-29 (through Batch 025, ahead of GitHub — see "Version control")
 
 PURPOSE OF THIS DOCUMENT
 
@@ -602,48 +602,59 @@ System Events/Accessibility is not needed and has historically been unavailable.
 
 10. NEXT HUMAN NEEDED ACTIONS
 
-1. **Visually confirm the Workspace screen redesign (Batch 023)** — the final screen of the
-   "Sunrise Planner" redesign. Screenshot: `Design Screenshots/2026-07-29/10-workspace-sunrise-redesign.png`
-   (or launch the app on the Workspace tab directly). This is the one open stop-and-confirm
-   checkpoint blocking the redesign initiative from being closed out.
-2. Push local git commits to GitHub — command-line push has been blocked all session (missing
-   HTTPS credentials); a computer-use request for GitHub Desktop access was denied once. Use
-   GitHub Desktop directly, or supply command-line credentials, whenever convenient.
-3. ~~Register a real customer-owned `.pptx` template...~~ **Done in Batch 024** with a
+1. ~~Visually confirm the Workspace screen redesign (Batch 023)~~ **Approved by the owner**
+   in the same session ("looks good," minus the raw file-path display, removed in Batch 024).
+2. ~~Push local git commits to GitHub~~ **Fixed in Batch 024/025's session** — SSH keypair
+   generated, host key verified against GitHub's published fingerprint, remote switched from
+   HTTPS to SSH, all commits through Batch 024 pushed. Command-line `git push origin main` now
+   works with no owner action needed; just keep pushing after each verified batch.
+3. **Visually verify the new "Placeholder assignments" Workspace UI (Batch 025)** — a Picker
+   per resolved template placeholder plus a "Confirm frame map" button. Compiles and passes a
+   real Xcode build, but was never opened on screen (built with no computer-use calls at the
+   owner's request while on a call). Screenshot + click through the flow before trusting it.
+4. ~~Register a real customer-owned `.pptx` template...~~ **Done in Batch 024** with a
    hand-authored, schema-valid generic template (`Sunrise Lesson Plan Template.pptx`, built to
    the `pptx` skill's OOXML/validate.py standard) — placeholder inheritance confirmed correct
    for all 3 tested paths (2 layout-override, 1 master-fallback). A *real* customer-owned
    template would still be a useful additional test (different placeholder shapes/naming than
    a hand-authored one), but is no longer blocking — the resolution logic is proven correct.
-4. Inspect a generated PowerPoint deck in Microsoft PowerPoint.
-5. Upload/open a generated deck in Google Slides for compatibility review.
-6. Decide whether the weekly planner still needs a dedicated overflow pattern for very dense
+5. Inspect a generated PowerPoint deck in Microsoft PowerPoint.
+6. Upload/open a generated deck in Google Slides for compatibility review.
+7. Decide whether the weekly planner still needs a dedicated overflow pattern for very dense
    blocks now that rows grow to fit (collapsed cards with click-to-expand, a detail drawer, or
    a separate agenda view — internal per-cell scroll has been tried and removed; do not reach
    for it again).
-7. Decide whether OS-level notifications are required beyond the in-app weekly prompt.
-8. Install `soffice` (LibreOffice) and/or `markitdown` on this machine if future pptx-skill
+8. Decide whether OS-level notifications are required beyond the in-app weekly prompt.
+9. Install `soffice` (LibreOffice) and/or `markitdown` on this machine if future pptx-skill
    work needs visual-render or content QA — neither is currently installed (found in Batch 024).
-9. Consider validating `NativePowerPointExporter.swift`'s theme XML against the same OOXML
-   schema `scripts/office/validate.py` checks — Batch 024 found the app's own exporter theme
-   shares the same schema gaps (missing `dk2`/`lt2`, `ea`/`cs`, complete `effectStyleLst`) that
-   a hand-authored template failed on first attempt. Real PowerPoint/Google Slides are lenient
-   about this, so it isn't urgent, but a stricter consumer could reject it.
+10. Consider validating `NativePowerPointExporter.swift`'s theme XML against the same OOXML
+    schema `scripts/office/validate.py` checks — Batch 024 found the app's own exporter theme
+    shares the same schema gaps (missing `dk2`/`lt2`, `ea`/`cs`, complete `effectStyleLst`) that
+    a hand-authored template failed on first attempt. Real PowerPoint/Google Slides are lenient
+    about this, so it isn't urgent, but a stricter consumer could reject it.
 
 
 11. NEXT IMPLEMENTATION STEPS
 
 Likely next development sequence, in the owner's stated priority order as of 2026-07-29:
 
-1. Once Workspace is visually confirmed (see section 10), the "Sunrise Planner" redesign is
-   fully closed. No further screens remain in scope.
+1. The "Sunrise Planner" redesign is fully closed — owner-approved, no further screens in scope.
 2. Continue the richer-output phase (Batch 017 already ported the stronger slide-deck arc
    into the native exporter): apply `LessonOutputContent` to the lesson-plan and
    differentiation-guide HTML templates next, then improve lesson-content enrichment from
    source text. See `OUTPUT_ENRICHMENT_PLAN.md`.
-3. Layout-preserving PowerPoint export: use `PowerPointTemplateInspector.resolvePlaceholders(url:)`
-   (Batch 005/006) to actually place approved-lesson content into a customer-owned template's
-   resolved placeholder frames, instead of only displaying the resolution in the UI.
+3. Layout-preserving PowerPoint export — in progress. Batch 025 built the structural
+   frame-map/placeholder-assignment layer (see section 13). Still needed:
+   - **Batch 026 (Codex-delegated)**: a `.pptx` package editor/patcher — copy an existing
+     template archive, duplicate/renumber slide parts per the frame map, patch `<p:txBody>`
+     runs in the copied slides with `LessonOutputContent` text at each assigned placeholder's
+     resolved geometry, write a valid archive back out. Suggested interface:
+     `PowerPointTemplateComposer.compose(templateURL:frameMap:placeholderAssignments:content:) throws -> Data`.
+     Verify with `scripts/office/validate.py`, the real test suite, a real Xcode build, and
+     opening the output in the app — this is the highest-risk part of the feature.
+   - **Batch 027**: wire `NativePowerPointExporter` (or a new template-aware exporter path) to
+     use the Batch 026 composer when `fidelityReviewCompleted = true`, falling back to today's
+     from-scratch layout otherwise.
 4. Source-readiness screen — classify extracted content as embedded text, OCR text, uncertain
    text, diagram, handwriting, or math notation, with an explicit review path for anything
    unreliable.
@@ -695,19 +706,17 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 024), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 025), the app has a working local-first prototype path:
 
 two-stage document intake -> automatic role sorting and pacing scaffold -> weekly planner
 population (subject-matched to the correct schedule block, Batch 022) -> interactive weekly
 lesson cells -> lesson plan/deck/differentiation guide outputs -> weekly hub package ->
-template placeholder inheritance resolution for customer-owned PowerPoint templates.
+template placeholder inheritance resolution AND structural placeholder-to-lesson-field
+assignment for customer-owned PowerPoint templates (the actual content-writing step is not
+yet built — see below).
 
 The "Sunrise Planner" visual redesign is code-complete across all 5 screens (Today, This
-Week, Planning Preview, Document Intake, Workspace). This Week, Planning Preview, and
-Document Intake are owner-reviewed and approved. Today and Workspace are built, tested, and
-self-verified (Workspace in exhaustive detail — every card and every empty state, in
-Batch 023) but have not had an explicit owner sign-off message logged. Workspace specifically
-is the one open stop-and-confirm checkpoint from the standing working agreement.
+Week, Planning Preview, Document Intake, Workspace) and owner-approved.
 
 Local verification for Batch 023: full Swift test suite passed 112 tests with 0 failures
 (unaffected — pure View-layer change); real Xcode build succeeded. Screenshot:
@@ -719,27 +728,45 @@ confirming zero trace of licensed curriculum content anywhere in the tracked rep
 `strings` on binaries, full git history audit — all clean, `LocalRepository` writes outside
 the repo by design); and a schema-valid, generically-branded `.pptx` test template used to
 directly confirm `PowerPointTemplateInspector.resolvePlaceholders` correctly resolves all 3
-tested inheritance paths (2 layout-override, 1 master-fallback). 112/112 tests passed, real
-Xcode build succeeded, visually re-verified after rebuild.
+tested inheritance paths (2 layout-override, 1 master-fallback). SSH-based GitHub auth was
+also set up this session (keypair generated, host key verified against GitHub's published
+fingerprint, remote switched from HTTPS to SSH) and all pending commits were pushed —
+`origin/main` was caught up through Batch 024 before Batch 025 began.
 
-GitHub status: local branch is `main`; remote is
-`https://github.com/niljuanzo89/Teachers-Assistant.git`. Command-line push has been blocked
-all session ("could not read Username... Device not configured"); a computer-use request for
-GitHub Desktop access to push through was denied once (Batch 022). Local `main` is at least 2
-commits ahead of `origin/main` as of Batch 022, plus Batch 023 and 024's commit(s) — needs the
-owner to push via GitHub Desktop or supply command-line credentials.
+Batch 025 (first step of "layout-preserving PowerPoint export," routed via the codex-router
+skill per the owner's standing instruction — this batch itself was Claude-native architecture
+work) fixed the disconnect the Batch 024 research surfaced: the Workspace UI's "frame map" was
+built by keyword-guessing on slide XML text, completely separate from the real
+`resolvePlaceholders` resolver, and nothing in the shipped app could ever set
+`fidelityReviewCompleted = true` — the "Complete template fidelity QA" readiness item was
+permanently stuck. Added `PresentationTemplatePlaceholderAssignment` (structural,
+shape-ID-addressed) alongside the existing heuristic frame map; `AppStore.assignPlaceholder`
+lets a teacher assign a lesson field to each resolved placeholder via a new Workspace UI
+section; `AppStore.confirmPresentationTemplateFrameMap` is the one real, user-completable path
+to `fidelityReviewCompleted = true`, gated on all 4 required fields being assigned. Re-
+inspecting a template now preserves prior assignments instead of discarding them. 115/115
+tests passed (112 baseline + 3 new), real Xcode build succeeded. Done with zero
+computer-use/screen-control calls (the owner was on a Zoom call) — the new "Placeholder
+assignments" UI is therefore unverified visually; do this before considering the feature
+done end-to-end.
+
+GitHub status: local branch is `main`, remote `git@github.com:niljuanzo89/Teachers-Assistant.git`
+(SSH, set up in Batch 024/025's session). `origin/main` was fully caught up through Batch 024;
+Batch 025's commit is pending push.
 
 Immediate next session should:
 
-1. Read CONTINUITY_LOG.md's Batch 022 and 023 entries and this document's sections 4/11/13 —
-   do not re-derive the font/icon/staging decisions or the subject-matching design, they're
-   already made and (for subject matching) already Codex-reviewed.
-2. Ask the owner whether the Workspace screen redesign looked right, or whether they have
-   feedback — do not assume approval and move on unprompted.
-3. If approved (or feedback doesn't change the approach), move to the next priority item in
-   section 11 — most likely the output-enrichment phase or pushing the pending GitHub commits.
+1. Read CONTINUITY_LOG.md's Batch 024 and 025 entries and this document's sections 4/11/13 —
+   do not re-derive the subject-matching design (Codex-reviewed) or the frame-map architecture
+   decisions from Batch 025.
+2. Visually verify the new "Placeholder assignments" Workspace UI (screenshot + click through
+   the Picker/Confirm flow) — deferred in Batch 025 per a no-screen-control constraint.
+3. Move to Batch 026: implement the `.pptx` package editor/patcher (see section 11) —
+   Codex-delegated per the routing plan already agreed with the owner, since it's
+   well-specified, algorithm-dense, mechanical work. Review Codex's diff carefully; this is
+   the highest-risk part of the whole feature (ZIP/XML corruption bugs are easy to introduce).
 4. Preserve the two-stage intake boundary (Batch 020) and the scored, full-text-aware subject
    matching (Batch 022) — both were hard-won fixes to real reported bugs; do not simplify
    either back toward "first keyword match wins" or "content type governs schedule timing."
-5. Use the approved GitHub cadence: commit each verified batch, then push every 2-3 committed
-   batches or before risky/handoff work. If command-line auth fails, use GitHub Desktop.
+5. Push Batch 025's commit (and any further batches) via `git push origin main` — SSH auth is
+   now working, no owner action needed for this specific step anymore.

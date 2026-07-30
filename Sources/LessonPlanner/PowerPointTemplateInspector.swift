@@ -20,6 +20,7 @@ enum PowerPointTemplateInspectionError: LocalizedError, Equatable {
 struct PowerPointTemplateInspectionResult: Equatable {
     var slideInventory: [PresentationTemplateSlideInventoryItem]
     var frameMap: [PresentationTemplateFrameMapEntry]
+    var placeholderAssignments: [PresentationTemplatePlaceholderAssignment]
 }
 
 /// A placeholder shape's position and size, in EMUs, as read from `<a:xfrm>`.
@@ -83,7 +84,30 @@ enum PowerPointTemplateInspector {
             )
         }
 
-        return PowerPointTemplateInspectionResult(slideInventory: inventory, frameMap: frameMap)
+        // Best-effort: a template that fails placeholder resolution (no discoverable
+        // layouts/masters) still has a usable slide inventory and frame map above, so this
+        // degrades to no placeholder assignments rather than failing the whole inspection.
+        let resolutions = (try? resolvePlaceholders(url: url)) ?? []
+        let placeholderAssignments = resolutions.flatMap { resolution in
+            resolution.placeholders.compactMap { placeholder -> PresentationTemplatePlaceholderAssignment? in
+                // A placeholder with no shape ID can't be structurally addressed later for
+                // content placement, so it's omitted rather than assigned a synthetic one.
+                guard let shapeID = placeholder.shapeID else { return nil }
+                return PresentationTemplatePlaceholderAssignment(
+                    id: UUID(),
+                    sourceSlideNumber: resolution.sourceSlideNumber,
+                    shapeID: shapeID,
+                    shapeName: placeholder.shapeName,
+                    effectiveType: placeholder.effectiveType,
+                    effectiveIdx: placeholder.effectiveIdx,
+                    lessonField: nil
+                )
+            }
+        }
+
+        return PowerPointTemplateInspectionResult(
+            slideInventory: inventory, frameMap: frameMap, placeholderAssignments: placeholderAssignments
+        )
     }
 
     /// Resolves each slide's placeholder shapes to their effective type, index, and

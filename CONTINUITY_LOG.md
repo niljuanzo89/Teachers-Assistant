@@ -1424,3 +1424,88 @@ proven correct against a real file, not just unit-test fixtures.
    `validate.py` checks, since it shares the gap found in this batch's first template attempt.
 4. Output-enrichment roadmap (`OUTPUT_ENRICHMENT_PLAN.md`) — still the next substantive
    product-work track.
+
+### Batch 025 — 2026-07-29 — Layout-preserving PowerPoint export, Batch 1: structural frame map
+
+**Compute:** high (routed via the `codex-router` skill's classification, per the owner's
+standing instruction). **Model shape:** Claude-native for this batch — architecture/data-model
+decisions, not bulk code generation; the mechanical `.pptx`-editing implementation is scoped
+to a future Codex-delegated batch once its interface is locked down here. **Constraint:** the
+owner was on a Zoom call; this batch was scoped to avoid computer-use/screen-control entirely
+(pure Swift source edits plus `swift build`/`swift test`/`xcodebuild` via Bash).
+
+**Goal.** First step of "layout-preserving PowerPoint export" — placing approved lesson
+content into a customer-owned template's real placeholder frames. An Explore subagent had
+mapped the existing code first: `PowerPointTemplateInspector.resolvePlaceholders(url:)` (the
+slide→layout→master inheritance resolver) is solid and already proven correct (Batch 024), but
+the Workspace UI's "frame map" was built by `inspect(url:)` via keyword-guessing on slide XML
+text — completely disconnected from the real resolver sitting in the same file — and nothing
+in the shipped app ever set `fidelityReviewCompleted = true`, so the "Complete template
+fidelity QA" readiness item could never actually be satisfied through real use.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Read `PowerPointTemplateInspector.swift`, `AppModels.swift`, `AppStore.swift`, and `WorkspaceView.swift` in full for the exact current shape of every type/function involved | Confirmed the Explore agent's findings precisely, with line numbers |
+| 2 | Added `PresentationTemplatePlaceholderAssignment` (`AppModels.swift`): `sourceSlideNumber`, `shapeID`, `shapeName`, `effectiveType`, `effectiveIdx`, `lessonField: LessonTemplateField?` — a structural, ECMA-376-accurate placeholder identity, distinct from the heuristic `mappedSlotNames` string list | New model, addressable by shape ID for future content placement |
+| 3 | Added `placeholderAssignments: [PresentationTemplatePlaceholderAssignment]` to `PresentationTemplateLayoutPlan` | |
+| 4 | Added `unassignedRequiredFields` computed property to `PresentationTemplateReadinessReport`; reworded the `.fidelityQAPending` issue instruction to describe the real action needed | |
+| 5 | `PowerPointTemplateInspector.inspect(url:)` now also calls `resolvePlaceholders(url:)` internally and populates `placeholderAssignments` directly from the real resolved placeholders (skipping any placeholder with no shape ID, since it can't be structurally addressed later) — the heuristic slide-inventory/frame-map generation is left as-is (still useful as informational role-guessing text), but the new field is 100% structural | Two real data representations now coexist without one replacing the other's purpose |
+| 6 | `AppStore.inspectPresentationTemplateLayout` now merges freshly-resolved assignments with the template's prior `placeholderAssignments` by `(sourceSlideNumber, shapeID)`, carrying forward any `lessonField` a teacher already chose — re-inspecting a changed template file no longer silently discards prior work | |
+| 7 | `AppStore.updatePresentationTemplateLayoutPlan` signature extended with `placeholderAssignments:` | |
+| 8 | Added `AppStore.assignPlaceholder(templateID:assignmentID:lessonField:)` — sets/clears one placeholder's lesson field; any edit resets `fidelityReviewCompleted` to `false`, since a stale confirmation must not survive a mapping change | |
+| 9 | Added `AppStore.confirmPresentationTemplateFrameMap(templateID:)` — the one real, user-completable path to `fidelityReviewCompleted = true`. Succeeds only once every required lesson field (title, objective, instructional sequence, assessment) has an assigned placeholder; otherwise reports exactly which fields are missing via `lastError` (already wired to a global alert in `RootView.swift`) | Fixes the "can never be satisfied" bug found in the Batch 024 research |
+| 10 | Added a "Placeholder assignments" section to `WorkspaceView.swift`'s `presentationTemplateCard`: one row per resolved placeholder (slide/shape name/type/idx) with a `Picker` bound to `assignPlaceholder`, plus a "Confirm frame map" button wired to `confirmPresentationTemplateFrameMap` | New, minimal UI — functional but not yet visually verified (see below) |
+| 11 | Updated 2 existing tests' direct `PresentationTemplateLayoutPlan(...)` constructions and 1 `updatePresentationTemplateLayoutPlan` call site for the new required parameter | |
+| 12 | Added an assertion to `testAppStoreInspectPresentationTemplateLayoutResolvesPlaceholderInheritance` confirming the structural assignment (shapeID 2, type "title", idx 0, unassigned lessonField) is derived correctly from the real hand-built template package already used in that test | |
+| 13 | Added 3 new tests: `testAssignPlaceholderSetsLessonFieldAndResetsFidelityReview`, `testConfirmPresentationTemplateFrameMapRequiresAllRequiredFieldsAssigned` (asserts the specific missing-field names in `lastError`), `testConfirmPresentationTemplateFrameMapSucceedsWhenAllRequiredFieldsAssigned` | |
+| 14 | Extended the real-template inheritance test with a re-inspect step: assign a placeholder, re-run `inspectPresentationTemplateLayout`, confirm the assignment survives and `fidelityReviewCompleted` correctly resets to `false` | Proves the merge-preserve logic from step 6 |
+| 15 | `swift build -Xswiftc -gnone` | Compiled clean |
+| 16 | `swift test -Xswiftc -gnone` | First run: 1 failure — `testConfirmPresentationTemplateFrameMapSucceedsWhenAllRequiredFieldsAssigned` failed because the test's own setup left `slideInventory`/`frameMap` empty, independently tripping `.layoutInventoryPending`/`.frameMapPending` regardless of placeholder assignments. Fixed the test data (added realistic inventory/frame-map entries), re-ran: **115/115 passed** (112 baseline + 3 new) |
+| 17 | Real `xcodebuild -scheme LessonPlanner -configuration Debug build` | BUILD SUCCEEDED — confirms the new SwiftUI `Picker`/`Button` code is valid, without ever opening the app on screen |
+| 18 | Updated `CONTINUITY_LOG.md` (this entry) | |
+
+**Outcome.** The frame-map system is no longer two disconnected representations — every
+resolved template placeholder is now structurally addressable (`sourceSlideNumber` +
+`shapeID`), and a teacher (via the new Workspace UI) or a future automated flow can assign each
+one to a lesson field and confirm the mapping through a real, testable action. The previously
+permanently-stuck "Complete template fidelity QA" readiness item can now genuinely reach
+"ready." This unblocks the next batch: a `.pptx` package editor that reads these assignments
+and actually writes lesson content into the resolved placeholder frames of a copied template
+slide — the one piece of this feature identified as completely missing.
+
+**Dead ends / notes.**
+
+- Caught before committing: an early draft of `testConfirmPresentationTemplateFrameMapSucceedsWhenAllRequiredFieldsAssigned`
+  only populated `placeholderAssignments` and left `slideInventory`/`frameMap` empty, which
+  fails `isReadyForLayoutPreservation` for an unrelated reason (inventory/frame-map issues,
+  not placeholder-assignment issues) — a reminder that `PresentationTemplateReadinessReport`
+  has three independent gates (mappings, inventory/frame-map, fidelity QA) that a test
+  exercising one must not accidentally leave failing on another.
+- This entire batch was done with zero `computer-use`/screen-control calls, per the owner's
+  request while on a Zoom call — confirms the project's own prior note (Batch 023) that most
+  of a batch's steps don't actually depend on screen access once a task is scoped as
+  architecture/code rather than visual verification.
+- The new Workspace UI (`placeholderAssignmentSection`) is unverified visually — it compiles
+  and passes a real Xcode build, but has not been screenshotted or clicked through. Do this
+  before considering the feature done end-to-end.
+
+**Still open.**
+
+1. **Batch 026 (Codex-delegated, per the routing plan)**: implement a `.pptx` package
+   editor/patcher — copy an existing template archive, duplicate/renumber slide parts per the
+   frame map, patch `<p:txBody>` runs in the copied slides with `LessonOutputContent` text at
+   each assigned placeholder's resolved geometry, write a valid archive back out. Interface to
+   hand Codex: something like
+   `PowerPointTemplateComposer.compose(templateURL:frameMap:placeholderAssignments:content:) throws -> Data`.
+   Review Codex's diff, then verify with `validate.py`, the real test suite, a real Xcode
+   build, and opening the output in the app before considering it done — this is the
+   highest-risk part of the whole feature (ZIP/XML corruption bugs are easy to introduce).
+2. **Batch 027**: wire `NativePowerPointExporter` (or a new template-aware exporter path) to
+   use the Batch 026 composer when a template has `fidelityReviewCompleted = true`, falling
+   back to today's from-scratch layout otherwise.
+3. Visually verify the new "Placeholder assignments" UI in Workspace (screenshot + a manual
+   click-through of the Picker/Confirm flow) — deferred this batch per the no-screen-control
+   constraint.
+4. GitHub sync — push this batch's commit once ready.
+5. Output-enrichment roadmap (`OUTPUT_ENRICHMENT_PLAN.md`) — still on the backlog, independent
+   of this initiative.

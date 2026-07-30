@@ -1062,3 +1062,38 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   own theme XML shares the same schema gaps the hand-authored template initially failed on;
   not fixed here (real PowerPoint/Google Slides tolerate it), but worth a future validation
   pass.
+
+### 2026-07-29 — GitHub SSH auth fixed; layout-preserving export, step 1: structural frame map
+
+- Diagnosed the session-long GitHub push blocker: no stored credential in the macOS Keychain
+  and no SSH key, so HTTPS push had nothing to authenticate with. Generated an SSH keypair,
+  had the owner add the public key to their GitHub account, verified GitHub's host key
+  fingerprint before trusting it, switched the remote from HTTPS to SSH, and pushed all
+  pending commits. `git push origin main` now works with no owner action needed going forward.
+- Began "layout-preserving PowerPoint export" (placing approved lesson content into a
+  customer-owned template's real placeholder frames). An Explore subagent mapped the existing
+  code first and found the placeholder-inheritance resolver solid but the Workspace UI's
+  "frame map" built by keyword-guessing on slide XML text, completely disconnected from that
+  resolver — and a real bug: nothing in the shipped app could ever set
+  `fidelityReviewCompleted = true`, so the "Complete template fidelity QA" readiness item was
+  permanently stuck.
+- Routed the implementation plan through the `codex-router` skill (per a standing owner
+  instruction to delegate high-compute work): this first batch was scoped as Claude-native
+  architecture work; the mechanical `.pptx`-editing step is planned as a future
+  Codex-delegated batch once its interface is locked down.
+- Added `PresentationTemplatePlaceholderAssignment` — a structural, shape-ID-addressed
+  placeholder identity, populated directly from `PowerPointTemplateInspector.resolvePlaceholders`
+  rather than guessed from text. Added `AppStore.assignPlaceholder` (lets a teacher assign a
+  lesson field to a resolved placeholder, invalidating any prior confirmation) and
+  `AppStore.confirmPresentationTemplateFrameMap` (the real, user-completable path to
+  `fidelityReviewCompleted = true`, gated on all 4 required fields being assigned). Re-
+  inspecting a template now preserves prior assignments by matching `(sourceSlideNumber,
+  shapeID)` instead of discarding them. Added a "Placeholder assignments" section to the
+  Workspace UI with a picker per placeholder and a "Confirm frame map" button.
+- Done entirely without computer-use/screen-control, at the owner's request while on a Zoom
+  call — confirmed a new SwiftUI UI section can be written, tested, and verified via a real
+  Xcode build with zero screen access; visual verification of that new UI is still pending.
+- Verification: `swift build`/`swift test -Xswiftc -gnone` — 115 tests passed (112 baseline +
+  3 new), 0 failures, after fixing one new test's incomplete setup (it left slideInventory/
+  frameMap empty, which independently trips unrelated readiness issues). Real Xcode build
+  succeeded.

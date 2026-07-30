@@ -3559,11 +3559,53 @@ struct ConfigurationSummaryView: View {
                         store.inspectPresentationTemplateLayout(templateID: template.id)
                     }
                     .buttonStyle(.dsSecondary)
+                    if let layoutPlan = template.layoutPlan, !layoutPlan.placeholderAssignments.isEmpty {
+                        placeholderAssignmentSection(templateID: template.id, layoutPlan: layoutPlan)
+                    }
                 }
                 if !store.lastPresentationTemplatePlaceholderResolution.isEmpty {
                     PlaceholderInheritanceView(resolutions: store.lastPresentationTemplatePlaceholderResolution)
                 }
             }
+        }
+    }
+
+    /// Lets a teacher assign each resolved template placeholder to a lesson field, then
+    /// confirm the frame map once every required field has an assignment — the one real,
+    /// user-completable path to satisfying the "fidelity QA" readiness item.
+    private func placeholderAssignmentSection(templateID: UUID, layoutPlan: PresentationTemplateLayoutPlan) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Placeholder assignments")
+                .font(DS.font(12, weight: .semibold))
+                .foregroundStyle(DS.text)
+            ForEach(layoutPlan.placeholderAssignments) { assignment in
+                HStack {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Slide \(assignment.sourceSlideNumber) — \(assignment.shapeName ?? "Unnamed shape")")
+                            .font(DS.font(12))
+                            .foregroundStyle(DS.text)
+                        Text("\(assignment.effectiveType), idx \(assignment.effectiveIdx)")
+                            .font(DS.font(11))
+                            .foregroundStyle(DS.neutral600)
+                    }
+                    Spacer()
+                    Picker("", selection: Binding(
+                        get: { assignment.lessonField },
+                        set: { store.assignPlaceholder(templateID: templateID, assignmentID: assignment.id, lessonField: $0) }
+                    )) {
+                        Text("Unassigned").tag(LessonTemplateField?.none)
+                        ForEach(LessonTemplateField.allCases) { field in
+                            Text(field.displayName).tag(LessonTemplateField?.some(field))
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 200)
+                }
+            }
+            Button("Confirm frame map") {
+                store.confirmPresentationTemplateFrameMap(templateID: templateID)
+            }
+            .buttonStyle(.dsPrimary)
         }
     }
 

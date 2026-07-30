@@ -1634,6 +1634,7 @@ final class LessonPlannerTests: XCTestCase {
                 frameMap: [
                     PresentationTemplateFrameMapEntry(id: UUID(), outputSlideNumber: 1, sourceSlideNumber: 1, narrativeRole: "Opening", mappedSlotNames: ["lesson.title"], notes: "")
                 ],
+                placeholderAssignments: [],
                 fidelityReviewCompleted: true,
                 updatedAt: .now
             ),
@@ -1666,6 +1667,7 @@ final class LessonPlannerTests: XCTestCase {
                     PresentationTemplateSlideInventoryItem(id: UUID(), sourceSlideNumber: 1, reusableRole: "Opening", placeholderCount: 2, notes: "")
                 ],
                 frameMap: [],
+                placeholderAssignments: [],
                 fidelityReviewCompleted: false,
                 updatedAt: .now
             ),
@@ -1912,6 +1914,7 @@ final class LessonPlannerTests: XCTestCase {
             templateID: templateID,
             slideInventory: inventory,
             frameMap: frameMap,
+            placeholderAssignments: [],
             fidelityReviewCompleted: true
         )
 
@@ -1952,6 +1955,7 @@ final class LessonPlannerTests: XCTestCase {
         // wiring runs cleanly on the no-placeholders case rather than crashing or omitting slides.
         XCTAssertEqual(store.lastPresentationTemplatePlaceholderResolution.count, 7)
         XCTAssertTrue(store.lastPresentationTemplatePlaceholderResolution.allSatisfy { $0.placeholders.isEmpty })
+        XCTAssertEqual(savedTemplate.layoutPlan?.placeholderAssignments, [])
     }
 
     @MainActor
@@ -2030,6 +2034,141 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertEqual(title.effectiveType, "title")
         XCTAssertEqual(title.frameSource, .master)
         XCTAssertEqual(title.effectiveFrame, OOXMLFrame(x: 1_000_000, y: 1_000_000, cx: 8_000_000, cy: 1_200_000))
+
+        // The structural placeholder assignment (used to address this shape directly for
+        // layout-preserving content placement) should be derived from the same resolution,
+        // unassigned to a lesson field until the teacher (or an auto-heuristic) picks one.
+        let savedTemplate = try XCTUnwrap(repository.loadConfiguration()?.outputTemplates.first(where: { $0.id == templateID }))
+        let assignment = try XCTUnwrap(savedTemplate.layoutPlan?.placeholderAssignments.first)
+        XCTAssertEqual(savedTemplate.layoutPlan?.placeholderAssignments.count, 1)
+        XCTAssertEqual(assignment.sourceSlideNumber, 1)
+        XCTAssertEqual(assignment.shapeID, 2)
+        XCTAssertEqual(assignment.shapeName, "Title 1")
+        XCTAssertEqual(assignment.effectiveType, "title")
+        XCTAssertEqual(assignment.effectiveIdx, 0)
+        XCTAssertNil(assignment.lessonField)
+
+        // Re-inspecting the same template (e.g. after the file changed on disk) must not
+        // silently discard a teacher's prior placeholder-to-field choice.
+        store.assignPlaceholder(templateID: templateID, assignmentID: assignment.id, lessonField: .title)
+
+        store.inspectPresentationTemplateLayout(templateID: templateID)
+
+        let reinspectedTemplate = try XCTUnwrap(repository.loadConfiguration()?.outputTemplates.first(where: { $0.id == templateID }))
+        XCTAssertEqual(reinspectedTemplate.layoutPlan?.placeholderAssignments.count, 1)
+        XCTAssertEqual(reinspectedTemplate.layoutPlan?.placeholderAssignments.first?.lessonField, .title)
+        XCTAssertEqual(reinspectedTemplate.layoutPlan?.fidelityReviewCompleted, false)
+    }
+
+    @MainActor
+    func testAssignPlaceholderSetsLessonFieldAndResetsFidelityReview() throws {
+        let repository = try makeRepository()
+        let workspace = repository.rootURL.appending(path: "workspace")
+        let templateURL = repository.rootURL.appending(path: "generic-template.pptx")
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Generic QA Workspace",
+            workspaceReference: FileReference(url: workspace)
+        ))
+        let store = AppStore(repository: repository)
+        store.registerPresentationTemplate(templateURL)
+        let templateID = try XCTUnwrap(store.activePresentationTemplate?.id)
+        let assignmentID = UUID()
+        store.updatePresentationTemplateLayoutPlan(
+            templateID: templateID,
+            slideInventory: [],
+            frameMap: [],
+            placeholderAssignments: [
+                PresentationTemplatePlaceholderAssignment(
+                    id: assignmentID, sourceSlideNumber: 1, shapeID: 2, shapeName: "Title 1",
+                    effectiveType: "title", effectiveIdx: 0, lessonField: nil
+                )
+            ],
+            fidelityReviewCompleted: true
+        )
+
+        store.assignPlaceholder(templateID: templateID, assignmentID: assignmentID, lessonField: .title)
+
+        let savedTemplate = try XCTUnwrap(repository.loadConfiguration()?.outputTemplates.first(where: { $0.id == templateID }))
+        XCTAssertEqual(savedTemplate.layoutPlan?.placeholderAssignments.first?.lessonField, .title)
+        // Editing an assignment must invalidate a prior confirmation — it no longer
+        // reflects the current mapping state.
+        XCTAssertEqual(savedTemplate.layoutPlan?.fidelityReviewCompleted, false)
+    }
+
+    @MainActor
+    func testConfirmPresentationTemplateFrameMapRequiresAllRequiredFieldsAssigned() throws {
+        let repository = try makeRepository()
+        let workspace = repository.rootURL.appending(path: "workspace")
+        let templateURL = repository.rootURL.appending(path: "generic-template.pptx")
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Generic QA Workspace",
+            workspaceReference: FileReference(url: workspace)
+        ))
+        let store = AppStore(repository: repository)
+        store.registerPresentationTemplate(templateURL)
+        let templateID = try XCTUnwrap(store.activePresentationTemplate?.id)
+        store.updatePresentationTemplateLayoutPlan(
+            templateID: templateID,
+            slideInventory: [],
+            frameMap: [],
+            placeholderAssignments: [
+                PresentationTemplatePlaceholderAssignment(
+                    id: UUID(), sourceSlideNumber: 1, shapeID: 2, shapeName: "Title 1",
+                    effectiveType: "title", effectiveIdx: 0, lessonField: .title
+                )
+            ],
+            fidelityReviewCompleted: false
+        )
+
+        store.confirmPresentationTemplateFrameMap(templateID: templateID)
+
+        let savedTemplate = try XCTUnwrap(repository.loadConfiguration()?.outputTemplates.first(where: { $0.id == templateID }))
+        XCTAssertEqual(savedTemplate.layoutPlan?.fidelityReviewCompleted, false)
+        let message = try XCTUnwrap(store.lastError)
+        XCTAssertTrue(message.contains("Objective"))
+        XCTAssertTrue(message.contains("Assessment"))
+        XCTAssertTrue(message.contains("Instructional sequence"))
+    }
+
+    @MainActor
+    func testConfirmPresentationTemplateFrameMapSucceedsWhenAllRequiredFieldsAssigned() throws {
+        let repository = try makeRepository()
+        let workspace = repository.rootURL.appending(path: "workspace")
+        let templateURL = repository.rootURL.appending(path: "generic-template.pptx")
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Generic QA Workspace",
+            workspaceReference: FileReference(url: workspace)
+        ))
+        let store = AppStore(repository: repository)
+        store.registerPresentationTemplate(templateURL)
+        let templateID = try XCTUnwrap(store.activePresentationTemplate?.id)
+        store.updatePresentationTemplateLayoutPlan(
+            templateID: templateID,
+            slideInventory: [
+                PresentationTemplateSlideInventoryItem(id: UUID(), sourceSlideNumber: 1, reusableRole: "Opening", placeholderCount: 2, notes: ""),
+                PresentationTemplateSlideInventoryItem(id: UUID(), sourceSlideNumber: 2, reusableRole: "Instruction", placeholderCount: 1, notes: ""),
+                PresentationTemplateSlideInventoryItem(id: UUID(), sourceSlideNumber: 3, reusableRole: "Assessment", placeholderCount: 1, notes: "")
+            ],
+            frameMap: [
+                PresentationTemplateFrameMapEntry(id: UUID(), outputSlideNumber: 1, sourceSlideNumber: 1, narrativeRole: "Opening", mappedSlotNames: ["lesson.title", "lesson.objective"], notes: ""),
+                PresentationTemplateFrameMapEntry(id: UUID(), outputSlideNumber: 2, sourceSlideNumber: 2, narrativeRole: "Instruction", mappedSlotNames: ["lesson.steps"], notes: ""),
+                PresentationTemplateFrameMapEntry(id: UUID(), outputSlideNumber: 3, sourceSlideNumber: 3, narrativeRole: "Assessment", mappedSlotNames: ["lesson.assessment"], notes: "")
+            ],
+            placeholderAssignments: [
+                PresentationTemplatePlaceholderAssignment(id: UUID(), sourceSlideNumber: 1, shapeID: 1, shapeName: "Title", effectiveType: "title", effectiveIdx: 0, lessonField: .title),
+                PresentationTemplatePlaceholderAssignment(id: UUID(), sourceSlideNumber: 1, shapeID: 2, shapeName: "Subtitle", effectiveType: "subTitle", effectiveIdx: 1, lessonField: .objective),
+                PresentationTemplatePlaceholderAssignment(id: UUID(), sourceSlideNumber: 2, shapeID: 3, shapeName: "Body", effectiveType: "body", effectiveIdx: 1, lessonField: .instructionalSequence),
+                PresentationTemplatePlaceholderAssignment(id: UUID(), sourceSlideNumber: 3, shapeID: 4, shapeName: "Body", effectiveType: "body", effectiveIdx: 1, lessonField: .assessmentSummary)
+            ],
+            fidelityReviewCompleted: false
+        )
+
+        store.confirmPresentationTemplateFrameMap(templateID: templateID)
+
+        let savedTemplate = try XCTUnwrap(repository.loadConfiguration()?.outputTemplates.first(where: { $0.id == templateID }))
+        XCTAssertEqual(savedTemplate.layoutPlan?.fidelityReviewCompleted, true)
+        XCTAssertNil(store.lastError)
+        XCTAssertTrue(store.presentationTemplateReadinessReport.isReadyForLayoutPreservation)
     }
 
     func testReleaseReadinessReportFlagsConfiguredNativeWorkspaceWithoutReviewedDeckAsAttention() {
