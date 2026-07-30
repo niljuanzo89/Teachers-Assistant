@@ -1260,15 +1260,15 @@ final class AppStore: ObservableObject {
         lesson.sourceReferences = [source.reference.path]
         lesson.sourceTextSnapshot = source.extractedText
 
-        let extracted = LessonFieldExtractor.extract(from: source.extractedText)
+        let extracted = LessonFieldExtractor.extractWithStructuralInference(from: source.extractedText)
         if lesson.objective.isEmpty { lesson.objective = extracted.objective ?? "" }
         lesson.subject = extracted.subject ?? ""
         lesson.gradeOrAgeRange = extracted.gradeOrAgeRange ?? ""
         lesson.materials = extracted.materials
         lesson.assessmentSummary = extracted.assessment ?? ""
         lesson.differentiationSummary = extracted.differentiation ?? ""
-        lesson.instructionalSequence = extracted.steps.map { InstructionalStep(id: UUID(), title: $0, notes: "") }
-        lesson.aiReviewWarnings = LessonFieldExtractor.unextractedFieldWarnings(for: extracted)
+        lesson.instructionalSequence = extracted.steps.map { InstructionalStep(id: UUID(), title: $0.title, notes: $0.notes) }
+        lesson.aiReviewWarnings = LessonFieldExtractor.extractionWarnings(for: extracted)
 
         lessons.append(lesson)
         mostRecentLessonID = lesson.id
@@ -1353,7 +1353,7 @@ final class AppStore: ObservableObject {
         if updated.assessmentSummary.isEmpty { updated.assessmentSummary = extracted.assessment ?? updated.assessmentSummary }
         if updated.differentiationSummary.isEmpty { updated.differentiationSummary = extracted.differentiation ?? updated.differentiationSummary }
         if updated.instructionalSequence.isEmpty {
-            updated.instructionalSequence = extracted.steps.map { InstructionalStep(id: UUID(), title: $0, notes: "") }
+            updated.instructionalSequence = extracted.steps.map { InstructionalStep(id: UUID(), title: $0.title, notes: $0.notes) }
         }
         updateLesson(updated)
         return updated
@@ -1777,6 +1777,18 @@ final class AppStore: ObservableObject {
 /// fill in themselves. See the "Fill empty fields from labeled source text" button's own
 /// tooltip in WorkspaceView, which states this constraint directly to the teacher.
 enum LessonFieldExtractor {
+    /// One instructional step. `notes` is populated when a step was recognized as a document
+    /// section with body text under it (see `LessonStructureInferencer`); a step parsed from a
+    /// plain labeled list is title-only.
+    struct ExtractedStep: Equatable {
+        var title: String
+        var notes: String = ""
+    }
+
+    enum Field: String, CaseIterable {
+        case subject, gradeOrAgeRange, objective, materials, assessment, differentiation, steps
+    }
+
     struct Result: Equatable {
         var subject: String?
         var gradeOrAgeRange: String?
@@ -1784,7 +1796,10 @@ enum LessonFieldExtractor {
         var materials: [String] = []
         var assessment: String?
         var differentiation: String?
-        var steps: [String] = []
+        var steps: [ExtractedStep] = []
+        /// Fields filled by structural inference rather than an explicit label in the source.
+        /// Empty for `extract(from:)`, which never infers.
+        var inferredFields: Set<Field> = []
     }
 
     private static let subjectLabels = ["subject", "content area"]
@@ -1811,8 +1826,18 @@ enum LessonFieldExtractor {
             materials: listValue(for: materialsLabels, in: lines),
             assessment: scalarValue(for: assessmentLabels, in: lines),
             differentiation: scalarValue(for: differentiationLabels, in: lines),
-            steps: listValue(for: stepsLabels, in: lines)
+            steps: listValue(for: stepsLabels, in: lines).map { ExtractedStep(title: $0) }
         )
+    }
+
+    /// Label-based extraction first, then `LessonStructureInferencer` for whatever the labels
+    /// didn't cover — for real curriculum documents that carry structure through phase
+    /// headings and standards codes instead of "Objective:"-style labels. Inferred values are
+    /// flagged in `Result.inferredFields`. Callers that must not infer (the lesson editor's
+    /// "Fill empty fields from labeled source text" button, which promises exactly that in its
+    /// tooltip) should keep using `extract(from:)` instead.
+    static func extractWithStructuralInference(from text: String) -> Result {
+        LessonStructureInferencer.fillingGaps(in: extract(from: text), from: text)
     }
 
     /// The value for a prose field: the same line's remainder if the label has one, otherwise
@@ -1913,20 +1938,48 @@ enum LessonFieldExtractor {
         return result.trimmingCharacters(in: .whitespaces)
     }
 
-    /// Names the fields the source text didn't explicitly label, so a teacher looking at a
-    /// half-filled draft knows the app found nothing to copy rather than wondering whether it
-    /// silently dropped something. Deliberately phrased as "no labeled X was found" — this
-    /// extractor never infers, so a blank field means "not labeled," not "not present."
-    static func unextractedFieldWarnings(for result: Result) -> [String]? {
+    /// Tells the teacher two different things they need to know about a generated draft:
+    /// which fields were *inferred* from document structure and therefore need checking, and
+    /// which came up empty so they know the app found nothing rather than silently dropping
+    /// content. Without this, an inferred objective is indistinguishable from one the document
+    /// stated outright — the difference matters when the guess is wrong.
+    static func extractionWarnings(for result: Result) -> [String]? {
         var warnings: [String] = []
-        if result.objective == nil { warnings.append("No labeled learning objective was found in the source text.") }
-        if result.steps.isEmpty { warnings.append("No labeled instructional sequence was found in the source text.") }
-        if result.materials.isEmpty { warnings.append("No labeled materials list was found in the source text.") }
-        if result.assessment == nil { warnings.append("No labeled assessment or success check was found in the source text.") }
-        if result.differentiation == nil { warnings.append("No labeled differentiation notes were found in the source text.") }
-        guard !warnings.isEmpty else { return nil }
-        warnings.append("Fields the source did not explicitly label were left blank rather than guessed. Fill them in as needed.")
-        return warnings
+
+        let inferredNames = result.inferredFields
+            .sorted { $0.rawValue < $1.rawValue }
+            .map(displayName)
+        if !inferredNames.isEmpty {
+            warnings.append(
+                "Inferred from the document's structure rather than an explicit label: \(inferredNames.joined(separator: ", ")). Check these before approving."
+            )
+        }
+
+        var missing: [String] = []
+        if result.objective == nil { missing.append("learning objective") }
+        if result.steps.isEmpty { missing.append("instructional sequence") }
+        if result.materials.isEmpty { missing.append("materials") }
+        if result.assessment == nil { missing.append("assessment") }
+        if result.differentiation == nil { missing.append("differentiation notes") }
+        if !missing.isEmpty {
+            warnings.append(
+                "No \(missing.joined(separator: ", ")) could be found in the source text. These were left blank rather than guessed."
+            )
+        }
+
+        return warnings.isEmpty ? nil : warnings
+    }
+
+    private static func displayName(_ field: Field) -> String {
+        switch field {
+        case .subject: "subject"
+        case .gradeOrAgeRange: "grade"
+        case .objective: "learning objective"
+        case .materials: "materials"
+        case .assessment: "assessment"
+        case .differentiation: "differentiation notes"
+        case .steps: "instructional sequence"
+        }
     }
 }
 

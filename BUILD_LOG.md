@@ -1184,3 +1184,34 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   subject/grade are absent.
 - Verification: `swift test -Xswiftc -gnone` — 126/126 passed (120 baseline + 6 new). Real
   `xcodebuild` succeeded.
+
+### 2026-07-29 — Fixed the real cause of "imported sources only fill in the title"
+
+- Root cause was not extraction quality. The primary "Create draft lesson from source" button
+  called `createDraftLesson(from:title:objective:)`, which never invoked `LessonFieldExtractor`
+  at all — it set only the title plus whatever objective the teacher typed. The extractor
+  existed and worked, but was wired to a *different* button on the lesson-editor screen, which
+  a teacher only reaches after the title-only draft already exists. The primary path now runs
+  extraction and pre-fills every field the source supports.
+- Upgraded `LessonFieldExtractor` for real document shapes: multi-line values under a heading
+  (previously an objective spanning two lines was silently truncated), bulleted and numbered
+  lists whose items may themselves contain commas, more label synonyms, and markdown headings.
+  Fixed a real matching bug: the "goal" label matched any line *starting* with it, so
+  "Goals for this unit are described in the pacing guide." was captured as the objective.
+- Probed the improved extractor against realistic teacher-edition prose (timed phase headings,
+  running paragraphs, no `Objective:` labels) and found it still extracted nothing — the honest
+  ceiling of a label-only approach. Reported that to the owner rather than declaring the bug
+  fixed; the owner chose to add structural heuristics.
+- Added `LessonStructureInferencer` (new file): recognizes timed phase headings
+  ("Warm-Up (5 min)"), conventional phase names across gradual-release/5E/workshop models,
+  conventional objective phrasing ("Students will…", "SWBAT", "I can…"), and
+  CCSS-math/CCSS-ELA/NGSS standards codes for subject and grade. Instructional steps now carry
+  the phase's body text as notes, not just a title. The same page that previously extracted
+  nothing now yields subject, grade, objective, assessment, and three fully-noted steps.
+- Kept the existing no-inference guarantee intact and made inference self-disclosing:
+  `extract(from:)` is unchanged and still label-only (the lesson-editor button promises exactly
+  that in its tooltip), while `extractWithStructuralInference(from:)` is the inferring variant
+  used by draft creation. Every inferred field is recorded and surfaced to the teacher as
+  "inferred from structure — check these," kept distinct from "not found — left blank."
+- Verification: `swift test -Xswiftc -gnone` — 138/138 passed. Real `xcodebuild` succeeded with
+  the new file registered in `project.pbxproj`.

@@ -3734,7 +3734,7 @@ final class LessonPlannerTests: XCTestCase {
 
         // Each bullet is one item: "Chart paper, any color" must not be comma-split into two.
         XCTAssertEqual(result.materials, ["Fraction strips", "Chart paper, any color", "Dry-erase markers"])
-        XCTAssertEqual(result.steps, ["Launch with a number talk", "Model comparing 2/3 and 3/5"])
+        XCTAssertEqual(result.steps.map(\.title), ["Launch with a number talk", "Model comparing 2/3 and 3/5"])
     }
 
     func testExtractorMatchesLabelSynonymsAndMarkdownHeadings() {
@@ -3782,6 +3782,110 @@ final class LessonPlannerTests: XCTestCase {
         // rather than swallowing the next section's heading and contents.
         XCTAssertEqual(result.objective, "Compare fractions with unlike denominators.")
         XCTAssertEqual(result.materials, ["fraction strips"])
+    }
+
+    func testStructuralInferenceReadsRealisticTeacherEditionPage() {
+        // A published teacher-edition page: no "Objective:"/"Materials:" labels anywhere.
+        // The label-only pass extracts nothing from this; structural inference is what makes
+        // it usable. This is the exact shape that produced title-only drafts before.
+        let text = """
+        LESSON 5.3
+
+        Compare Fractions Using Benchmarks
+
+        Mathematical Standards
+        5.NF.A.2 Solve word problems involving fractions.
+
+        Students will compare fractions with unlike denominators using benchmark reasoning.
+
+        Warm-Up (5 min)
+        Display two fractions. Ask students which is greater and why.
+
+        Teaching the Lesson (20 min)
+        Begin by reviewing benchmark fractions. Model comparing 2/3 and 3/5.
+
+        Have students turn and talk about which strategy they prefer.
+
+        Wrap-Up (5 min)
+        Students complete the exit ticket on page 212.
+        """
+
+        XCTAssertNil(LessonFieldExtractor.extract(from: text).objective, "label-only pass should find nothing here")
+
+        let result = LessonFieldExtractor.extractWithStructuralInference(from: text)
+        XCTAssertEqual(result.subject, "Math")
+        XCTAssertEqual(result.gradeOrAgeRange, "Grade 5")
+        XCTAssertEqual(result.objective, "Students will compare fractions with unlike denominators using benchmark reasoning.")
+        XCTAssertEqual(result.assessment, "Students complete the exit ticket on page 212.")
+        XCTAssertEqual(result.steps.map(\.title), ["Warm-Up", "Teaching the Lesson", "Wrap-Up"])
+        // A phase's body continues across a paragraph break, up to the next phase heading.
+        XCTAssertEqual(
+            result.steps[1].notes,
+            "Begin by reviewing benchmark fractions. Model comparing 2/3 and 3/5. Have students turn and talk about which strategy they prefer."
+        )
+        XCTAssertEqual(result.inferredFields, [.subject, .gradeOrAgeRange, .objective, .assessment, .steps])
+        // Nothing supports materials or differentiation here, so they stay genuinely empty.
+        XCTAssertTrue(result.materials.isEmpty)
+        XCTAssertNil(result.differentiation)
+    }
+
+    func testStructuralInferenceNeverOverridesAnExplicitLabel() {
+        let result = LessonFieldExtractor.extractWithStructuralInference(from: """
+        Objective: Compare fractions using common denominators.
+
+        Students will do something entirely different in this sentence.
+
+        Warm-Up (5 min)
+        Number talk.
+        """)
+
+        // The labeled objective is better evidence than the "Students will…" heuristic.
+        XCTAssertEqual(result.objective, "Compare fractions using common denominators.")
+        XCTAssertFalse(result.inferredFields.contains(.objective))
+        XCTAssertTrue(result.inferredFields.contains(.steps))
+    }
+
+    func testStructuralInferenceRecognizesELAAndScienceStandards() {
+        let ela = LessonFieldExtractor.extractWithStructuralInference(from: "Standard RL.4.1 Refer to details in a text.")
+        XCTAssertEqual(ela.subject, "English Language Arts")
+        XCTAssertEqual(ela.gradeOrAgeRange, "Grade 4")
+
+        let science = LessonFieldExtractor.extractWithStructuralInference(from: "Standard 5-PS1-1 Develop a model of matter.")
+        XCTAssertEqual(science.subject, "Science")
+        XCTAssertEqual(science.gradeOrAgeRange, "Grade 5")
+
+        // Middle/high-school NGSS codes name a band, not a single grade — infer subject only.
+        let middle = LessonFieldExtractor.extractWithStructuralInference(from: "Standard MS-LS1-4 Construct an explanation.")
+        XCTAssertEqual(middle.subject, "Science")
+        XCTAssertNil(middle.gradeOrAgeRange)
+    }
+
+    func testStructuralInferenceRecognizesNamedPhasesWithoutDurations() {
+        let result = LessonFieldExtractor.extractWithStructuralInference(from: """
+        Launch
+        Pose the problem of the day.
+
+        Guided Practice
+        Work three problems together.
+
+        Closure
+        Summarize the strategy.
+        """)
+
+        XCTAssertEqual(result.steps.map(\.title), ["Launch", "Guided Practice", "Closure"])
+        XCTAssertEqual(result.steps[0].notes, "Pose the problem of the day.")
+    }
+
+    func testStructuralInferenceIgnoresOrdinaryProseAsPhaseHeadings() {
+        let result = LessonFieldExtractor.extractWithStructuralInference(from: """
+        This lesson continues the unit on fractions and builds toward comparing unlike denominators later in the week.
+
+        Students should already be comfortable with benchmark fractions before beginning.
+        """)
+
+        // Neither line is a phase heading, so nothing should be invented as a step.
+        XCTAssertTrue(result.steps.isEmpty)
+        XCTAssertTrue(result.inferredFields.isEmpty || !result.inferredFields.contains(.steps))
     }
 
     @MainActor
@@ -3832,7 +3936,7 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertEqual(lesson.instructionalSequence.map(\.title), ["Launch with a number talk", "Model with fraction strips"])
         XCTAssertEqual(lesson.assessmentSummary, "Exit ticket comparing 2/5 and 3/10.")
         XCTAssertEqual(lesson.differentiationSummary, "Pre-cut strips for students who need them.")
-        // Everything was labeled, so there's nothing to warn about.
+        // Everything was explicitly labeled, so nothing was inferred and nothing is missing.
         XCTAssertNil(lesson.aiReviewWarnings)
     }
 
@@ -3864,9 +3968,11 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertTrue(lesson.materials.isEmpty)
         XCTAssertTrue(lesson.instructionalSequence.isEmpty)
         let warnings = try XCTUnwrap(lesson.aiReviewWarnings)
-        XCTAssertTrue(warnings.contains("No labeled materials list was found in the source text."))
-        XCTAssertTrue(warnings.contains("No labeled instructional sequence was found in the source text."))
-        XCTAssertFalse(warnings.contains("No labeled learning objective was found in the source text."))
+        let missingWarning = try XCTUnwrap(warnings.first { $0.hasPrefix("No ") })
+        XCTAssertTrue(missingWarning.contains("materials"))
+        XCTAssertTrue(missingWarning.contains("instructional sequence"))
+        // The objective WAS found (labeled in the source), so it must not be listed missing.
+        XCTAssertFalse(missingWarning.contains("learning objective"))
     }
 
     func testLessonDraftProposalDecodesStrictJSONContract() throws {

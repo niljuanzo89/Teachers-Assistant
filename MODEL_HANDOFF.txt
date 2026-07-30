@@ -1,5 +1,5 @@
 LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
-Last updated: 2026-07-29 (through Batch 028, ahead of GitHub — see "Version control")
+Last updated: 2026-07-29 (through Batch 029, ahead of GitHub — see "Version control")
 
 PURPOSE OF THIS DOCUMENT
 
@@ -713,7 +713,7 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 028), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 029), the app has a working local-first prototype path:
 
 two-stage document intake -> automatic role sorting and pacing scaffold -> weekly planner
 population (subject-matched to the correct schedule block, Batch 022) -> interactive weekly
@@ -812,24 +812,56 @@ with blank title AND blank notes used to render an empty bullet; now correctly s
 (`google chrome --headless --screenshot`) after discovering the in-app Browser preview pane
 doesn't support local `file://` URLs interactively.
 
+Batch 029 fixed the long-standing "imported sources only populate the title" problem the owner
+described as "a massive problem in this project." Root cause was NOT extraction quality: the
+primary "Create draft lesson from source" button called
+`createDraftLesson(from:title:objective:)`, which never invoked `LessonFieldExtractor` at all —
+it set only the title plus a typed objective. The extractor existed but was reachable only from
+a separate button on the lesson-editor screen, which a teacher reaches *after* the title-only
+draft already exists. The primary path now extracts. Beyond that fix:
+- `LessonFieldExtractor` was upgraded for real document shapes (multi-line values under a
+  heading, bulleted/numbered lists whose items may contain commas, more label synonyms,
+  markdown headings) and a real matching bug was fixed — "goal" previously matched any line
+  starting "Goals…", capturing the wrong sentence as the objective.
+- New `Sources/LessonPlanner/LessonStructureInferencer.swift`: a second pass for curriculum
+  documents that carry structure through timed phase headings ("Warm-Up (5 min)"), conventional
+  phase names, objective phrasing ("Students will…", "SWBAT"), and CCSS-math/CCSS-ELA/NGSS
+  standards codes rather than field labels. On a realistic teacher-edition page that previously
+  extracted NOTHING, it now fills subject, grade, objective, assessment, and instructional
+  steps with multi-paragraph body notes.
+- **Load-bearing design rule**: inference is opt-in and always disclosed.
+  `extract(from:)` remains strictly label-only (the lesson-editor button's tooltip promises
+  exactly that); `extractWithStructuralInference(from:)` is the inferring variant used by draft
+  creation. Every heuristically-filled field is recorded in `Result.inferredFields` and
+  surfaced to the teacher as "inferred from structure — check these," distinct from "not found
+  — left blank." Do not collapse these two entry points or drop the disclosure.
+138/138 tests passed, real Xcode build succeeded.
+
 GitHub status: local branch is `main`, remote `git@github.com:niljuanzo89/Teachers-Assistant.git`
-(SSH, set up in Batch 024/025's session). `origin/main` is caught up through Batch 027; Batch
-028's commit is pending push.
+(SSH, set up in Batch 024/025's session). `origin/main` is caught up through Batch 028; Batch
+029's commit is pending push.
 
 Immediate next session should:
 
-1. Read CONTINUITY_LOG.md's Batch 024-028 entries and this document's sections 4/11/13 — do
+1. Read CONTINUITY_LOG.md's Batch 024-029 entries and this document's sections 4/11/13 — do
    not re-derive the subject-matching design (Codex-reviewed), the frame-map architecture
    (Batch 025), the composer's design (Batch 026), the fail-loud wiring decision (Batch 027),
-   or the fallback-text/differentiation-scope decisions (Batch 028).
-2. Visually verify the Batch 025 "Placeholder assignments" Workspace UI (screenshot + click
+   the fallback-text/differentiation-scope decisions (Batch 028), or the label-vs-inference
+   separation (Batch 029).
+2. **Highest-value next step: get one of the owner's real curriculum PDFs that has been failing
+   and run the new inferencer against it.** Batch 029's heuristics are tested against realistic
+   synthetic text only; tuning against a genuine document is what will tell us whether they
+   actually work on the owner's material. Ask for one rather than guessing further — guessing
+   at document shape is exactly what cost time in Batch 029.
+3. Visually verify the Batch 025 "Placeholder assignments" Workspace UI (screenshot + click
    through the Picker/Confirm flow) — still deferred, no screen-control batch has happened yet.
-3. Output enrichment's next lever is Implementation Sequence #1 from `OUTPUT_ENRICHMENT_PLAN.md`
-   — a deterministic layer that improves sparse EXTRACTED `LessonRecord` fields from source
-   text, not just their rendering (which is what Batch 028 did). This is the bigger,
-   more speculative remaining piece of the output-enrichment initiative.
 4. Preserve the two-stage intake boundary (Batch 020) and the scored, full-text-aware subject
    matching (Batch 022) — both were hard-won fixes to real reported bugs; do not simplify
    either back toward "first keyword match wins" or "content type governs schedule timing."
-5. Push Batch 028's commit via `git push origin main` — SSH auth is working, no owner action
+5. Push Batch 029's commit via `git push origin main` — SSH auth is working, no owner action
    needed for this specific step anymore.
+
+PROCESS NOTE FROM BATCH 029, worth internalizing: earlier in that same session I told the owner
+the enrichment layer was "not started," based on reading `OUTPUT_ENRICHMENT_PLAN.md` rather than
+grepping the code. `LessonFieldExtractor` had existed for many batches. A plan document states
+intent, not what shipped — check the code before reporting a roadmap item's status.

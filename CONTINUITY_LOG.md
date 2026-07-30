@@ -1705,3 +1705,64 @@ placeholder text. Verified visually via real rendered screenshots, not just stri
 3. GitHub sync — push this batch's commit.
 4. Everything still open from Batch 027 (Placeholder-assignments UI visual verification,
    slide duplication/reordering, `GeneratedOutputRecord` provenance distinction).
+
+### Batch 029 — 2026-07-29 — Fix the real "only the title populates" extraction bug
+
+**Compute:** medium. **Model shape:** Claude-native — diagnosis-heavy, and the fix turned out
+to be small once the actual cause was found.
+
+**Goal.** The owner reported that importing a source produced a lesson with only the title
+filled in, describing it as "a massive problem in this project." Earlier in the same session I
+had told them the enrichment layer was "not started" — that was wrong, and worth recording as
+a process failure: I had described a roadmap item from the plan document without first checking
+whether it existed in the code. It did.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Before scoping anything, traced how a `LessonRecord` is actually created from a source | Found `LessonFieldExtractor` (in `AppStore.swift`) already existed — a deterministic label-based extractor, wired to a "Fill empty fields from labeled source text" button in the lesson editor, with a passing test |
+| 2 | Asked the owner what the failure actually looked like rather than guessing further | Answer: "extracts title only sometimes… looks like it's extracting plain text in a giant bundle but only the title populates" — pointing at something upstream of the extractor's parsing quality |
+| 3 | Traced every `createDraftLesson` call site in the UI | **Found the real bug**: the primary "Create draft lesson from source" button calls `createDraftLesson(from:title:objective:)`, which never called the extractor at all — it set only the title plus whatever the teacher typed into an objective field that starts blank. The extractor was only reachable from a *different* button on a *different* screen (the lesson editor), which a teacher reaches only after the title-only draft already exists and has no reason to know they must press |
+| 4 | Fixed the primary path: `createDraftLesson(from:title:objective:)` now runs extraction and pre-fills every field the source supports; a typed title/objective still wins over an extracted value | |
+| 5 | Improved the extractor itself for real document shapes: multi-line values under a heading (previously only the same line or literally the next line — an objective spanning two lines was silently truncated), bulleted/numbered lists where an item may itself contain a comma, more label synonyms, and markdown headings (`## Materials`, `**Grade Level:**`) | |
+| 6 | Fixed a genuine matching bug found while adding whole-label boundary checking: the label "goal" previously matched any line *starting* with it, so "Goals for this unit are described in the pacing guide." was captured as the learning objective | Regression test added |
+| 7 | Added warnings naming which fields the source didn't support, so a half-filled draft explains itself rather than looking broken | |
+| 8 | **Probed against realistic curriculum prose** (a teacher-edition page with "Warm-Up (5 min)" headings and running paragraphs, no `Objective:` labels) to check whether the improvements actually helped in the real case | Extracted **nothing** — confirming the honest ceiling of a label-only approach, and that steps 4-7 alone would not have solved the owner's problem for documents of that shape |
+| 9 | Reported that ceiling to the owner plainly rather than declaring the bug fixed, and offered three paths (inspect a real failing document first / structural heuristics / promote the AI path) | Owner chose structural heuristics |
+| 10 | Built `LessonStructureInferencer` (new file) — a clearly separated second pass that recognizes: timed phase headings ("Warm-Up (5 min)") and conventional phase names (gradual-release, 5E, workshop) as instructional steps *with body text as notes*; conventional objective phrasing ("Students will…", "SWBAT", "I can…"); and CCSS-math / CCSS-ELA / NGSS standards codes to infer subject and grade | |
+| 11 | Kept the existing no-inference promise intact: `extract(from:)` is unchanged and still label-only (the lesson-editor button's tooltip explicitly promises "It does not infer missing content"), with inference available only via a new `extractWithStructuralInference(from:)` used by draft creation | |
+| 12 | Made inference honest rather than invisible: `Result.inferredFields` records every heuristically-filled field, and the warnings now distinguish "inferred from structure — check these" from "not found — left blank" | The key design decision; an inferred objective must not be indistinguishable from a stated one |
+| 13 | Re-probed the same realistic page | Now extracts subject (Math), grade (Grade 5), objective, assessment, and 3 instructional steps with full multi-paragraph body notes — all correctly flagged as inferred |
+| 14 | Added 5 structural-inference tests including two guard tests: labels always beat heuristics, and ordinary prose is never mistaken for a phase heading | |
+| 15 | Registered the new file in `project.pbxproj` (4-entry pattern) | |
+| 16 | `swift test -Xswiftc -gnone`; real `xcodebuild` | 138/138 passed; BUILD SUCCEEDED, with the new file confirmed compiling in the app target |
+
+**Outcome.** The reported bug is fixed at its actual root (the primary draft path never called
+the extractor), and the extractor is now capable enough to populate a realistic teacher-edition
+page that previously yielded nothing — while still never presenting a guess as though the
+document stated it.
+
+**Dead ends / notes.**
+
+- **Process lesson worth keeping:** I described `OUTPUT_ENRICHMENT_PLAN.md`'s "Implementation
+  Sequence #1" as "not started" based on the plan document alone, without grepping for it.
+  `LessonFieldExtractor` had existed for many batches. Check the code before reporting the
+  status of a roadmap item — the plan is a statement of intent, not a record of what shipped.
+- Asking the owner what the failure *looked like* (rather than inferring from the code) is what
+  located the bug: "only the title populates" is the signature of a call site that doesn't call
+  the extractor, not of an extractor that parses badly. Two very different fixes.
+- Probing against realistic messy text before declaring victory is what surfaced the honest
+  ceiling of steps 4-7. A tidy test fixture would have shown green and hidden the real gap.
+- `phaseHeadingTitle` treats a duration annotation ("(12 min)") as sufficient evidence on its
+  own, so an unrecognized phase name still parses. The known-name list is a fallback for
+  headings without durations, not the primary signal.
+
+**Still open.**
+
+1. **The inferencer is unvalidated against the owner's actual curriculum PDFs.** It's tested
+   against realistic synthetic text, but the highest-value next step is running it on one real
+   failing document and tuning from what that shows. Worth asking for one.
+2. Materials and differentiation are still label-only — no structural inference. Materials in
+   real teacher editions often appear as an unlabeled sidebar list, which needs a positional/
+   layout signal the current plain-text pipeline doesn't preserve.
+3. GitHub sync — push this batch's commit.
+4. Everything still open from Batches 027-028.
