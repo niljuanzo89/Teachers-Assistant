@@ -3095,6 +3095,99 @@ final class LessonPlannerTests: XCTestCase {
     }
 
     @MainActor
+    func testAppStoreSlideDeckGenerationUsesComposerWhenFrameMapConfirmed() async throws {
+        let repository = try makeRepository()
+        let workspace = repository.rootURL.appending(path: "workspace")
+        let outputFolder = repository.rootURL.appending(path: "outputs")
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Generic QA Workspace",
+            workspaceReference: FileReference(url: workspace),
+            outputFolderReference: FileReference(url: outputFolder)
+        ))
+        let template = try makeComposablePresentationTemplate(in: repository.rootURL, fileName: "confirmed-template.pptx")
+
+        var lesson = LessonRecord.draft(title: "Layout Preserving Lesson")
+        lesson.status = .approved
+        lesson.objective = "Confirm the composer is actually used for export."
+
+        let store = AppStore(repository: repository)
+        store.registerPresentationTemplate(template.templateURL)
+        let templateID = try XCTUnwrap(store.activePresentationTemplate?.id)
+        store.updatePresentationTemplateLayoutPlan(
+            templateID: templateID,
+            slideInventory: [
+                PresentationTemplateSlideInventoryItem(id: UUID(), sourceSlideNumber: 1, reusableRole: "Opening", placeholderCount: 1, notes: ""),
+                PresentationTemplateSlideInventoryItem(id: UUID(), sourceSlideNumber: 2, reusableRole: "Body", placeholderCount: 1, notes: "")
+            ],
+            frameMap: [
+                PresentationTemplateFrameMapEntry(id: UUID(), outputSlideNumber: 1, sourceSlideNumber: 1, narrativeRole: "Opening", mappedSlotNames: ["lesson.title"], notes: ""),
+                PresentationTemplateFrameMapEntry(id: UUID(), outputSlideNumber: 2, sourceSlideNumber: 2, narrativeRole: "Body", mappedSlotNames: ["lesson.objective"], notes: "")
+            ],
+            placeholderAssignments: [
+                PresentationTemplatePlaceholderAssignment(id: UUID(), sourceSlideNumber: 1, shapeID: 2, shapeName: "Title 1", effectiveType: "title", effectiveIdx: 0, lessonField: .title),
+                PresentationTemplatePlaceholderAssignment(id: UUID(), sourceSlideNumber: 2, shapeID: 3, shapeName: "Body 1", effectiveType: "body", effectiveIdx: 1, lessonField: .objective)
+            ],
+            fidelityReviewCompleted: true
+        )
+
+        let generatedOutput = await store.generateSlideDeckPPTX(for: lesson)
+        let output = try XCTUnwrap(generatedOutput)
+        let unzipRoot = repository.rootURL.appending(path: "generated-unzipped")
+        try runUnzip(source: URL(fileURLWithPath: output.filePath), destination: unzipRoot)
+
+        let slide1XML = try String(contentsOf: unzipRoot.appending(path: "ppt/slides/slide1.xml"), encoding: .utf8)
+        XCTAssertTrue(slide1XML.contains("<a:t>Layout Preserving Lesson</a:t>"))
+        XCTAssertFalse(slide1XML.contains("Old title"))
+
+        let slide2XML = try String(contentsOf: unzipRoot.appending(path: "ppt/slides/slide2.xml"), encoding: .utf8)
+        XCTAssertTrue(slide2XML.contains("<a:t>Confirm the composer is actually used for export.</a:t>"))
+
+        // The composed output preserves the template's own 2-slide structure, unlike the
+        // generic from-scratch deck's ~7 slides — proving the composer path ran, not the
+        // NativePowerPointDeck fallback.
+        XCTAssertFalse(FileManager.default.fileExists(atPath: unzipRoot.appending(path: "ppt/slides/slide3.xml").path))
+    }
+
+    @MainActor
+    func testAppStoreSlideDeckGenerationSurfacesComposerFailureWithoutSilentFallback() async throws {
+        let repository = try makeRepository()
+        let workspace = repository.rootURL.appending(path: "workspace")
+        let outputFolder = repository.rootURL.appending(path: "outputs")
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Generic QA Workspace",
+            workspaceReference: FileReference(url: workspace),
+            outputFolderReference: FileReference(url: outputFolder)
+        ))
+        // Registers a template whose file doesn't actually exist on disk, but marks its layout
+        // plan confirmed anyway — simulates the template being moved or deleted after
+        // confirmation. This must surface as a real error, not a silent fallback to a generic
+        // deck the teacher didn't ask for.
+        let missingTemplateURL = repository.rootURL.appending(path: "missing-template.pptx")
+
+        var lesson = LessonRecord.draft(title: "Should Not Silently Fall Back")
+        lesson.status = .approved
+
+        let store = AppStore(repository: repository)
+        store.registerPresentationTemplate(missingTemplateURL)
+        let templateID = try XCTUnwrap(store.activePresentationTemplate?.id)
+        store.updatePresentationTemplateLayoutPlan(
+            templateID: templateID,
+            slideInventory: [PresentationTemplateSlideInventoryItem(id: UUID(), sourceSlideNumber: 1, reusableRole: "Opening", placeholderCount: 1, notes: "")],
+            frameMap: [PresentationTemplateFrameMapEntry(id: UUID(), outputSlideNumber: 1, sourceSlideNumber: 1, narrativeRole: "Opening", mappedSlotNames: ["lesson.title"], notes: "")],
+            placeholderAssignments: [
+                PresentationTemplatePlaceholderAssignment(id: UUID(), sourceSlideNumber: 1, shapeID: 2, shapeName: "Title 1", effectiveType: "title", effectiveIdx: 0, lessonField: .title)
+            ],
+            fidelityReviewCompleted: true
+        )
+
+        let generatedOutput = await store.generateSlideDeckPPTX(for: lesson)
+
+        XCTAssertNil(generatedOutput)
+        XCTAssertNotNil(store.lastError)
+        XCTAssertTrue(store.generatedOutputs.isEmpty)
+    }
+
+    @MainActor
     func testAppStoreRefusesSlideDeckForUnapprovedLesson() async throws {
         let repository = try makeRepository()
         let workspace = repository.rootURL.appending(path: "workspace")

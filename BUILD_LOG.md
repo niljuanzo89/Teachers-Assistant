@@ -1135,3 +1135,24 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   explicit-file-reference pattern) — Codex was explicitly told not to touch this file.
 - Verification: `swift test -Xswiftc -gnone` — 118/118 passed (115 baseline + 3 new). Real
   `xcodebuild` succeeded.
+
+### 2026-07-29 — Layout-preserving PowerPoint export, part 3: wired into real export
+
+- Wired `PowerPointTemplateComposer` into `AppStore.generateSlideDeckPPTX`'s actual generation
+  path, closing out the 3-batch "layout-preserving PowerPoint export" arc. No new UI trigger
+  was needed — the existing single generation entry point already threaded the active
+  presentation template through; `NativePowerPointExporter.generate` now branches to the
+  composer whenever that template's `fidelityReviewCompleted = true`, falling back to the
+  existing generic from-scratch deck otherwise.
+- Deliberate design decision: a composer failure is never silently swallowed into a fallback
+  to the generic deck — it propagates as a real error (`lastError`, already wired to a global
+  alert), since a teacher who confirmed template placement expects to see it actually used.
+- Verified with 2 new tests (the composer path produces output matching the template's own
+  slide structure rather than the generic exporter's; a template pointing at a missing file
+  surfaces a real error with no output silently written) and, again, a real end-to-end pass
+  beyond unit tests: ran the FULL production path against the real Sunrise template with only
+  2 of 4 placeholders assigned, schema-validated the output, and confirmed *selective*
+  replacement — assigned placeholders got new text, unassigned ones kept the original
+  template text exactly.
+- Verification: `swift test -Xswiftc -gnone` — 120/120 passed (118 baseline + 2 new). Real
+  `xcodebuild` succeeded (no new files, no `project.pbxproj` change needed).

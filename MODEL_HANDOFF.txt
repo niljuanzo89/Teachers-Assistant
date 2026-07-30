@@ -1,5 +1,5 @@
 LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
-Last updated: 2026-07-29 (through Batch 026, ahead of GitHub — see "Version control")
+Last updated: 2026-07-29 (through Batch 027, ahead of GitHub — see "Version control")
 
 PURPOSE OF THIS DOCUMENT
 
@@ -643,24 +643,21 @@ Likely next development sequence, in the owner's stated priority order as of 202
    into the native exporter): apply `LessonOutputContent` to the lesson-plan and
    differentiation-guide HTML templates next, then improve lesson-content enrichment from
    source text. See `OUTPUT_ENRICHMENT_PLAN.md`.
-3. Layout-preserving PowerPoint export — in progress. Batch 025 built the structural
-   frame-map/placeholder-assignment layer; Batch 026 built and verified the composer itself
-   (see section 13). Still needed:
-   - ~~Batch 026: a `.pptx` package editor/patcher~~ **Done.** `PowerPointTemplateComposer.compose(templateURL:placeholderAssignments:content:) throws -> Data`
-     in `Sources/LessonPlanner/PowerPointTemplateComposer.swift`. Edits placeholder text on the
-     template's own existing slides in place — does not duplicate/reorder slides (see the note
-     below). Schema-validated against a real template, unit-tested, independently code-reviewed.
-   - **Batch 027**: wire `PowerPointTemplateComposer` into the real export flow — a new branch
-     in `AppStore`'s slide-deck generation path used when the active presentation template's
-     `fidelityReviewCompleted = true`, falling back to `NativePowerPointExporter`'s from-scratch
-     layout otherwise. Needs a UI decision: where does a teacher trigger a template-aware
-     export vs. the default one? Probably surfaced wherever the app currently offers slide-deck
-     generation for an approved lesson.
+3. **Layout-preserving PowerPoint export — complete and working end-to-end** (Batches 025-027,
+   see section 13). `AppStore.generateSlideDeckPPTX` automatically uses
+   `PowerPointTemplateComposer` whenever the active presentation template's
+   `fidelityReviewCompleted = true`, falling back to `NativePowerPointExporter`'s from-scratch
+   layout otherwise — no separate UI trigger needed, since there was already exactly one
+   generation entry point that already threaded the template through. A composer failure
+   surfaces as a real error (`lastError`), never a silent fallback.
    - **Future, not yet scoped**: slide duplication/reordering support, for lessons that need
      more slides than the registered template has (e.g. several practice slides). The composer
      and frame-map pipeline both currently assume output slide count == template slide count;
      this needs a UI concept for a teacher to express "reuse this slide N times" before it's
      worth building.
+   - **Small polish item**: `GeneratedOutputRecord` doesn't currently distinguish
+     "layout-preserving" vs. "metadata-only" provenance (only `templateDisplayName` is
+     tracked) — flagged in Batch 027, not yet done.
 4. Source-readiness screen — classify extracted content as embedded text, OCR text, uncertain
    text, diagram, handwriting, or math notation, with an explicit review path for anything
    unreliable.
@@ -712,16 +709,16 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 026), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 027), the app has a working local-first prototype path:
 
 two-stage document intake -> automatic role sorting and pacing scaffold -> weekly planner
 population (subject-matched to the correct schedule block, Batch 022) -> interactive weekly
 lesson cells -> lesson plan/deck/differentiation guide outputs -> weekly hub package ->
 template placeholder inheritance resolution, structural placeholder-to-lesson-field
-assignment, AND now a working `.pptx` composer (`PowerPointTemplateComposer`, Batch 026) that
-writes real lesson content into a customer-owned template's placeholder shapes — proven against
-both hand-built fixtures and the real, schema-validated Sunrise template. Not yet wired into
-the app's actual export flow (that's Batch 027).
+assignment, AND a fully wired layout-preserving PowerPoint export: a teacher who registers a
+template, assigns lesson fields to its placeholders, and confirms the frame map gets real
+lesson content placed into that template's actual slides on the next generated deck — this
+is now the default behavior of `AppStore.generateSlideDeckPPTX`, not a separate opt-in path.
 
 The "Sunrise Planner" visual redesign is code-complete across all 5 screens (Today, This
 Week, Planning Preview, Document Intake, Workspace) and owner-approved.
@@ -775,24 +772,39 @@ just XML-text assertions; unzipped and grepped the result to directly confirm co
 landed in the correct placeholders. Registered the new file in `project.pbxproj` (4-entry
 pattern, Codex was told not to touch this). Real Xcode build succeeded.
 
+Batch 027 (Claude-native — small, judgment-heavy wiring, no Codex delegation needed) closed the
+loop: found there was already exactly one slide-deck generation entry point
+(`AppStore.generateSlideDeckPPTX`) that already threaded the active template through, so no new
+UI trigger was needed — just a branch inside `NativePowerPointExporter.generate`. When the
+active template's `layoutPlan?.fidelityReviewCompleted == true`, it now calls
+`PowerPointTemplateComposer.compose(...)` instead of building the generic from-scratch deck.
+Deliberate design decision: a composer failure does NOT silently fall back to the generic deck
+— it surfaces as a real error via `lastError`, since a teacher who confirmed template placement
+expects to see it used. Verified with 2 new tests (composer-used path proven by asserting the
+output has the template's own 2-slide structure, not the generic ~7; failure-surfaces-not-masked
+path proven with a template pointing at a missing file) plus, again, a real end-to-end pass:
+the FULL `AppStore.generateSlideDeckPPTX` production path run against the real Sunrise template
+with only 2 of its 4 placeholders assigned, schema-validated, and content-inspected to confirm
+correct *selective* replacement (assigned placeholders changed, unassigned ones kept their
+original template text). 120/120 tests passed, real Xcode build succeeded.
+
 GitHub status: local branch is `main`, remote `git@github.com:niljuanzo89/Teachers-Assistant.git`
 (SSH, set up in Batch 024/025's session). `origin/main` was fully caught up through Batch 024;
-Batch 025 and 026's commits are pending push.
+Batch 025, 026, and 027's commits are pending push.
 
 Immediate next session should:
 
-1. Read CONTINUITY_LOG.md's Batch 024, 025, and 026 entries and this document's sections
-   4/11/13 — do not re-derive the subject-matching design (Codex-reviewed), the frame-map
-   architecture decisions from Batch 025, or the composer's design from Batch 026.
+1. Read CONTINUITY_LOG.md's Batch 024-027 entries and this document's sections 4/11/13 — do
+   not re-derive the subject-matching design (Codex-reviewed), the frame-map architecture
+   (Batch 025), the composer's design (Batch 026), or the fail-loud wiring decision (Batch 027).
 2. Visually verify the Batch 025 "Placeholder assignments" Workspace UI (screenshot + click
    through the Picker/Confirm flow) — still deferred, no screen-control batch has happened yet.
-3. Move to Batch 027: wire `PowerPointTemplateComposer` into the real export flow — likely a
-   new branch in `AppStore`'s slide-deck generation path used when the active presentation
-   template's `fidelityReviewCompleted = true`, falling back to `NativePowerPointExporter`'s
-   from-scratch layout otherwise. Needs a UI decision: where does a teacher trigger a
-   template-aware export vs. the default one?
+3. "Layout-preserving PowerPoint export" is now a complete, working feature end-to-end. Next
+   priorities: the output-enrichment phase (`OUTPUT_ENRICHMENT_PLAN.md`), or the smaller polish
+   items flagged in Batch 027's "still open" list (e.g. `GeneratedOutputRecord` provenance
+   distinguishing layout-preserving vs. metadata-only exports).
 4. Preserve the two-stage intake boundary (Batch 020) and the scored, full-text-aware subject
    matching (Batch 022) — both were hard-won fixes to real reported bugs; do not simplify
    either back toward "first keyword match wins" or "content type governs schedule timing."
-5. Push Batch 025 and 026's commits via `git push origin main` — SSH auth is working, no owner
-   action needed for this specific step anymore.
+5. Push Batch 025, 026, and 027's commits via `git push origin main` — SSH auth is working, no
+   owner action needed for this specific step anymore.

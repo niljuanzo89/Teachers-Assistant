@@ -10,8 +10,28 @@ enum NativePowerPointExporter: SlideDeckGenerating {
     }
 
     @MainActor static func generate(lesson: LessonRecord, destination: URL, template: OutputTemplateRegistration? = nil) async throws {
-        let deck = NativePowerPointDeck(lesson: lesson, template: template)
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+        // A template only reaches `fidelityReviewCompleted = true` by way of
+        // `AppStore.confirmPresentationTemplateFrameMap`, which already requires every
+        // required lesson field to have an assigned placeholder — so this flag alone is a
+        // sufficient "ready to compose" signal without re-deriving the full readiness report
+        // here. When ready, a composer failure (e.g. the template moved or was edited
+        // externally) is deliberately NOT swallowed into a silent fallback to the generic
+        // deck: a teacher who set up template placement expects to see it used, so a failure
+        // should surface as a real error rather than quietly substituting different output.
+        if let template, template.kind == .presentation, template.layoutPlan?.fidelityReviewCompleted == true {
+            let placeholderAssignments = template.layoutPlan?.placeholderAssignments ?? []
+            let data = try PowerPointTemplateComposer.compose(
+                templateURL: URL(fileURLWithPath: template.reference.path),
+                placeholderAssignments: placeholderAssignments,
+                content: LessonOutputContent(lesson: lesson)
+            )
+            try data.write(to: destination, options: .atomic)
+            return
+        }
+
+        let deck = NativePowerPointDeck(lesson: lesson, template: template)
         try deck.packageData().write(to: destination, options: .atomic)
     }
 }

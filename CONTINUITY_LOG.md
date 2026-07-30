@@ -1578,3 +1578,60 @@ tests, manual code review, real-template schema validation, direct content inspe
    scope, needs a UI concept first.
 4. GitHub sync — push this batch's commit.
 5. Output-enrichment roadmap (`OUTPUT_ENRICHMENT_PLAN.md`) — still on the backlog.
+
+### Batch 027 — 2026-07-29 — Layout-preserving PowerPoint export, Batch 3: wire it into export
+
+**Compute:** medium. **Model shape:** Claude-native — the actual wiring was small and
+judgment-heavy (fallback/error-propagation semantics), not bulk code generation, so no Codex
+delegation was needed for this step.
+
+**Goal.** Wire `PowerPointTemplateComposer` (Batch 026) into the app's real slide-deck
+generation flow, so an approved lesson with a confirmed template frame map actually produces
+layout-preserving output instead of the generic from-scratch deck.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Traced the existing call path before assuming a new UI trigger was needed | Found exactly one entry point, `AppStore.generateSlideDeckPPTX(for:)`, which already resolves `activePresentationTemplate` and passes it into `activeSlideDeckGenerator.generate(lesson:destination:template:)` — no new UI decision point required, just a branch inside the existing generator |
+| 2 | Designed the fallback/error semantics: when the active template's `layoutPlan?.fidelityReviewCompleted == true` (a flag that, per Batch 025, can only become true once every required lesson field has an assigned placeholder — sufficient "ready" signal on its own), use the composer; otherwise keep today's generic from-scratch deck unchanged. **Deliberately do NOT swallow a composer failure into a silent fallback** — a teacher who confirmed template placement expects to see it used, so a failure (e.g. the template file moved or was edited externally) surfaces as a real error via the existing `AppStore.lastError`/`RootView` alert path, not a quietly-substituted generic deck | A genuine design decision, not just wiring |
+| 3 | Edited `NativePowerPointExporter.generate(lesson:destination:template:)` — ~15 lines, branches to `PowerPointTemplateComposer.compose(...)` when ready, falls through to the existing `NativePowerPointDeck` path otherwise | `swift build` compiled clean |
+| 4 | Added `testAppStoreSlideDeckGenerationUsesComposerWhenFrameMapConfirmed` — confirms real lesson content lands in the correct placeholders of a hand-built 2-slide template, and that the OUTPUT has exactly 2 slides (not the generic exporter's ~7), proving the composer path actually ran | |
+| 5 | Added `testAppStoreSlideDeckGenerationSurfacesComposerFailureWithoutSilentFallback` — registers a template pointing at a file that doesn't exist on disk, marks its layout plan confirmed anyway (simulating the file moving after confirmation), and asserts `generateSlideDeckPPTX` returns `nil`, `lastError` is set, and no output was silently written | Confirms the "fail loud, don't mask" decision from step 2 actually holds |
+| 6 | `swift test -Xswiftc -gnone` | 120/120 passed (118 baseline + 2 new); confirmed zero regression on the pre-existing "template registered but not confirmed → generic deck with metadata in speaker notes" tests |
+| 7 | Went beyond unit tests again for the payoff step of the whole feature: added a temporary verification-only test exercising the FULL `AppStore.generateSlideDeckPPTX` production path (destination naming, output-folder resolution, `GeneratedOutputRecord` creation — not just calling the composer directly) against the real `Sunrise Lesson Plan Template.pptx`, assigning only 2 of its 4 placeholders (title on slide 1, body on slide 2) | Ran via `swift test --filter`, produced a real file |
+| 8 | Ran `scripts/office/validate.py --original` against the output, then unzipped and grepped its `<a:t>` runs | **"All validations PASSED!"** — and content confirmed correct *selective* replacement: the 2 assigned placeholders got new text, the 2 unassigned ones (slide 1's subtitle, slide 2's title) kept their original template text exactly as-is |
+| 9 | Removed the temporary verification test | `git diff` on the test file now shows only the 2 permanent tests from steps 4-5 |
+| 10 | `swift test -Xswiftc -gnone` and real `xcodebuild` again after removing the temp test | 120/120 passed; BUILD SUCCEEDED (no new files this batch, no `project.pbxproj` change needed) |
+| 11 | Updated `CONTINUITY_LOG.md` (this entry) | |
+
+**Outcome.** "Layout-preserving PowerPoint export" is now a working, end-to-end feature: a
+teacher who registers a customer-owned template, assigns lesson fields to its placeholders,
+and confirms the frame map will get real lesson content placed into that template's actual
+slides when they generate a deck — verified against a real file at every layer (unit tests,
+the full production call path, OOXML schema validation, and direct content inspection). This
+closes out the 3-batch arc that started with Batch 024's research finding the feature was
+completely unbuilt.
+
+**Dead ends / notes.**
+
+- No new UI was needed for "where does a teacher trigger a template-aware export" — the
+  existing single generation entry point already threads the active template through, so the
+  "decision" collapsed into "does this template happen to be confirmed," which is exactly the
+  state `AppStore.confirmPresentationTemplateFrameMap` (Batch 025) already tracks.
+- The temporary Batch 026 lesson (compose against a real, already-validated template for a
+  stronger-than-unit-test proof) was repeated here at the full-production-path level, and is
+  becoming a recognizable pattern for this project: a hand-built test fixture proves the logic
+  is correct in isolation, a real previously-validated file proves it holds up in practice.
+  Worth reaching for again on any future PowerPoint-writing work.
+
+**Still open.**
+
+1. Visually verify the Batch 025 "Placeholder assignments" Workspace UI — still deferred, no
+   screen-control batch has happened yet since it was built.
+2. Slide duplication/reordering for templates with fewer slides than a lesson needs — future
+   scope, needs a UI concept first (flagged since Batch 026).
+3. GitHub sync — push this batch's commit.
+4. Consider whether `GeneratedOutputRecord` should distinguish "layout-preserving" vs.
+   "metadata-only" provenance in its own data/UI (currently only `templateDisplayName` is
+   tracked, which doesn't say which mode was used) — deliberately deferred this batch to keep
+   scope to the wiring itself; a reasonable next small polish item.
+5. Output-enrichment roadmap (`OUTPUT_ENRICHMENT_PLAN.md`) — still on the backlog.
