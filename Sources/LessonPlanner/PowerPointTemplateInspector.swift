@@ -169,7 +169,7 @@ enum PowerPointTemplateInspector {
     /// "slideLayout" or "slideMaster") to a package-relative entry path, or nil if the
     /// part has no `.rels` file or no relationship of that type — a template's slide or
     /// layout is not guaranteed to have one.
-    private static func resolvedRelationshipTarget(
+    static func resolvedRelationshipTarget(
         for partEntry: String, relationshipTypeSuffix: String, archive: PowerPointPackageReader
     ) -> String? {
         let relsEntry = relationshipsEntryName(for: partEntry)
@@ -181,7 +181,7 @@ enum PowerPointTemplateInspector {
         return normalizedPackagePath(basePart: partEntry, relativeTarget: relationship.target)
     }
 
-    private static func relationshipsEntryName(for partEntry: String) -> String {
+    static func relationshipsEntryName(for partEntry: String) -> String {
         let components = partEntry.split(separator: "/")
         guard let fileName = components.last else { return partEntry }
         let directory = components.dropLast().joined(separator: "/")
@@ -191,7 +191,7 @@ enum PowerPointTemplateInspector {
 
     /// Resolves a `Target` attribute (relative to `basePart`'s directory, per OPC
     /// conventions) into a package-absolute entry path, collapsing `..` segments.
-    private static func normalizedPackagePath(basePart: String, relativeTarget: String) -> String {
+    static func normalizedPackagePath(basePart: String, relativeTarget: String) -> String {
         if relativeTarget.hasPrefix("/") { return String(relativeTarget.dropFirst()) }
         var components = basePart.split(separator: "/").dropLast().map(String.init)
         for segment in relativeTarget.split(separator: "/") {
@@ -354,13 +354,13 @@ enum OOXMLPlaceholderResolution {
     }
 }
 
-private struct OOXMLRelationship {
+struct OOXMLRelationship {
     var id: String
     var type: String
     var target: String
 }
 
-private enum OOXMLRelationshipParser {
+enum OOXMLRelationshipParser {
     static func parse(_ xml: String) -> [OOXMLRelationship] {
         guard let data = xml.data(using: .utf8) else { return [] }
         let delegate = RelationshipDelegate()
@@ -390,7 +390,7 @@ private enum OOXMLRelationshipParser {
 /// recognized, a safe under-approximation rather than a wrong-geometry result. Does not
 /// descend into grouped shapes (`<p:grpSp>`); a placeholder nested inside a group is rare
 /// in practice and is skipped rather than mis-parsed.
-private enum OOXMLPlaceholderParser {
+enum OOXMLPlaceholderParser {
     static func parsePlaceholderShapes(from xml: String) -> [OOXMLPlaceholderShape] {
         guard let data = xml.data(using: .utf8) else { return [] }
         let delegate = PlaceholderDelegate()
@@ -486,7 +486,7 @@ private enum OOXMLPlaceholderParser {
     }
 }
 
-private struct PowerPointPackageReader {
+struct PowerPointPackageReader {
     private struct Entry {
         var name: String
         var compressionMethod: UInt16
@@ -505,11 +505,15 @@ private struct PowerPointPackageReader {
         entries = try Self.readCentralDirectory(from: data)
     }
 
-    func xml(named name: String) throws -> String {
+    func data(named name: String) throws -> Data {
         guard let entry = entries.first(where: { $0.name == name }) else {
             throw PowerPointTemplateInspectionError.unreadablePackage
         }
-        let fileData = try dataForEntry(entry)
+        return try dataForEntry(entry)
+    }
+
+    func xml(named name: String) throws -> String {
+        let fileData = try data(named: name)
         guard let xml = String(data: fileData, encoding: .utf8) else {
             throw PowerPointTemplateInspectionError.unreadablePackage
         }
@@ -600,7 +604,7 @@ private struct PowerPointPackageReader {
     }
 }
 
-private extension Data {
+extension Data {
     func uint16(at offset: Int) -> UInt16 {
         guard offset + 2 <= count else { return 0 }
         return self[offset..<offset + 2].enumerated().reduce(UInt16(0)) { result, pair in

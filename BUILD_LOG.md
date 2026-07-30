@@ -1097,3 +1097,41 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   3 new), 0 failures, after fixing one new test's incomplete setup (it left slideInventory/
   frameMap empty, which independently trips unrelated readiness issues). Real Xcode build
   succeeded.
+
+### 2026-07-29 — Layout-preserving PowerPoint export, part 2: the `.pptx` composer (Codex-delegated)
+
+- Implemented `PowerPointTemplateComposer.compose(templateURL:placeholderAssignments:content:) throws -> Data`
+  in a new file, `Sources/LessonPlanner/PowerPointTemplateComposer.swift` — the piece Batch 024's
+  research had flagged as completely missing: a `.pptx` package editor that writes real lesson
+  content into a customer-owned template's placeholder shapes.
+- Delegated the implementation to Codex, per the routing plan set up in the prior batch — this
+  was well-specified, algorithm-dense ZIP/XML editing work with a locked-down interface, the
+  profile suited to delegation. The `mcp__codex__codex` MCP tool timed out on the first attempt
+  (confirmed nothing had been touched); retried via the `codex` CLI directly
+  (`/Applications/ChatGPT.app/Contents/Resources/codex exec -s workspace-write`, run in the
+  background), which completed cleanly.
+- Deliberately scoped narrower than originally sketched: the composer edits placeholder text on
+  the template's own existing slides in place and does not duplicate or reorder slides. The
+  current frame-map pipeline never needs more output slides than the template already has, so
+  this avoided the much higher-risk content-types/relationship-renumbering work for now.
+- Independently verified every part of Codex's work rather than trusting its self-report: read
+  the full diff (access-level widening in `PowerPointTemplateInspector.swift` was exactly
+  `private` → internal, zero behavior change, plus one clean helper reused by existing code);
+  read the new composer file in full and hand-traced its custom string-based XML editing
+  (boundary-safe `<p:sp>` vs `<p:spPr>` matching, shape/`txBody` range-finding, paragraph
+  replacement preserving `bodyPr`/`lstStyle`, a from-scratch ZIP writer matching the same
+  well-known format the app's own `NativePowerPointExporter` already uses in production); ran
+  `swift build`/`swift test` myself (118/118 passed) rather than trusting Codex's own build
+  report (which had needed `--disable-sandbox` in its managed environment).
+- Went beyond unit tests for extra confidence given this is the highest-risk part of the whole
+  feature: composed a real lesson against the actual, already schema-validated
+  `Sunrise Lesson Plan Template.pptx` (Batch 024) via a temporary verification-only test, ran the
+  `pptx` skill's `scripts/office/validate.py --original` against the output — **passed full
+  OOXML schema validation** — and unzipped/grepped the result to directly confirm the exact
+  mapped text landed in the correct placeholders (including a deliberately non-default field
+  mapping and a multi-item instructional sequence correctly split into separate paragraphs).
+  Removed the temporary test afterward.
+- Registered the new file in `LessonPlanner.xcodeproj/project.pbxproj` (the 4-entry
+  explicit-file-reference pattern) — Codex was explicitly told not to touch this file.
+- Verification: `swift test -Xswiftc -gnone` — 118/118 passed (115 baseline + 3 new). Real
+  `xcodebuild` succeeded.

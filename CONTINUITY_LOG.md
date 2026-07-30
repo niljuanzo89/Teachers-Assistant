@@ -1509,3 +1509,72 @@ slide — the one piece of this feature identified as completely missing.
 4. GitHub sync — push this batch's commit once ready.
 5. Output-enrichment roadmap (`OUTPUT_ENRICHMENT_PLAN.md`) — still on the backlog, independent
    of this initiative.
+
+### Batch 026 — 2026-07-29 — Layout-preserving PowerPoint export, Batch 2: the `.pptx` composer
+
+**Compute:** high, **Codex-delegated** per the routing plan agreed in Batch 025 — this was the
+well-specified, algorithm-dense, mechanical piece (ZIP/XML editing against a locked-down
+interface), the profile the `codex-router` skill calls out for delegation.
+
+**Goal.** Implement the piece identified as completely missing in Batch 024's research: a
+`.pptx` package editor that actually writes approved lesson content into a customer-owned
+template's real placeholder shapes, using the `PresentationTemplatePlaceholderAssignment`
+data built in Batch 025.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Wrote a single, fully self-contained prompt for Codex (interface signature, exact field-mapping table, ZIP-writer approach, explicit "do not touch" list for `NativePowerPointExporter.swift`/`AppStore.swift`/views/`project.pbxproj`, and 3 required test cases) — kept scope deliberately narrow: edit placeholder text on the template's own existing slides in place, no slide duplication/reordering (that's a later batch) | Lower-risk first version of the highest-risk part of this feature |
+| 2 | First attempt via the `mcp__codex__codex` MCP tool timed out at the transport level before any work started (confirmed via `git status` — no files touched) | Not a Codex failure, an MCP RPC timeout on a long-running call |
+| 3 | Retried via the `codex` CLI directly (`/Applications/ChatGPT.app/Contents/Resources/codex exec`, found via `find /Applications -iname codex`) run in the background with `-s workspace-write`, writing to a log file instead of waiting on the MCP round-trip | Completed cleanly, no MCP timeout this time |
+| 4 | Reviewed every changed/new file in full before trusting any of it (per standing practice — never accept a delegated agent's self-report alone): `git status` confirmed only the 3 expected files touched; `git diff` on `PowerPointTemplateInspector.swift` confirmed the access-widening was exactly `private` → default-internal with zero added `public`, zero behavior change, plus one small well-placed helper (`PowerPointPackageReader.data(named:)`) reused by both the existing `xml(named:)` and the new composer | Clean, precisely scoped diff |
+| 5 | Read the new `PowerPointTemplateComposer.swift` in full and traced the correctness of its custom string-based XML editing by hand: the `<p:sp` vs `<p:spPr` boundary-matching logic, the shape/`txBody` range-finding scoped correctly per shape, the paragraph-replacement logic (preserves `<a:bodyPr>`/`<a:lstStyle>`, replaces only `<a:p>` children, inserts new content exactly once at the first paragraph's position), and the re-implemented CRC32/ZIP-writer (byte-for-byte the same well-known format `NativePowerPointExporter.swift`'s own `StoredZipWriter` already uses successfully in production) | No correctness issues found |
+| 6 | Read the 3 new tests in full — confirmed they matched the spec, including one Codex added on its own initiative (a title containing `<` and `&` to actually exercise XML escaping, not just happy-path text) | Good test judgment beyond the literal ask |
+| 7 | Independently ran `swift build -Xswiftc -gnone` and `swift test -Xswiftc -gnone` myself (not trusting Codex's own build/test report, which had noted it needed `--disable-sandbox` to run in its own environment) | 118/118 passed cleanly in my own environment |
+| 8 | Added one temporary, clearly-marked verification-only test composing against the REAL, already schema-validated `Sunrise Lesson Plan Template.pptx` from Batch 024 (not a hand-built fixture), writing the output to a fixed scratch path | Ran via `swift test --filter`, produced a real file |
+| 9 | Ran the `pptx` skill's `scripts/office/validate.py --original "Sunrise Lesson Plan Template.pptx"` against the composed output | **"All validations PASSED!"** — full OOXML schema validation, not just XML-text matching |
+| 10 | Unzipped the composed output and grepped its `<a:t>` runs directly | Confirmed exact correct text landed in the right placeholders, including a deliberately non-default mapping (assessment → slide 2's title) and a 2-item instructional sequence correctly split into 2 separate `<a:p>` paragraphs |
+| 11 | Removed the temporary verification test (it was scratch-only, not part of the deliverable) | `git diff` on the test file now shows only Codex's 3 permanent tests |
+| 12 | Registered the new file in `LessonPlanner.xcodeproj/project.pbxproj` myself (Codex was explicitly told not to touch this) — 4 entries per the project's documented explicit-file-reference pattern, new ID `0000000000000018` (confirmed unused first) | |
+| 13 | `swift test -Xswiftc -gnone` again after removing the temp test | 118/118 passed |
+| 14 | Real `xcodebuild -scheme LessonPlanner -configuration Debug build` | BUILD SUCCEEDED |
+| 15 | Updated `CONTINUITY_LOG.md` (this entry) | |
+
+**Outcome.** `PowerPointTemplateComposer.compose(templateURL:placeholderAssignments:content:)`
+now exists, is unit-tested, and has been independently proven correct against a real,
+previously-validated template — not just hand-built test fixtures. This is the piece Batch 024's
+research flagged as completely missing and the highest-risk part of the whole "layout-preserving
+export" feature; it's now built, reviewed, and verified from multiple independent angles (unit
+tests, manual code review, real-template schema validation, direct content inspection).
+
+**Dead ends / notes.**
+
+- The `mcp__codex__codex` MCP tool timed out on a large, well-specified prompt — confirmed via
+  `git status` that nothing had started, so it was safe to simply retry rather than investigate
+  further. The CLI fallback (`codex exec -s workspace-write` run via Bash in the background)
+  worked cleanly and avoids the MCP transport's timeout ceiling for long-running delegated work.
+  Binary path: `/Applications/ChatGPT.app/Contents/Resources/codex` (not `/Applications/Codex.app`
+  as an earlier generic fallback pattern assumed — the ChatGPT desktop app hosts it on this Mac).
+- Codex reported it needed `--disable-sandbox` to run `swift build`/`swift test` inside its own
+  managed sandbox environment (blocked cache paths) — noted but not a concern, since this
+  project's standing practice is to always independently re-verify a delegated agent's work in
+  the real environment regardless of what it self-reports.
+- Deliberately scoped this batch to in-place placeholder-text editing only (no slide
+  duplication/reordering), since the current `inspect()`/frame-map pipeline never produces
+  more output slides than source slides anyway — this kept the highest-risk part of the feature
+  meaningfully smaller and lower-risk than the original Batch 025 write-up implied ("duplicate/
+  renumber slide parts"). Slide duplication for lessons needing more slides than the template
+  has (e.g. multiple practice slides) is deferred to a future batch, once there's a UI for a
+  teacher to actually express that intent.
+
+**Still open.**
+
+1. **Batch 027**: wire `PowerPointTemplateComposer` into the real export flow — likely a new
+   case in `AppStore`'s slide-deck generation path, used when `fidelityReviewCompleted = true`
+   on the active presentation template, falling back to `NativePowerPointExporter`'s
+   from-scratch layout otherwise. Needs a decision on where in the UI a teacher triggers a
+   template-aware export vs. the default one.
+2. Visually verify the Batch 025 "Placeholder assignments" Workspace UI — still deferred.
+3. Slide duplication/reordering for templates with fewer slides than a lesson needs — future
+   scope, needs a UI concept first.
+4. GitHub sync — push this batch's commit.
+5. Output-enrichment roadmap (`OUTPUT_ENRICHMENT_PLAN.md`) — still on the backlog.

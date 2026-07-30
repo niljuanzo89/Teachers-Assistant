@@ -18,6 +18,55 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertEqual(process.terminationStatus, 0)
     }
 
+    private func runUnzip(source: URL, destination: URL) throws {
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        process.arguments = ["-q", source.path, "-d", destination.path]
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0)
+    }
+
+    private func makeComposablePresentationTemplate(in rootURL: URL, fileName: String = "template.pptx") throws -> (templateURL: URL, masterData: Data) {
+        let packageRoot = rootURL.appending(path: "\(UUID().uuidString)-template-package")
+        let slidesFolder = packageRoot.appending(path: "ppt/slides")
+        let mastersFolder = packageRoot.appending(path: "ppt/slideMasters")
+        try FileManager.default.createDirectory(at: slidesFolder, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: mastersFolder, withIntermediateDirectories: true)
+
+        try """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+          <p:cSld><p:spTree>
+            <p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr/><p:nvPr><p:ph type="title" idx="0"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Old title</a:t></a:r></a:p></p:txBody></p:sp>
+          </p:spTree></p:cSld>
+        </p:sld>
+        """.write(to: slidesFolder.appending(path: "slide1.xml"), atomically: true, encoding: .utf8)
+
+        try """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+          <p:cSld><p:spTree>
+            <p:sp><p:nvSpPr><p:cNvPr id="3" name="Body 1"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Old body</a:t></a:r></a:p></p:txBody></p:sp>
+          </p:spTree></p:cSld>
+        </p:sld>
+        """.write(to: slidesFolder.appending(path: "slide2.xml"), atomically: true, encoding: .utf8)
+
+        let masterXML = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+          <p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id="10" name="Master Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/></p:sp></p:spTree></p:cSld>
+        </p:sldMaster>
+        """
+        let masterURL = mastersFolder.appending(path: "slideMaster1.xml")
+        try masterXML.write(to: masterURL, atomically: true, encoding: .utf8)
+
+        let templateURL = rootURL.appending(path: fileName)
+        try runZip(cwd: packageRoot, destination: templateURL)
+        return (templateURL, Data(masterXML.utf8))
+    }
+
     private func makeDOCX(at destination: URL, paragraphs: [String]) throws {
         let packageRoot = destination.deletingLastPathComponent().appending(path: "\(UUID().uuidString)-docx")
         let wordFolder = packageRoot.appending(path: "word")
@@ -2058,6 +2107,102 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertEqual(reinspectedTemplate.layoutPlan?.placeholderAssignments.count, 1)
         XCTAssertEqual(reinspectedTemplate.layoutPlan?.placeholderAssignments.first?.lessonField, .title)
         XCTAssertEqual(reinspectedTemplate.layoutPlan?.fidelityReviewCompleted, false)
+    }
+
+    func testPowerPointTemplateComposerWritesAssignedPlaceholderTextAndPreservesUnchangedParts() throws {
+        let repository = try makeRepository()
+        let template = try makeComposablePresentationTemplate(in: repository.rootURL)
+        var lesson = LessonRecord.draft(title: "A < B & Compose")
+        lesson.status = .approved
+        lesson.objective = "Use template placeholders."
+        lesson.subject = "Math"
+        lesson.gradeOrAgeRange = "Grade 4"
+        lesson.instructionalSequence = [
+            InstructionalStep(id: UUID(), title: "Model", notes: "Use examples.")
+        ]
+        lesson.materials = ["projector"]
+        lesson.differentiationSummary = "Offer sentence frames."
+        lesson.printableResourcePrompt = "Show work."
+        lesson.assessmentSummary = "Exit ticket."
+
+        let output = try PowerPointTemplateComposer.compose(
+            templateURL: template.templateURL,
+            placeholderAssignments: [
+                PresentationTemplatePlaceholderAssignment(
+                    id: UUID(), sourceSlideNumber: 1, shapeID: 2, shapeName: "Title 1",
+                    effectiveType: "title", effectiveIdx: 0, lessonField: .title
+                )
+            ],
+            content: LessonOutputContent(lesson: lesson)
+        )
+
+        let composedURL = repository.rootURL.appending(path: "composed.pptx")
+        try output.write(to: composedURL)
+        let unzipRoot = repository.rootURL.appending(path: "composed-unzipped")
+        try runUnzip(source: composedURL, destination: unzipRoot)
+
+        let slideXML = try String(
+            contentsOf: unzipRoot.appending(path: "ppt/slides/slide1.xml"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(slideXML.contains("<a:t>A &lt; B &amp; Compose</a:t>"))
+        XCTAssertFalse(slideXML.contains("Old title"))
+
+        let masterData = try Data(contentsOf: unzipRoot.appending(path: "ppt/slideMasters/slideMaster1.xml"))
+        XCTAssertEqual(masterData, template.masterData)
+    }
+
+    func testPowerPointTemplateComposerThrowsWhenNoPlaceholdersAreAssigned() throws {
+        let repository = try makeRepository()
+        let template = try makeComposablePresentationTemplate(in: repository.rootURL)
+        let lesson = LessonRecord.draft(title: "Unassigned")
+
+        XCTAssertThrowsError(try PowerPointTemplateComposer.compose(
+            templateURL: template.templateURL,
+            placeholderAssignments: [
+                PresentationTemplatePlaceholderAssignment(
+                    id: UUID(), sourceSlideNumber: 1, shapeID: 2, shapeName: "Title 1",
+                    effectiveType: "title", effectiveIdx: 0, lessonField: nil
+                )
+            ],
+            content: LessonOutputContent(lesson: lesson)
+        )) { error in
+            XCTAssertEqual(error as? PowerPointTemplateComposerError, .noAssignedPlaceholders)
+        }
+    }
+
+    func testPowerPointTemplateComposerSkipsStaleShapeIDAndAppliesValidAssignment() throws {
+        let repository = try makeRepository()
+        let template = try makeComposablePresentationTemplate(in: repository.rootURL)
+        var lesson = LessonRecord.draft(title: "Valid title")
+        lesson.objective = "Stale objective should not be written."
+
+        let output = try PowerPointTemplateComposer.compose(
+            templateURL: template.templateURL,
+            placeholderAssignments: [
+                PresentationTemplatePlaceholderAssignment(
+                    id: UUID(), sourceSlideNumber: 1, shapeID: 999, shapeName: "Missing",
+                    effectiveType: "body", effectiveIdx: 1, lessonField: .objective
+                ),
+                PresentationTemplatePlaceholderAssignment(
+                    id: UUID(), sourceSlideNumber: 1, shapeID: 2, shapeName: "Title 1",
+                    effectiveType: "title", effectiveIdx: 0, lessonField: .title
+                )
+            ],
+            content: LessonOutputContent(lesson: lesson)
+        )
+
+        let composedURL = repository.rootURL.appending(path: "stale-and-valid.pptx")
+        try output.write(to: composedURL)
+        let unzipRoot = repository.rootURL.appending(path: "stale-and-valid-unzipped")
+        try runUnzip(source: composedURL, destination: unzipRoot)
+        let slideXML = try String(
+            contentsOf: unzipRoot.appending(path: "ppt/slides/slide1.xml"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(slideXML.contains("<a:t>Valid title</a:t>"))
+        XCTAssertFalse(slideXML.contains("Stale objective should not be written."))
     }
 
     @MainActor
