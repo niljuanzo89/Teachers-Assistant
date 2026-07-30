@@ -1886,3 +1886,64 @@ Findings from the affected profile's `lesson-records.json` / `weekly-plans/*.jso
   before declaring any of this fixed. Unit tests do not exercise the real import path end to
   end.
 - Never commit curriculum filenames, module names, or extracted text.
+
+#### PLAN REVISION (same day, after an owner question) — add a document-level "is this even a lesson?" gate
+
+The owner asked whether the app should decide *whether a fed document is a lesson at all*
+before anything gets placed, noting the imported folder held both lessons and non-lessons.
+Investigated, and this is not a refinement — it is the largest single cause of the scatter and
+it belongs ahead of the other steps.
+
+**Evidence from the owner's real import (inspected locally; no curriculum content copied here):**
+
+- 316 documents were imported. **315 were classified `lessonMaterial`; exactly 1 was anything
+  else.** The classifier effectively has one output for curriculum content.
+- Why: `ImportedSourceRole.infer` (AppModels.swift) reaches `.lessonMaterial` on a plain
+  substring hit for any of `lesson`, `worksheet`, `student handout`, `teacher guide`,
+  `activity`, `practice`, tested against the filename plus the first 2,000 characters. In a real
+  curriculum folder essentially every artifact contains the word "lesson" — an answer key says
+  "Lesson 5 Answer Key", a family letter says "in this lesson", a test says "Lessons 1-5". So
+  everything matches, and `.other` is effectively unreachable.
+- The folder's actual composition, by generic artifact type: teacher-edition pages, student-
+  edition pages, challenge/enrichment sheets, practice/homework pages, reteach/intervention
+  sheets, and one planning document. **Most of these are supporting materials, not teachable
+  lessons.**
+
+**The deeper modeling error this exposes.** The app currently treats "lesson material" as "a
+lesson," so every worksheet, practice page, and challenge sheet becomes its own schedulable
+lesson record. That is where 173 fragment lessons came from. A practice page is *material for* a
+lesson; it should attach to one, not become one. The existing role enum answers "what kind of
+setup document is this?" — a question designed for sorting planning documents (pacing guide vs.
+calendar vs. map). It was never designed to answer "is this a teachable lesson, or an artifact
+that supports one?" Those are different questions and need different fields.
+
+**Revised step order. This becomes the new step 1; the previously written steps shift down.**
+
+1. **Add a placement-eligibility classification, separate from `ImportedSourceRole`.** At
+   minimum three outcomes:
+   - *Placeable lesson* — has the shape of a teachable lesson (an objective and/or an
+     instructional sequence). Only these may ever be scheduled.
+   - *Supporting material* — worksheet, practice page, answer key, challenge/reteach sheet,
+     assessment. Must attach to a lesson (or simply be available), never occupy a block.
+   - *Planning document* — pacing/calendar/map, which the existing role inference already
+     handles well and should keep handling.
+   - *Unknown* — never placed; surfaced to the teacher for a decision.
+   Classify on document structure, not just keyword presence, and require positive evidence of
+   lesson shape before granting *placeable lesson*. Bias toward "not a lesson," because a
+   missed lesson is a teacher noticing an empty block, whereas a false positive corrupts the
+   planner — which is the failure the owner actually hit.
+2. **Only *placeable lesson* documents may propose lessons.** This alone should collapse the
+   173 fragments to something near the real lesson count, and it makes the subject-matching and
+   segmentation work far easier because they stop being fed answer keys and practice pages.
+3. Stop placing content that has no confident subject match (previously step 1). Still needed:
+   a genuine lesson whose subject is unclear must leave the block untouched.
+4. Populate `subject` at import time (previously step 2).
+5. Fix segmentation so one lesson means one lesson (previously step 3) — smaller in scope once
+   steps 1-2 stop feeding it non-lessons, but still real.
+6. Report import outcomes to the teacher (previously step 4), now including counts per
+   classification: how many placeable lessons, how many materials, how many unknown.
+
+**Open question for the owner, worth answering before step 1 is built:** when a document is
+classified *supporting material*, what should the app do with it — attach it to a matching
+lesson automatically, list it as available material for the teacher to attach, or simply keep it
+importable but inert? This is a product decision, not a technical one.

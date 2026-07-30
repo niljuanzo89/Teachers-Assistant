@@ -843,7 +843,18 @@ GitHub status: local branch is `main`, remote `git@github.com:niljuanzo89/Teache
 
 Immediate next session should:
 
-0. START HERE: "NEXT SESSION PLAN" at the end of CONTINUITY_LOG.md. The owner reported that
+0. START HERE: "NEXT SESSION PLAN" at the end of CONTINUITY_LOG.md, and the "PLAN REVISION"
+   immediately after it — the revision reorders the plan and supersedes the original step
+   order. Headline: 315 of 316 imported documents were classified `lessonMaterial`, because
+   `ImportedSourceRole.infer` reaches that case on a bare substring match for "lesson" /
+   "practice" / "worksheet", which every curriculum artifact contains. The app then treats
+   "lesson material" as "a lesson," so answer keys, practice pages, and challenge sheets each
+   became their own schedulable lesson record. The first task is a placement-eligibility
+   classification distinct from `ImportedSourceRole` — placeable lesson vs. supporting material
+   vs. planning document vs. unknown — and only placeable lessons may ever be scheduled. There
+   is an open product question recorded there about what should happen to supporting material.
+
+   Original context also in CONTINUITY_LOG.md. The owner reported that
    imported math curriculum scatters across the weekly planner — landing in the English
    Language Arts block and in time slots that are not blocks at all — instead of filling only
    Math blocks and leaving everything else untouched. The diagnosis is already done and is
