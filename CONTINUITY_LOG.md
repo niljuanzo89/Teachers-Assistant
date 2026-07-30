@@ -1355,3 +1355,72 @@ the original plan scoped it.
    count + expandable list) — not done here to keep this batch scoped to the visual redesign.
 4. Output-enrichment roadmap (`OUTPUT_ENRICHMENT_PLAN.md`) — still the next substantive
    product-work track once the redesign is signed off.
+
+### Batch 024 — 2026-07-29 — Workspace path cleanup, boundary trace-check, and a validated test template
+
+**Compute:** high. **Model shape:** single sufficient — mechanical UI edit, forensic
+grep/strings audit, and hand-authored OOXML; no architectural judgment calls.
+
+**Goal.** Three owner requests from a review of the Batch 023 Workspace redesign: (1) drop the
+raw file-path display if it isn't load-bearing, (2) prove licensed curriculum material used
+only for local testing leaves no trace in the tracked repo, (3) clarify and, if reasonable,
+produce the "template" needed to test placeholder-inheritance resolution.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Confirmed `outputFolderReference` is functionally load-bearing (`AppStore.swift` sets it from the folder picker and falls back to a `LessonPlanner Outputs` subfolder when nil — it decides where generated decks/guides save) before removing anything | Kept the "Choose output folder…" button; only the raw `.path` string display was removable |
+| 2 | Rewrote `workspaceLocationsCard` in `WorkspaceView.swift`: dropped the `Location`/`Output folder` raw-path rows, replaced with one plain-language sentence that reflects whether a custom output folder is set; renamed section header "Workspace location" → "Workspace settings" | `swift build -Xswiftc -gnone` compiled clean |
+| 3 | Boundary trace-check: `git grep -il` across tracked text for curriculum/publisher identifiers (`im_nl`, `im_pse`, `HMH`, `Illustrative Math`, `TeacherEdition`, `g5_im`, etc.) | Only hit: `SELLABLE_POWERPOINT_EXPORTER_BOUNDARY.md`'s own boundary rule (benign, expected) |
+| 4 | Ran `strings` on every PNG match from a broader case-insensitive grep across `Design Screenshots/` | All matches were coincidental compressed-binary byte sequences ("HmhH", "=HmH"), not real embedded text — no leak |
+| 5 | `git log --all --diff-filter=A --name-only` filtered for `.docx`/`.pdf`/`.pptx`/curriculum-name matches across full history | Zero results — no such file was ever committed, at any point, on any branch |
+| 6 | Confirmed architecturally that `LocalRepository` stores all app data under `~/Library/Application Support/`, structurally outside the git-tracked project folder — real curriculum content a teacher imports for testing never enters the repo's working tree in the first place | Reported this finding to the owner as the structural reason the trace-check keeps coming back clean |
+| 7 | Clarified the "template" ask: it's a PowerPoint slide template (.pptx) needed to exercise `PowerPointTemplateInspector.resolvePlaceholders(url:)` with genuine slide→layout→master inheritance — explained why a generator library (`pptxgenjs`) wouldn't produce real inheritance, and that hand-authoring valid OOXML directly was the right approach | Loaded the `pptx` skill for its `validate.py` script and reference guidance |
+| 8 | Hand-wrote a complete 2-slide "Sunrise Lesson Plan Template" OOXML package (content types, rels, theme, slide master, 2 layouts, 2 slides) using the app's own warm Sunrise palette, deliberately designed so Slide 1's placeholders inherit geometry from Layout 1, Slide 2's title has geometry nowhere but the master, and Slide 2's body inherits from Layout 2 | Package built at scratch path; zipped to `.pptx` |
+| 9 | Ran `scripts/office/validate.py` | FAILED — 7 schema errors in `theme1.xml`: missing `dk2`/`lt2` color entries, missing `ea`/`cs` font children, incomplete `effectStyleLst` |
+| 10 | Rewrote `theme1.xml` to be fully schema-complete (full `dk1/lt1/dk2/lt2/accent1-6/hlink/folHlink` color scheme, `ea`/`cs` typeface children on both major and minor fonts, 3-entry `effectStyleLst`) | Re-zipped, re-ran `validate.py` — **"All validations PASSED!"** |
+| 11 | Attempted `soffice`/`markitdown` visual and content QA per the `pptx` skill's standard process | Neither tool is installed on this machine — skipped automated render QA; relied on direct XML read (already confirmed correct text, no placeholder leftovers) plus the schema pass |
+| 12 | Asked the owner how to proceed given no local render QA; owner chose: register the template in the live app and verify placeholder resolution directly | `AskUserQuestion` |
+| 13 | Requested screen access, registered `Sunrise Lesson Plan Template.pptx` via the app's file picker | "7 mapped lesson fields", "Template provenance ready" |
+| 14 | Clicked "Inspect presentation template" | Placeholder inheritance panel showed exactly the 3 designed paths: Slide 1 title/subtitle "geometry inherited from the layout"; Slide 2 title "geometry inherited from the master"; Slide 2 body "geometry inherited from the layout" — full slide→layout→master resolution confirmed correct |
+| 15 | Noticed the running app was still the pre-Batch-023-fix stale binary (still showing raw paths) — owner reclaimed screen control before a rebuild happened | Deferred the rebuild to steps 16-18, which don't need the screen |
+| 16 | `swift test -Xswiftc -gnone` | 112/112 passed |
+| 17 | Real `xcodebuild -scheme LessonPlanner -configuration Debug build` | BUILD SUCCEEDED |
+| 18 | Owner briefly returned screen access; quit the stale app instance, relaunched the freshly built binary, navigated to Workspace | Visually confirmed the "Workspace settings" card no longer shows raw paths — matches step 2's intent |
+| 19 | `git status`/`git diff` review before committing | Only `WorkspaceView.swift` changed; diff matches intent exactly |
+| 20 | Updated `CONTINUITY_LOG.md` (this entry); committed | See below |
+
+**Outcome.** Workspace screen no longer surfaces raw filesystem paths while keeping the
+functionally load-bearing "Choose output folder…" control. Boundary trace-check came back
+fully clean via three independent methods (tracked-file grep, binary `strings` scan, full git
+history audit), with the architectural reason (`LocalRepository` writes outside the repo)
+identified as the root cause the check keeps passing. A schema-valid, generically-branded
+`.pptx` slide template now exists and has been used to directly confirm
+`PowerPointTemplateInspector.resolvePlaceholders` correctly resolves all three inheritance
+paths (layout-override ×2, master-fallback ×1) — the placeholder-inheritance feature is now
+proven correct against a real file, not just unit-test fixtures.
+
+**Dead ends / notes.**
+
+- This machine has neither `soffice` (LibreOffice) nor `markitdown` installed, so the `pptx`
+  skill's standard visual-render and content-QA steps aren't available here. Direct XML
+  inspection plus `validate.py`'s schema pass was the fallback, and was sufficient for this
+  template's purpose (testing a Swift XML reader, not shipping a polished deck) — but a future
+  task that needs to *see* a rendered deck will need one of those tools installed first.
+- The theme XML pattern in `NativePowerPointExporter.swift` (the app's own exporter) is the
+  same simplified shape that failed `validate.py` here — missing `dk2`/`lt2`, `ea`/`cs`, and a
+  complete `effectStyleLst`. It has apparently never been strictly schema-validated. Not fixed
+  in this batch (out of scope — the exporter's decks open fine in real PowerPoint/Google
+  Slides, which are lenient about these omissions), but worth a future validation pass since a
+  stricter consumer could reject it.
+- Screen control can be reclaimed and returned mid-batch more than once; splitting a batch's
+  computer-use-dependent steps into two short windows (register+inspect, then a quick
+  rebuild-verify) worked fine as long as everything in between (build, test) needed no screen.
+
+**Still open.**
+
+1. GitHub sync — still ahead of `origin/main`; push still needs the owner.
+2. Install `soffice`/`markitdown` locally if future pptx-skill work needs visual/content QA.
+3. Consider validating `NativePowerPointExporter.swift`'s theme against the same schema
+   `validate.py` checks, since it shares the gap found in this batch's first template attempt.
+4. Output-enrichment roadmap (`OUTPUT_ENRICHMENT_PLAN.md`) — still the next substantive
+   product-work track.

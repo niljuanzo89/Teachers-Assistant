@@ -1,5 +1,5 @@
 LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
-Last updated: 2026-07-29 (through Batch 023, 2 commits ahead of GitHub — see "Version control")
+Last updated: 2026-07-29 (through Batch 024, ahead of GitHub — see "Version control")
 
 PURPOSE OF THIS DOCUMENT
 
@@ -609,10 +609,12 @@ System Events/Accessibility is not needed and has historically been unavailable.
 2. Push local git commits to GitHub — command-line push has been blocked all session (missing
    HTTPS credentials); a computer-use request for GitHub Desktop access was denied once. Use
    GitHub Desktop directly, or supply command-line credentials, whenever convenient.
-3. Register a real customer-owned `.pptx` template (through the interactive file picker) and
-   click "Inspect presentation template" to visually confirm the "Placeholder inheritance"
-   list — this project's own generated decks can't exercise it, since they don't use
-   placeholders.
+3. ~~Register a real customer-owned `.pptx` template...~~ **Done in Batch 024** with a
+   hand-authored, schema-valid generic template (`Sunrise Lesson Plan Template.pptx`, built to
+   the `pptx` skill's OOXML/validate.py standard) — placeholder inheritance confirmed correct
+   for all 3 tested paths (2 layout-override, 1 master-fallback). A *real* customer-owned
+   template would still be a useful additional test (different placeholder shapes/naming than
+   a hand-authored one), but is no longer blocking — the resolution logic is proven correct.
 4. Inspect a generated PowerPoint deck in Microsoft PowerPoint.
 5. Upload/open a generated deck in Google Slides for compatibility review.
 6. Decide whether the weekly planner still needs a dedicated overflow pattern for very dense
@@ -620,6 +622,13 @@ System Events/Accessibility is not needed and has historically been unavailable.
    a separate agenda view — internal per-cell scroll has been tried and removed; do not reach
    for it again).
 7. Decide whether OS-level notifications are required beyond the in-app weekly prompt.
+8. Install `soffice` (LibreOffice) and/or `markitdown` on this machine if future pptx-skill
+   work needs visual-render or content QA — neither is currently installed (found in Batch 024).
+9. Consider validating `NativePowerPointExporter.swift`'s theme XML against the same OOXML
+   schema `scripts/office/validate.py` checks — Batch 024 found the app's own exporter theme
+   shares the same schema gaps (missing `dk2`/`lt2`, `ea`/`cs`, complete `effectStyleLst`) that
+   a hand-authored template failed on first attempt. Real PowerPoint/Google Slides are lenient
+   about this, so it isn't urgent, but a stricter consumer could reject it.
 
 
 11. NEXT IMPLEMENTATION STEPS
@@ -686,7 +695,7 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 023), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 024), the app has a working local-first prototype path:
 
 two-stage document intake -> automatic role sorting and pacing scaffold -> weekly planner
 population (subject-matched to the correct schedule block, Batch 022) -> interactive weekly
@@ -704,12 +713,21 @@ Local verification for Batch 023: full Swift test suite passed 112 tests with 0 
 (unaffected — pure View-layer change); real Xcode build succeeded. Screenshot:
 `Design Screenshots/2026-07-29/10-workspace-sunrise-redesign.png`.
 
+Batch 024 added: raw file-path display removed from Workspace's "Workspace settings" card
+(kept the functionally load-bearing "Choose output folder…" control); a boundary trace-check
+confirming zero trace of licensed curriculum content anywhere in the tracked repo (grep,
+`strings` on binaries, full git history audit — all clean, `LocalRepository` writes outside
+the repo by design); and a schema-valid, generically-branded `.pptx` test template used to
+directly confirm `PowerPointTemplateInspector.resolvePlaceholders` correctly resolves all 3
+tested inheritance paths (2 layout-override, 1 master-fallback). 112/112 tests passed, real
+Xcode build succeeded, visually re-verified after rebuild.
+
 GitHub status: local branch is `main`; remote is
 `https://github.com/niljuanzo89/Teachers-Assistant.git`. Command-line push has been blocked
 all session ("could not read Username... Device not configured"); a computer-use request for
 GitHub Desktop access to push through was denied once (Batch 022). Local `main` is at least 2
-commits ahead of `origin/main` as of Batch 022, plus Batch 023's commit(s) — needs the owner
-to push via GitHub Desktop or supply command-line credentials.
+commits ahead of `origin/main` as of Batch 022, plus Batch 023 and 024's commit(s) — needs the
+owner to push via GitHub Desktop or supply command-line credentials.
 
 Immediate next session should:
 

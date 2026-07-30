@@ -3250,15 +3250,15 @@ struct ConfigurationSummaryView: View {
     private func workspaceLocationsCard(_ configuration: AppConfiguration) -> some View {
         DSCard {
             VStack(alignment: .leading, spacing: 10) {
-                sectionHeader("Workspace location")
+                sectionHeader("Workspace settings")
                 workspaceRow("Workspace", configuration.workspaceName)
-                workspaceRow("Location", configuration.workspaceReference.path)
-                workspaceRow("Output folder", configuration.outputFolderReference?.path ?? "Not selected")
-                Button("Choose output folder…") { chooseOutputFolder() }
-                    .buttonStyle(.dsSecondary)
-                Text("Phase 1 registers these locations only. It does not read or modify their contents.")
+                Text(configuration.outputFolderReference == nil
+                    ? "Generated lesson plans, decks, and guides save to a default folder inside your workspace."
+                    : "Generated lesson plans, decks, and guides save to your chosen output folder.")
                     .font(DS.font(12))
                     .foregroundStyle(DS.neutral600)
+                Button("Choose output folder…") { chooseOutputFolder() }
+                    .buttonStyle(.dsSecondary)
             }
         }
     }

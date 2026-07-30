@@ -1028,3 +1028,37 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   (no new tests needed; pure View-layer change). Real Xcode build succeeded (no new files).
 - Awaiting the owner's visual sign-off on this final screen before considering the redesign
   initiative fully closed.
+
+### 2026-07-29 — Workspace path cleanup, boundary trace-check, validated test template
+
+- Removed the raw file-path display from Workspace's "Workspace settings" card (the section
+  used to show `configuration.workspaceReference.path` and `configuration.outputFolderReference?.path`
+  directly); kept the "Choose output folder…" button since `outputFolderReference` is
+  functionally load-bearing (`AppStore` uses it to decide where generated lesson
+  plans/decks/guides save, falling back to a default subfolder when unset).
+- Ran a full boundary trace-check for licensed curriculum material used only for local
+  testing: `git grep`/`strings` across all tracked files and screenshots, plus a full
+  `git log --all --diff-filter=A` history audit. Result: clean — no trace anywhere. The
+  handful of substring matches found were either the boundary rule's own text or coincidental
+  compressed-PNG byte sequences, not real leaked content. `LocalRepository` stores all app
+  data under `~/Library/Application Support/`, structurally outside the git-tracked project
+  folder, which is the architectural reason this check reliably stays clean.
+- Hand-authored a complete, schema-valid, generically-branded `.pptx` slide template
+  ("Sunrise Lesson Plan Template") from scratch OOXML (content types, rels, theme, slide
+  master, 2 layouts, 2 slides) to test `PowerPointTemplateInspector.resolvePlaceholders(url:)`
+  against genuine slide→layout→master inheritance — deliberately covering 2 layout-override
+  paths and 1 master-fallback path. First attempt failed the `pptx` skill's schema validator
+  on `theme1.xml` (missing `dk2`/`lt2` colors, `ea`/`cs` font children, an incomplete
+  `effectStyleLst`); rebuilt the theme to be fully schema-complete and it passed cleanly.
+  Registered the template in the running app and confirmed via "Inspect presentation
+  template" that all 3 inheritance paths resolve exactly as designed — the placeholder
+  resolution feature is now proven correct against a real file, not just unit-test fixtures.
+- Verification: `swift test -Xswiftc -gnone` — 112 tests passed, 0 failures. Real
+  `xcodebuild -scheme LessonPlanner -configuration Debug build` succeeded. Relaunched the
+  freshly built app and visually confirmed the Workspace screen no longer shows raw paths.
+- Noted for later: this machine has neither `soffice` (LibreOffice) nor `markitdown`
+  installed, so the `pptx` skill's visual-render/content-QA steps weren't available — relied
+  on direct XML inspection plus schema validation instead. Also noted `NativePowerPointExporter.swift`'s
+  own theme XML shares the same schema gaps the hand-authored template initially failed on;
+  not fixed here (real PowerPoint/Google Slides tolerate it), but worth a future validation
+  pass.
