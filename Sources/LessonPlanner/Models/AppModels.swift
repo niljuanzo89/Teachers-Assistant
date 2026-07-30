@@ -368,6 +368,36 @@ struct PresentationTemplateLayoutPlan: Codable, Equatable {
     var placeholderAssignments: [PresentationTemplatePlaceholderAssignment]
     var fidelityReviewCompleted: Bool
     var updatedAt: Date
+
+    /// `placeholderAssignments` was added after this app had already written layout plans to
+    /// disk. Swift's synthesized decoder treats a missing key as a hard failure, so without
+    /// this every previously-saved workspace became unreadable and the app fell back to the
+    /// setup wizard as though the teacher's data had been erased. Any field added to a
+    /// persisted model from here on needs the same treatment — see `decodeIfPresent` below.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        slideInventory = try container.decode([PresentationTemplateSlideInventoryItem].self, forKey: .slideInventory)
+        frameMap = try container.decode([PresentationTemplateFrameMapEntry].self, forKey: .frameMap)
+        placeholderAssignments = try container.decodeIfPresent(
+            [PresentationTemplatePlaceholderAssignment].self, forKey: .placeholderAssignments
+        ) ?? []
+        fidelityReviewCompleted = try container.decode(Bool.self, forKey: .fidelityReviewCompleted)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
+
+    init(
+        slideInventory: [PresentationTemplateSlideInventoryItem],
+        frameMap: [PresentationTemplateFrameMapEntry],
+        placeholderAssignments: [PresentationTemplatePlaceholderAssignment],
+        fidelityReviewCompleted: Bool,
+        updatedAt: Date
+    ) {
+        self.slideInventory = slideInventory
+        self.frameMap = frameMap
+        self.placeholderAssignments = placeholderAssignments
+        self.fidelityReviewCompleted = fidelityReviewCompleted
+        self.updatedAt = updatedAt
+    }
 }
 
 struct FileReference: Codable, Equatable, Identifiable {

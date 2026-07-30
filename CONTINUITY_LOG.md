@@ -1766,3 +1766,54 @@ document stated it.
    layout signal the current plain-text pipeline doesn't preserve.
 3. GitHub sync — push this batch's commit.
 4. Everything still open from Batches 027-028.
+
+### Batch 030 — 2026-07-29 — Regression fix: schema change made saved workspaces unreadable
+
+**Compute:** medium. **Model shape:** Claude-native — urgent diagnosis of a self-inflicted bug.
+
+**Goal.** The owner launched the app and got "The data couldn't be read because it is missing"
+with the setup wizard, as though their workspace had been erased. This was a regression I
+introduced in Batch 025.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | Located the app's real data on disk before touching anything | All files present and intact — nothing had actually been deleted |
+| 2 | Inspected the active profile's `configuration.json` | Its saved `layoutPlan` had keys `fidelityReviewCompleted, frameMap, slideInventory, updatedAt` — no `placeholderAssignments` |
+| 3 | **Root cause**: Batch 025 added `placeholderAssignments` to `PresentationTemplateLayoutPlan` as a non-optional property. Swift's *synthesized* decoder treats a missing key as a hard failure (a property default does NOT satisfy it), so every layout plan written before Batch 025 became undecodable → `AppConfiguration` failed → `configuration == nil` → setup wizard | The Batch 024 session had registered the Sunrise template with the pre-025 binary, writing exactly such a file |
+| 4 | Audited every Codable model change since the last known-good commit | Exactly one problematic addition; the new nested struct was fine |
+| 5 | Added an explicit `init(from:)` to `PresentationTemplateLayoutPlan` using `decodeIfPresent` for the new field, plus an explicit memberwise init (a custom init in the struct body suppresses synthesis) | |
+| 6 | Added two regression tests: decoding the exact legacy JSON shape, and a full encode/decode round trip | |
+| 7 | Verified against the owner's REAL files, not just fixtures — compiled a throwaway harness that decoded every `configuration.json` under Application Support with the fixed model | Initially reported a failure that turned out to be my harness missing the repository's `.iso8601` date strategy; re-ran correctly → the real file decodes, `assignments=0 inventory=2` |
+| 8 | Rebuilt and relaunched | App opens straight into the workspace, no error |
+| 9 | **Followed the failure one step further**: `load` returns nil only when a file is *absent*; a decode failure throws, leaves `configuration == nil`, and renders `SetupWizardView` — whose "Create workspace" calls `saveConfiguration`, **overwriting the intact-but-unreadable file**. My bug was one click away from real data loss | The genuinely dangerous part, and not something the owner had asked about |
+| 10 | Added `hasStoredConfiguration()` to the repository protocol and `AppStore.configurationIsUnreadable` to distinguish "never set up" from "exists but unreadable" | |
+| 11 | Added `WorkspaceRecoveryView`, shown ahead of the setup-wizard branch: states plainly that nothing was lost, shows the error and the exact data folder, offers only non-destructive actions ("Try again", "Reveal in Finder"), and explicitly says creating a new workspace is unavailable here and why | |
+| 12 | Added 3 tests: unreadable config is not a fresh install, a genuinely missing file still is, and "Try again" recovers once the file is readable | |
+| 13 | Added a `LESSONPLANNER_DATA_ROOT` env override (matching the existing `LESSONPLANNER_INITIAL_TAB` convention) so data-state behavior can be exercised against throwaway fixtures | Otherwise the only way to see the recovery screen would have been damaging the owner's real data |
+| 14 | Verified the recovery screen visually against a synthetic corrupted data root, then deleted the fixture and relaunched on real data | Both states confirmed correct by screenshot |
+| 15 | `swift test`; real `xcodebuild` | 143/143 passed; BUILD SUCCEEDED |
+
+**Outcome.** The reported error is fixed, existing saved workspaces load again, and the failure
+mode that made it dangerous — an unreadable workspace presenting as a fresh install — can no
+longer destroy data.
+
+**Dead ends / notes.**
+
+- **The rule this batch exists to prevent:** adding a non-optional field to any persisted
+  Codable model silently breaks every previously-saved file. A property default (`= []`) does
+  NOT satisfy the synthesized decoder. Every future field added to a persisted model needs
+  `decodeIfPresent` in an explicit `init(from:)`, and a test decoding the pre-change JSON shape.
+- Verifying against a hand-written fixture would have passed while the owner's real file still
+  failed. Decoding the actual on-disk files is what proved the fix. Note the harness must
+  replicate `LocalRepository`'s `.iso8601` date strategy or it produces a misleading failure.
+- Batch 025 ran `swift test` and a real `xcodebuild` and both passed — neither catches a
+  persistence-compatibility break, because tests build their own fresh data. Only launching the
+  app against pre-existing data would have caught it, and that batch deliberately skipped
+  launching (no-screen-control constraint). Worth relaunching the app after any persisted-model
+  change even when the batch otherwise needs no visual check.
+
+**Still open.**
+
+1. Push this batch's commit.
+2. Everything still open from Batches 027-029, including validating the new extraction
+   inferencer against a real curriculum PDF.

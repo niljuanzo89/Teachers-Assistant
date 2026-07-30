@@ -38,6 +38,12 @@ final class AppStore: ObservableObject {
     /// each time a template is inspected rather than persisted, so it carries none of the
     /// migration risk a saved schema change would.
     @Published private(set) var lastPresentationTemplatePlaceholderResolution: [PresentationTemplatePlaceholderResolution] = []
+    /// True when a configuration file exists on disk but could not be decoded. Distinct from
+    /// `configuration == nil` with no file, which is a genuine first run. Without this
+    /// distinction an unreadable workspace renders the setup wizard, and completing that
+    /// wizard overwrites the very file that failed to load — turning a recoverable read
+    /// error into real data loss.
+    @Published private(set) var configurationIsUnreadable = false
 
     private let repository: any LocalRepositoryProtocol
     private let slideDeckGeneratorOverride: (any SlideDeckGenerating.Type)?
@@ -159,13 +165,24 @@ final class AppStore: ObservableObject {
             importedSources = try repository.loadImportedSources()
             generatedOutputs = try repository.loadGeneratedOutputs()
             progressSnapshots = try repository.loadProgressSnapshots()
+            configurationIsUnreadable = false
             lastError = nil
             if syncReadableDocuments {
                 syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: false)
             }
         } catch {
+            // A saved workspace that exists but won't decode must never be mistaken for a
+            // fresh install; the recovery screen keeps the teacher away from any action that
+            // would overwrite it.
+            configurationIsUnreadable = repository.hasStoredConfiguration()
             lastError = error.localizedDescription
         }
+    }
+
+    /// Re-attempts a failed load — the recovery screen's "Try again" action, for when the
+    /// teacher has restored a backup or installed a build that understands the saved file.
+    func retryLoadingWorkspace() {
+        reload(syncReadableDocuments: false)
     }
 
     func createLocalTeacherProfile(displayName: String, role: String, gradeOrSubject: String) {

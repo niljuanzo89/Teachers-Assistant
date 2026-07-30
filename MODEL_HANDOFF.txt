@@ -1,5 +1,5 @@
 LESSONPLANNER — CONTINUITY HANDOFF AND PROJECT STATUS
-Last updated: 2026-07-29 (through Batch 029, ahead of GitHub — see "Version control")
+Last updated: 2026-07-29 (through Batch 030, ahead of GitHub — see "Version control")
 
 PURPOSE OF THIS DOCUMENT
 
@@ -713,7 +713,7 @@ Likely next development sequence, in the owner's stated priority order as of 202
 
 13. CURRENT STOPPING POINT
 
-As of 2026-07-29 (end of Batch 029), the app has a working local-first prototype path:
+As of 2026-07-29 (end of Batch 030), the app has a working local-first prototype path:
 
 two-stage document intake -> automatic role sorting and pacing scaffold -> weekly planner
 population (subject-matched to the correct schedule block, Batch 022) -> interactive weekly
@@ -860,6 +860,32 @@ Immediate next session should:
    either back toward "first keyword match wins" or "content type governs schedule timing."
 5. Push Batch 029's commit via `git push origin main` — SSH auth is working, no owner action
    needed for this specific step anymore.
+
+CRITICAL PERSISTENCE RULE (added Batch 030, after this broke a real workspace):
+
+Adding a NON-OPTIONAL field to any Codable model that gets saved to disk will make every
+previously-saved file undecodable. A property default (`= []`) does NOT satisfy Swift's
+synthesized decoder — it still requires the key. Batch 025 added `placeholderAssignments` to
+`PresentationTemplateLayoutPlan` this way, and the owner's saved workspace stopped loading
+entirely; the app showed "The data couldn't be read because it is missing" and fell back to the
+setup wizard as though their data had been erased.
+
+For every field added to a persisted model:
+1. Write an explicit `init(from:)` using `decodeIfPresent` with a sensible default (see
+   `PresentationTemplateLayoutPlan` for the worked example, including the explicit memberwise
+   init that a custom initializer otherwise suppresses).
+2. Add a test that decodes the JSON shape as it existed BEFORE the change.
+3. Actually launch the app against pre-existing data. `swift test` and `xcodebuild` both pass
+   on this class of bug, because tests construct their own fresh data — only a real launch
+   against a real saved file catches it.
+
+Related safety net, also Batch 030: `AppStore.configurationIsUnreadable` distinguishes "no
+workspace yet" from "workspace exists but won't decode," and `WorkspaceRecoveryView` handles the
+latter. Before this, an unreadable workspace rendered the setup wizard, whose "Create workspace"
+would overwrite the unreadable file — one click from real data loss. Do not remove that branch
+or reorder it after the `configuration == nil` check. `LESSONPLANNER_DATA_ROOT` (same convention
+as `LESSONPLANNER_INITIAL_TAB`) points the app at a throwaway data folder so these states can be
+reproduced without touching real teacher data.
 
 PROCESS NOTE FROM BATCH 029, worth internalizing: earlier in that same session I told the owner
 the enrichment layer was "not started," based on reading `OUTPUT_ENRICHMENT_PLAN.md` rather than

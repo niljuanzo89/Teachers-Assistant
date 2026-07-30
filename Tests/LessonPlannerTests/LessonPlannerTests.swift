@@ -3784,6 +3784,102 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertEqual(result.materials, ["fraction strips"])
     }
 
+    @MainActor
+    func testUnreadableConfigurationIsNotMistakenForAFreshInstall() throws {
+        let repository = try makeRepository()
+        // A configuration file that exists but cannot be decoded — the state a schema change
+        // produced in the field. The app must not treat this as "no workspace yet."
+        try "{ \"this\": \"is not an AppConfiguration\" }".write(
+            to: repository.rootURL.appending(path: "configuration.json"), atomically: true, encoding: .utf8
+        )
+
+        let store = AppStore(repository: repository)
+
+        XCTAssertNil(store.configuration)
+        XCTAssertTrue(store.configurationIsUnreadable, "an undecodable saved workspace must be distinguishable from a first run")
+        XCTAssertNotNil(store.lastError)
+    }
+
+    @MainActor
+    func testMissingConfigurationIsStillTreatedAsAFreshInstall() throws {
+        let repository = try makeRepository()
+
+        let store = AppStore(repository: repository)
+
+        XCTAssertNil(store.configuration)
+        XCTAssertFalse(store.configurationIsUnreadable, "no file at all is a genuine first run, not a recovery case")
+    }
+
+    @MainActor
+    func testRetryLoadingWorkspaceRecoversOnceTheFileCanBeRead() throws {
+        let repository = try makeRepository()
+        let configURL = repository.rootURL.appending(path: "configuration.json")
+        try "{ \"broken\": true }".write(to: configURL, atomically: true, encoding: .utf8)
+
+        let store = AppStore(repository: repository)
+        XCTAssertTrue(store.configurationIsUnreadable)
+
+        // Simulates the teacher restoring a good backup, or installing a build that
+        // understands the saved file, then pressing "Try again".
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Recovered Workspace",
+            workspaceReference: FileReference(url: repository.rootURL.appending(path: "workspace"))
+        ))
+        store.retryLoadingWorkspace()
+
+        XCTAssertFalse(store.configurationIsUnreadable)
+        XCTAssertEqual(store.configuration?.workspaceName, "Recovered Workspace")
+        XCTAssertNil(store.lastError)
+    }
+
+    func testLayoutPlanDecodesConfigurationSavedBeforePlaceholderAssignmentsExisted() throws {
+        // Verbatim shape of a layoutPlan written to disk before `placeholderAssignments` was
+        // added to the model. Swift's synthesized decoder treats the missing key as a hard
+        // failure, which made every previously-saved workspace unreadable — the app fell back
+        // to the setup wizard as though the teacher's data had been erased. Decoding this must
+        // keep working for as long as any such file might still exist on a real machine.
+        let legacyJSON = """
+        {
+          "slideInventory": [
+            {"id": "1E1F1A2B-0000-4000-8000-000000000001", "sourceSlideNumber": 1, "reusableRole": "Opening", "placeholderCount": 2, "notes": ""}
+          ],
+          "frameMap": [
+            {"id": "1E1F1A2B-0000-4000-8000-000000000002", "outputSlideNumber": 1, "sourceSlideNumber": 1, "narrativeRole": "Opening", "mappedSlotNames": ["lesson.title"], "notes": ""}
+          ],
+          "fidelityReviewCompleted": false,
+          "updatedAt": 774144000
+        }
+        """
+
+        let decoder = JSONDecoder()
+        let plan = try decoder.decode(PresentationTemplateLayoutPlan.self, from: Data(legacyJSON.utf8))
+
+        XCTAssertEqual(plan.slideInventory.count, 1)
+        XCTAssertEqual(plan.frameMap.count, 1)
+        XCTAssertEqual(plan.placeholderAssignments, [], "a missing key must default to empty, not fail the whole decode")
+        XCTAssertFalse(plan.fidelityReviewCompleted)
+    }
+
+    func testLayoutPlanRoundTripsPlaceholderAssignments() throws {
+        let plan = PresentationTemplateLayoutPlan(
+            slideInventory: [],
+            frameMap: [],
+            placeholderAssignments: [
+                PresentationTemplatePlaceholderAssignment(
+                    id: UUID(), sourceSlideNumber: 2, shapeID: 7, shapeName: "Body",
+                    effectiveType: "body", effectiveIdx: 1, lessonField: .objective
+                )
+            ],
+            fidelityReviewCompleted: true,
+            updatedAt: Date(timeIntervalSince1970: 774_144_000)
+        )
+
+        let data = try JSONEncoder().encode(plan)
+        let decoded = try JSONDecoder().decode(PresentationTemplateLayoutPlan.self, from: data)
+
+        XCTAssertEqual(decoded, plan)
+    }
+
     func testStructuralInferenceReadsRealisticTeacherEditionPage() {
         // A published teacher-edition page: no "Objective:"/"Materials:" labels anywhere.
         // The label-only pass extracts nothing from this; structural inference is what makes

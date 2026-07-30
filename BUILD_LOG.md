@@ -1215,3 +1215,37 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
   "inferred from structure — check these," kept distinct from "not found — left blank."
 - Verification: `swift test -Xswiftc -gnone` — 138/138 passed. Real `xcodebuild` succeeded with
   the new file registered in `project.pbxproj`.
+
+### 2026-07-29 — Regression fix: a schema change made existing saved workspaces unreadable
+
+- The owner launched the app and got "The data couldn't be read because it is missing" plus the
+  setup wizard, as though their workspace had been erased. Nothing was actually lost — every
+  file was intact on disk — but the app could not decode it.
+- Root cause was a regression introduced when `placeholderAssignments` was added to
+  `PresentationTemplateLayoutPlan` as a non-optional property. Swift's synthesized decoder
+  requires the key to be present; a property default does not satisfy it. Every layout plan
+  written before that change became undecodable, which failed the whole `AppConfiguration`
+  load and left the app looking like a fresh install.
+- Fixed with an explicit `init(from:)` using `decodeIfPresent` (plus the explicit memberwise
+  init a custom initializer otherwise suppresses), and covered by two regression tests: one
+  decoding the exact pre-change JSON shape, one round-tripping the current shape. Verified
+  against the owner's real on-disk configuration files, not just fixtures.
+- Followed the failure one step further and found the genuinely dangerous part: a decode
+  failure left `configuration == nil`, which rendered the setup wizard — whose "Create
+  workspace" would have overwritten the intact-but-unreadable file. Added
+  `AppStore.configurationIsUnreadable` (backed by a new `hasStoredConfiguration()` on the
+  repository protocol) to distinguish "never set up" from "exists but unreadable", and a
+  `WorkspaceRecoveryView` for the latter: states plainly that nothing was lost, shows the
+  error and the exact data folder, and offers only non-destructive actions. Creating a new
+  workspace is deliberately unavailable there, and the screen says so and why.
+- Added a `LESSONPLANNER_DATA_ROOT` environment override, matching the existing
+  `LESSONPLANNER_INITIAL_TAB` convention, so data-state behavior can be reproduced against
+  throwaway fixtures. Without it, the only way to exercise the recovery screen would have been
+  to damage real teacher data.
+- Standing rule recorded in MODEL_HANDOFF.txt: any new field on a persisted model needs
+  `decodeIfPresent`, a test against the pre-change JSON shape, and an actual app launch
+  against pre-existing data. `swift test` and `xcodebuild` both pass on this class of bug,
+  because tests build their own fresh data.
+- Verification: `swift test -Xswiftc -gnone` — 143/143 passed. Real `xcodebuild` succeeded.
+  Both the recovery screen (against a synthetic corrupted data root) and normal startup
+  (against real data) confirmed by screenshot.

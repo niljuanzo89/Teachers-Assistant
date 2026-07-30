@@ -7,6 +7,11 @@ protocol LocalRepositoryProtocol {
     func saveActiveTeacherProfileID(_ id: UUID?) throws
     func loadConfiguration() throws -> AppConfiguration?
     func saveConfiguration(_ configuration: AppConfiguration) throws
+    /// Whether a configuration file exists for the active profile, regardless of whether it
+    /// can currently be decoded. Lets the app tell "this teacher has never set up a
+    /// workspace" apart from "this teacher's workspace is on disk but unreadable" — two
+    /// states that must not lead to the same screen. See `AppStore.configurationIsUnreadable`.
+    func hasStoredConfiguration() -> Bool
     func loadDailyPlan(for date: Date) throws -> DailyPlan?
     func saveDailyPlan(_ plan: DailyPlan) throws
     func loadWeeklyPlan(for weekOf: Date) throws -> WeeklyPlan?
@@ -57,6 +62,21 @@ struct LocalRepository: LocalRepositoryProtocol {
 
     func loadConfiguration() throws -> AppConfiguration? {
         try load(AppConfiguration.self, from: dataRootURL().appending(path: "configuration.json"))
+    }
+
+    func hasStoredConfiguration() -> Bool {
+        FileManager.default.fileExists(atPath: configurationURL().path)
+    }
+
+    /// Where the active profile's configuration lives. Exposed so a recovery screen can tell
+    /// the teacher exactly which file to back up or send along when reporting a problem.
+    /// Non-throwing on purpose: this is called precisely when reads are already failing, and
+    /// pointing at the root data folder is far more useful than surfacing a second error. If
+    /// the active-profile selection itself can't be read, the root folder still contains the
+    /// teacher-data directory the teacher needs to back up.
+    func configurationURL() -> URL {
+        let root = (try? dataRootURL()) ?? rootURL
+        return root.appending(path: "configuration.json")
     }
 
     func saveConfiguration(_ configuration: AppConfiguration) throws {
@@ -136,7 +156,15 @@ struct LocalRepository: LocalRepositoryProtocol {
         try data.write(to: url, options: .atomic)
     }
 
+    /// `LESSONPLANNER_DATA_ROOT` points the app at an alternate data folder, following the
+    /// same QA-override convention as `LESSONPLANNER_INITIAL_TAB`. This exists so data-state
+    /// behavior (an unreadable workspace, a half-migrated file) can be reproduced against
+    /// throwaway fixtures instead of by damaging real teacher data — which was otherwise the
+    /// only way to exercise the recovery screen.
     private static func defaultRootURL() -> URL {
+        if let override = ProcessInfo.processInfo.environment["LESSONPLANNER_DATA_ROOT"], !override.isEmpty {
+            return URL(fileURLWithPath: override)
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base.appending(path: "LessonPlanner")
     }
