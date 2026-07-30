@@ -1817,3 +1817,72 @@ longer destroy data.
 1. Push this batch's commit.
 2. Everything still open from Batches 027-029, including validating the new extraction
    inferencer against a real curriculum PDF.
+
+### NEXT SESSION PLAN (written 2026-07-29 end of day) — content scatters across non-matching blocks
+
+**Reported by the owner.** A daily-schedule document populated the weekly planner perfectly.
+Then math curriculum documents were imported and scattered across the week: lessons landed in
+the English Language Arts block and in time slots that are not blocks at all, instead of going
+only into Math blocks and leaving every other block untouched.
+
+**Desired behavior (owner's words):** lessons should only go into Math blocks; every other
+block stays as an unaltered placeholder.
+
+**Diagnosis — done, grounded in the owner's real saved data, not guessed from the screenshot.**
+(Inspected locally only; no curriculum content copied into the repo.)
+
+Findings from the affected profile's `lesson-records.json` / `weekly-plans/*.json`:
+
+1. **173 lesson records were created from the math import, and they are fragments, not
+   lessons.** Titles are either generic (`Lesson 1`, `Lesson 2`, `Lesson 1 Name`,
+   `Lesson 1—1 Day`) or mid-sentence text captured from the PDF (`days`, `day. How much does
+   the account receive`, `LESSON FOCUS AND COHERENCE`, `Lesson Materials: two-color counters,
+   square t…`). This is the same defect the owner described earlier as "extracting plain text
+   in a giant bundle but only the title populates."
+2. **`subject` is empty on all 173 records.** Nothing in the import path ever fills it, so the
+   single strongest signal for choosing a schedule block is absent before matching even runs.
+3. **`bestScheduleBlock` (AppStore.swift ~1078) therefore has nothing reliable to match on.**
+   Its title-based pass sees generic/garbage text. Its fallback then scores the *entire source
+   document's* text — which is identical for every fragment from that document, and a math
+   document legitimately contains ELA-ish vocabulary ("write an equation", "read the problem"),
+   so it can and does score English over Math.
+4. **The real damage is the no-match path.** `scheduledTimeRange` (AppStore.swift ~1019) falls
+   back to a hard-coded 9:00 AM start with a 45-minute duration when no block matches. 9:00 AM
+   is not one of the teacher's blocks, so unmatched content is invented into slots that do not
+   exist in their schedule. `firstAvailableSchedulePlacement` then spreads collisions across
+   other days, which is what produces the scatter across the whole week.
+5. Only 24 of the 173 records were actually placed, so the current behavior is also silently
+   dropping most of what it created, with no report to the teacher.
+
+**Plan, in dependency order. Do not start at step 3 — steps 1-2 are what make matching possible.**
+
+1. **Stop placing content that has no confident subject match.** Smallest change with the
+   biggest correctness win, and it directly delivers the owner's stated requirement. Replace
+   the 9:00 AM fallback in `scheduledTimeRange` with "return no placement," have the caller skip
+   the suggestion, and surface a count of what was not placed and why. A block the app is not
+   sure about must stay an untouched placeholder — never a guess. Add tests: content with no
+   subject signal places nothing and leaves all blocks empty; content with a clear Math signal
+   fills only Math blocks.
+2. **Populate `subject` during import.** Infer it once per source document (filename plus
+   document text) and stamp it on every lesson proposed from that document, rather than
+   re-deriving it per fragment at scheduling time. Then match on the record's own `subject`
+   first and treat title/body text as a fallback, which is the inverse of today's order. Add a
+   test that a math source yields records with `subject == "Math"`.
+3. **Fix segmentation so one lesson means one lesson.** 173 fragments from a handful of
+   documents is the underlying defect; steps 1-2 stop it from corrupting the planner but do not
+   fix it. Requires deciding what actually delimits a lesson in a real teacher-edition PDF
+   (module/lesson headings, page structure) and rejecting candidates that are clearly not
+   lessons (a bare `days`, a sentence fragment, a materials list). Expect this to be the
+   largest piece and to need real curriculum PDFs to validate against.
+4. **Report the outcome of an import to the teacher.** "24 of 173 proposed lessons were
+   scheduled" must be visible, not silent. Also surface why the rest were skipped.
+
+**Verification requirements for this work, learned the hard way this session:**
+
+- Test against the owner's real curriculum documents locally, not just tidy fixtures. A
+  hand-written fixture will pass while the real import still fails — that is exactly how the
+  earlier extraction work looked correct while being wrong in practice.
+- Relaunch the app and re-import against a throwaway profile (or `LESSONPLANNER_DATA_ROOT`)
+  before declaring any of this fixed. Unit tests do not exercise the real import path end to
+  end.
+- Never commit curriculum filenames, module names, or extracted text.

@@ -843,6 +843,17 @@ GitHub status: local branch is `main`, remote `git@github.com:niljuanzo89/Teache
 
 Immediate next session should:
 
+0. START HERE: "NEXT SESSION PLAN" at the end of CONTINUITY_LOG.md. The owner reported that
+   imported math curriculum scatters across the weekly planner — landing in the English
+   Language Arts block and in time slots that are not blocks at all — instead of filling only
+   Math blocks and leaving everything else untouched. The diagnosis is already done and is
+   grounded in the owner's real saved data: lesson `subject` is empty on every imported record,
+   import produces fragment "lessons" rather than real ones, and the no-match path invents a
+   9:00 AM slot instead of declining to place. That plan has the ordered fix. Do not re-derive
+   it, and do not start with the segmentation rewrite — the first two steps are what make
+   correct placement possible at all.
+
+
 1. Read CONTINUITY_LOG.md's Batch 024-029 entries and this document's sections 4/11/13 — do
    not re-derive the subject-matching design (Codex-reviewed), the frame-map architecture
    (Batch 025), the composer's design (Batch 026), the fail-loud wiring decision (Batch 027),
