@@ -219,3 +219,60 @@ Steps here depend on the placement-eligibility classification landing first (CON
 PLAN REVISION). That gate is what identifies a document as supporting material in the first
 place, and it produces the artifact-type signal this design reuses for `DifferentiationRole`.
 Building the attachment model before the gate would mean writing the classifier twice.
+
+### Investigated: can the app ignore "non-compliant" files? — measured answer
+
+The owner asked whether the program can be instructed to ignore non-compliant files. Measured
+this against their real 316-document import before designing anything, and the data argues
+against an import-side ignore rule.
+
+**Findings (full extracted text of all 316 documents):**
+
+- **310 of 316 carry a copyright notice** — 98%.
+- **5** contain any reproduction-permission language (blackline/photocopy/"may be reproduced").
+- **0** contain explicit prohibition language.
+
+Two conclusions follow directly:
+
+1. **An "ignore copyrighted material" rule would ignore 98% of the folder** and remove the
+   app's core value. Nearly everything a teacher legitimately owns and plans from is
+   copyrighted. Copyright presence is not non-compliance: a teacher reading their own licensed
+   curriculum to plan their own class is ordinary, legitimate use.
+2. **A permission-detection gate is not viable** — the signal is effectively absent from these
+   documents. Designing around it would mean building a mechanism that almost never fires, and
+   whose silence would be misread as "no restrictions found."
+
+**Therefore the control belongs on the output side, not the import side.** The distinction that
+actually matters is not *which files the app may read* but *what it does with them*:
+
+| Action | Assessment |
+|---|---|
+| Extract text locally, plan from it, populate lesson fields | Fine. This is the product. |
+| Cite a material in an output ("print pp. 12-13 of X") | Fine. Points the teacher at a file they own. |
+| Embed a material's content into a newly generated printable | The action needing care. |
+
+**Recommended design — no import-side compliance filter; an output-side default instead:**
+
+1. **Never embed source content into generated outputs by default.** Cite-only, as already
+   assumed by the printable-resources design above. This achieves the owner's goal without
+   discarding files they need.
+2. **Add a per-material `reproductionPermission` field** — `unknown` (default), `citeOnly`, or
+   `teacherConfirmedReproducible`. Only the last permits embedding, and only the teacher can
+   set it, because only the teacher knows their license terms. Pre-flag the ~5 documents whose
+   text does carry blackline/photocopy language as candidates, but never auto-grant.
+3. **Respect machine-readable publisher signals where they genuinely exist.** `PDFDocument`
+   exposes `isEncrypted` and `allowsCopying`; a PDF that is copy-protected is an explicit,
+   unambiguous signal and should be treated as `citeOnly` with no override. This is a real
+   compliance check, unlike copyright-notice presence.
+
+**What an import-side filter should actually exclude** — genuine junk, not "compliance":
+
+- Documents whose extraction produced no usable text (already partly handled via the
+  `.blocked` source-readiness level).
+- Encrypted PDFs that cannot be read at all.
+- Non-lesson artifacts, which the placement-eligibility gate already handles — that gate is the
+  right home for "don't schedule this," and it does not require refusing to import the file.
+
+**Net:** the app should keep reading everything the teacher gives it, place only real lessons,
+cite materials rather than reproduce them, and require an explicit teacher decision before any
+source content is embedded. No file needs to be ignored to get there.
