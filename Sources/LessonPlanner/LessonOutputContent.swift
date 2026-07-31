@@ -1,5 +1,15 @@
 import Foundation
 
+/// A presentation-ready projection of a `LessonRecord`.
+///
+/// **These fields are empty when the lesson is.** They previously carried confident student-facing
+/// fallbacks — a missing objective became "Explore the teacher-reviewed learning objective." — which
+/// meant an entirely empty lesson still produced a deck that looked populated, and asserted teacher
+/// review that had not happened. Measured against two real corpora, 0% of automatically created
+/// lessons had an objective, so every generated deck was showing invented content.
+///
+/// Consumers must therefore check for emptiness and *omit* the slide or line rather than render a
+/// substitute. `title` keeps a structural fallback because a deck and a filename need some name.
 struct LessonOutputContent {
     struct Step: Equatable {
         var title: String
@@ -25,7 +35,7 @@ struct LessonOutputContent {
 
     init(lesson: LessonRecord) {
         title = Self.clean(lesson.title, fallback: "Lesson")
-        objective = Self.clean(lesson.objective, fallback: "Explore the teacher-reviewed learning objective.")
+        objective = Self.clean(lesson.objective)
         subject = Self.clean(lesson.subject)
         gradeOrAgeRange = Self.clean(lesson.gradeOrAgeRange)
         steps = lesson.instructionalSequence.compactMap { step in
@@ -35,18 +45,9 @@ struct LessonOutputContent {
             return Step(title: title, notes: notes)
         }
         materials = lesson.materials.map { Self.clean($0) }.filter { !$0.isEmpty }
-        differentiation = Self.clean(
-            lesson.differentiationSummary,
-            fallback: "Use a teacher-selected support, challenge, or small-group activity."
-        )
-        printablePrompt = Self.clean(
-            lesson.printableResourcePrompt ?? "",
-            fallback: "Choose a strategy, show your thinking, and explain why it works."
-        )
-        assessment = Self.clean(
-            lesson.assessmentSummary,
-            fallback: "Be ready to explain your model, answer, or reasoning."
-        )
+        differentiation = Self.clean(lesson.differentiationSummary)
+        printablePrompt = Self.clean(lesson.printableResourcePrompt ?? "")
+        assessment = Self.clean(lesson.assessmentSummary)
         sourceReferences = lesson.sourceReferences.map { Self.clean($0) }.filter { !$0.isEmpty }
     }
 

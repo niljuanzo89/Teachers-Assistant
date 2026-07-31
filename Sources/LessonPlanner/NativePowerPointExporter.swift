@@ -102,16 +102,20 @@ private struct NativePowerPointDeck {
             )
         ]
 
-        slides.append(SlideContent(
-            title: "Learning goal",
-            subtitle: title,
-            body: [
-                "I can...",
-                objective,
-                "",
-                "Success looks like explaining your strategy and showing your work clearly."
-            ].joined(separator: "\n")
-        ))
+        // A learning-goal slide with no goal is worse than no slide: it asserts an objective the
+        // lesson does not have. Omit it entirely rather than substituting one.
+        if !objective.isEmpty {
+            slides.append(SlideContent(
+                title: "Learning goal",
+                subtitle: title,
+                body: [
+                    "I can...",
+                    objective,
+                    "",
+                    "Success looks like explaining your strategy and showing your work clearly."
+                ].joined(separator: "\n")
+            ))
+        }
 
         slides.append(SlideContent(
             title: "Warm up and connect",
@@ -132,14 +136,16 @@ private struct NativePowerPointDeck {
         ))
 
         for (index, group) in content.practiceStepGroups(startingAt: 6, size: 4).enumerated() {
-            let promptLines = [
+            var promptLines = [
                 "Show your work",
                 "1. Choose a strategy.",
                 "2. Represent it with a model, evidence, or explanation.",
-                "3. Explain why it works.",
-                "",
-                "Student prompt: \(content.printablePrompt)"
+                "3. Explain why it works."
             ]
+            // Only show a student prompt the lesson actually specifies.
+            if !content.printablePrompt.isEmpty {
+                promptLines.append(contentsOf: ["", "Student prompt: \(content.printablePrompt)"])
+            }
             slides.append(SlideContent(
                 title: index == 0 ? "Practice and explain" : "Continue practice",
                 subtitle: title,
@@ -151,13 +157,20 @@ private struct NativePowerPointDeck {
             section(title: "Materials", values: content.materials),
             section(title: "Differentiation", value: content.differentiation)
         ].filter { !$0.isEmpty }.joined(separator: "\n")
-        slides.append(SlideContent(title: "Choose the support you need", subtitle: title, body: supports))
+        // Both sections empty means there are no supports to choose from; an empty supports slide
+        // implies the lesson offers options it does not.
+        if !supports.isEmpty {
+            slides.append(SlideContent(title: "Choose the support you need", subtitle: title, body: supports))
+        }
 
-        slides.append(SlideContent(
-            title: "Exit ticket",
-            subtitle: title,
-            body: xmlEscape("\(content.assessment)\n\nBefore you leave: What strategy helped you most?")
-        ))
+        // The exit-ticket slide is only meaningful with a real success check behind it.
+        if !content.assessment.isEmpty {
+            slides.append(SlideContent(
+                title: "Exit ticket",
+                subtitle: title,
+                body: xmlEscape("\(content.assessment)\n\nBefore you leave: What strategy helped you most?")
+            ))
+        }
 
         return slides
     }

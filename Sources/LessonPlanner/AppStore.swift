@@ -1189,6 +1189,17 @@ final class AppStore: ObservableObject {
         var lesson = LessonRecord.draft(title: suggestion.pacingLessonTitle)
         if let source = sourceDocument(referencedIn: suggestion.sourceNotes) {
             lesson.subject = source.effectiveInferredSubject ?? ""
+            // Without this the teacher cannot even fill the lesson in by hand: the "Fill empty
+            // fields from labeled source text" action guards on this field being non-empty, so an
+            // auto-created lesson was unreachable by both the automatic and the manual path.
+            //
+            // Deliberately NOT auto-populating the lesson's fields from this text yet. The
+            // extractor is document-scoped while a lesson is day-scoped, so running it here would
+            // give every weekday lesson the whole week's content — measured at 20 instructional
+            // steps for a single day. Lesson-scoped source spans have to exist first; until then a
+            // teacher choosing to fill from source sees the whole document and can judge it, which
+            // is honest, whereas silently writing it into five lessons would not be.
+            lesson.sourceTextSnapshot = source.extractedText
         }
         lesson.status = .approved
         lesson.sourceReferences = [suggestion.planningNote]

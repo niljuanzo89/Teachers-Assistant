@@ -1983,6 +1983,10 @@ final class LessonPlannerTests: XCTestCase {
         lesson.status = .approved
         lesson.instructionalSequence = [InstructionalStep(id: UUID(), title: "Teach", notes: "Use guided practice.")]
         lesson.assessmentSummary = "Check for understanding."
+        // Complete lesson: the exporter now omits slides whose content is absent, so a deck with
+        // every section present is what this inspection test intends to examine.
+        lesson.materials = ["Whiteboards"]
+        lesson.differentiationSummary = "Offer sentence frames for students who need them."
         try await NativePowerPointExporter.generate(lesson: lesson, destination: templateURL)
         try repository.saveConfiguration(AppConfiguration(
             workspaceName: "Generic QA Workspace",

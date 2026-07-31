@@ -2935,3 +2935,49 @@ plus a cardinality assertion, plus zero decks containing the current fallback ph
 **Also raised, not yet planned:** re-import idempotency. Re-deriving pacing will duplicate lessons or
 overwrite teacher edits unless lesson identity is stable and merge rules exist. This is the same
 identity gap found in Batch 042, now with a second consequence.
+
+### Batch 043 — 2026-07-30 — Batch A: stop the deck asserting content the lesson does not have
+
+First of the four batches from PLAN REVISION 6. Scoped to the items all three reviewers agreed were
+safe without segmentation.
+
+**1. Removed the fabricating fallbacks.** `LessonOutputContent` turned a missing objective into
+"Explore the teacher-reviewed learning objective.", a missing assessment into "Be ready to explain
+your model, answer, or reasoning.", and similarly for differentiation and the student prompt. With
+0% of automatically created lessons carrying any of those fields, **every generated deck was showing
+invented content** — and the objective fallback additionally asserted teacher review that had not
+happened. Those four fallbacks are gone; `title` keeps a structural one because a deck and a
+filename need a name.
+
+**2. The exporter now omits rather than substitutes.** A learning-goal slide with no goal, an exit
+ticket with no success check, and a supports slide with neither materials nor differentiation are
+each dropped entirely. The student-prompt line only appears when the lesson specifies one. An empty
+lesson now yields a short, honest deck instead of a full-looking, invented one.
+
+**3. `sourceTextSnapshot` is set on auto-created lessons.** The manual "Fill empty fields from
+labeled source text" action guards on that field, so auto-created lessons were previously unreachable
+by *both* the automatic and the manual path. They are now fillable by hand.
+
+**Deliberately not done, and why it is recorded in code.** Auto-population from that snapshot is
+*not* wired up. The extractor is document-scoped while a lesson is day-scoped, so running it here
+would give every weekday lesson the whole week — measured at 20 instructional steps for a single
+day. A teacher who chooses to fill from source sees the whole document and can judge it, which is
+honest; silently writing it into five lessons would not be. Lesson-scoped spans (Batch C) come first.
+
+**Also found, recorded, not fixed.** The deck injects generic prose beyond the field fallbacks —
+"Talk with a partner: What do you already know that can help?", "Success looks like explaining your
+strategy…", the three-step "Show your work" scaffold, and the `emptyMessage` placeholders in the
+warm-up and build-understanding slides. This is closer to generic pedagogy than to fabricated lesson
+content, so it was left alone rather than silently widening this batch — but it is exactly what the
+output-quality rubric's "is the deck teachable, or generic pedagogy wrapped around a title?" is
+asking about, and it should be judged there.
+
+**Verification.** 205 tests pass (201 + 4 new asserting a deck never contains any of the four
+invented strings, that slides needing absent content are omitted, that a fully populated lesson still
+renders every section, and that the manual fill path refuses without a snapshot). Real `xcodebuild`
+succeeded. One existing test needed its fixture completed rather than its expectation lowered: it
+asserted a 7-slide deck while building a lesson with no materials or differentiation, so the supports
+slide is now correctly omitted — the fixture was made a complete lesson instead.
+
+**Next:** Batch B (decouple placement from approval status), which carries real regression risk to
+the verified placement behaviour and needs before/after measurement against the real profile.
