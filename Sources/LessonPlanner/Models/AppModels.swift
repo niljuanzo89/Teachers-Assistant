@@ -979,10 +979,15 @@ struct ImportedSource: Codable, Equatable, Identifiable {
     /// The document's subject, computed on read when nothing was stored.
     ///
     /// `inferredSubject` is only stamped at import, so it is nil for every document imported before
-    /// the field existed — 316 of 316 in the owner's real profile. Without this fallback those
-    /// sources silently lose the strongest signal for matching a lesson to the right schedule
-    /// block, and fall back to scoring whole-document text, which is what once put math content in
-    /// an English block.
+    /// the field existed. This keeps that case consistent rather than silently losing the value.
+    ///
+    /// Treat this as **opportunistic, not a primary signal**. Measured against a real 316-document
+    /// curriculum import it resolved nothing at all: those files carry no standards codes and no
+    /// `Subject:` label, which are the only two things subject inference keys on. Schedule-block
+    /// matching is carried in practice by `SubjectVocabulary` content scoring, which placed 15 of
+    /// 15 lessons correctly with no stored subject. This remains worth having because other
+    /// publishers and districts do label subjects and cite standards — but do not build on it as
+    /// though it reliably yields a subject.
     ///
     /// A stored value wins, but only if it is actually a value: a blank or whitespace-only string
     /// is treated as absent rather than as a subject, so hand-edited or older JSON carrying `""`

@@ -2621,3 +2621,47 @@ Real-profile placements unchanged at 15/15 in the Math block — no regression, 
 **Still open.** Per-artifact derivation versions; automatic stale rebuild; the derived-proposal /
 teacher-overlay split; and now the open question above about what subject inference should actually
 key on.
+
+### PLAN REVISION 4 (2026-07-30) — infrastructure track paused; product work resumes
+
+Confirmed by the Batch 041 debrief. Two conclusions, both grounded in the 0-of-316 result rather
+than preference.
+
+**1. Standards/label subject inference is demoted, not deleted.** The premise that populating
+`subject` at import would materially improve placement does not hold for this corpus. Codex: "I
+would not delete it, because standards and `Subject:` labels will exist in other districts and
+publishers, but I would stop treating it as a core repair strategy." The in-code documentation has
+been corrected to say so, since it previously described the fallback as the strongest matching
+signal — which the real data contradicts.
+
+**If subject inference is revisited, the agreed priority order is:**
+
+1. **Folder / import-batch context, or a teacher-selected course.** A batch import is usually one
+   subject; per-folder context beats per-document guessing.
+2. **The existing `SubjectVocabulary` scoring**, promoted from a matching heuristic to a stored
+   inference — but as a *versioned classifier with a confidence*, not a timeless fact.
+3. **Filename and path tokens**, only after mapping what real publisher tokens mean. Markers like
+   `CHLG` / `RteachSE` denote material type or series role, not subject.
+4. **Not `DocumentLessonKey`.** It is a join key ("this reteach sheet belongs to Module 3 Lesson 7"),
+   not a subject signal. Subject should be *inherited* through that join, from the folder, course,
+   or the primary lesson's schedule block.
+
+**2. The infrastructure track is paused here.** The owner's profile is repaired and placements are
+correct, so the remaining infrastructure items no longer justify going next simply because they were
+next on the list:
+
+- **Per-artifact derivation versions** — still the right tool before any broad stale-state rebuild,
+  but do it **just-in-time**, immediately before the next classifier or rebuild change that would
+  otherwise strand existing profiles. Not as a standalone batch now.
+- **Automatic stale rebuild** — remains gated behind versioning, and is less urgent now that the
+  explicit rebuild exists.
+- **Derived-proposal / teacher-overlay split** — still architecturally right, but a large
+  persistence redesign. Defer until a concrete workflow forces it.
+
+**Next work: differentiation-material attachments** (`OUTPUT_ENRICHMENT_PLAN.md`'s approved routing
+design). This is the piece deferred across several batches and the one with real user-visible value:
+routing the 174 supporting-material documents into the differentiation guide, attaching them to
+lessons via `DocumentLessonKey`, and handling the measured 45% attachment coverage honestly.
+
+Two open owner decisions still gate parts of that work: **cite vs. embed** for printable resources,
+and what to do with material whose lesson key does not resolve.
