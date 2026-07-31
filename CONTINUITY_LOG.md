@@ -3159,3 +3159,47 @@ explicit labels, and add an audit that reports unknown heading-like lines seen i
 promoting terms only from measured misses. Not started.
 
 **Verification:** 218 tests passing (6 new), `xcodebuild` succeeds.
+
+### Batch 047 — Batch E: the inference marker becomes visible and honest
+
+**Compute: medium. Model shape: dual (Codex pre-review + debrief).**
+
+Batch 046 recorded `inferredFields` but never showed it, and it meant slightly different things
+on different paths. This batch makes it mean one thing and puts it in front of the teacher.
+
+**Lifecycle by value diff.** `updateLessonFromTeacherEdit` now compares the incoming record
+against the stored one and drops the marker for any field whose value actually changed. Keyed
+on the value rather than on a view reporting an edit, so edit paths added later are covered
+without anyone remembering this. `LessonRecord.contentFingerprint(for:)` deliberately covers
+content only — Codex's catch: "Mark approved" routes through the teacher-edit path, and
+approving a lesson is not rewriting its objective. A test pins that.
+
+Conservative in the other direction on purpose: a teacher who reads an inferred sequence,
+agrees, and saves without changing a character keeps the marker. A stale "inferred" is a much
+cheaper error than a missing one. An explicit "I checked this" affordance is the cleaner
+answer and is product scope, not this batch (Codex concurred).
+
+`updateLessonFromAutomaticSync` never clears markers — an automatic pass touching a record is
+not a teacher vouching for it.
+
+**Markers now mean the same thing everywhere.** `createDraftLesson` records what it inferred,
+but only for fields whose stored value actually came from extraction: a teacher-typed objective
+overrides the extracted one, so marking it inferred would misdescribe their own words (Codex's
+finding). `populateFields` unions rather than assigns, so a later inferred fill cannot erase an
+earlier marker.
+
+**Surfaced in two places, and deliberately not in a third.** A banner in the lesson editor names
+the affected fields, driven by the set rather than hardcoded to steps. A line at the approval
+control repeats it, because approval gates every generated output and is the last honest moment
+to say so. **Not** carried into the generated plan/deck/guide: those are read in a classroom,
+and provenance of the planning process is a note to the teacher, not to a room of students.
+Codex agreed on all three.
+
+**Verification:** 226 tests passing (8 new), `xcodebuild` succeeds. Editor banner visually
+confirmed against a throwaway seeded profile via `LESSONPLANNER_DATA_ROOT`
+(`Design Screenshots/2026-07-31/01-inferred-fields-banner.png`); the approval-point line sits
+below the fold and is **not** yet visually confirmed. Owner visual sign-off still open.
+
+**Process note:** two scripted edits in this batch silently did nothing — one because a `grep`
+in an `&&` chain failed and short-circuited the script that followed. The Batch 036 rule
+(assert every anchor) only helps if the script actually runs; check that it did.

@@ -1234,6 +1234,40 @@ struct InstructionalStep: Codable, Equatable, Identifiable {
     var notes: String
 }
 
+extension LessonRecord {
+    /// A comparable value for one content field, used to decide whether a teacher's save actually
+    /// changed that field.
+    ///
+    /// Deliberately covers **only** content. Status, provenance, timestamps, warnings, and source
+    /// references are excluded: marking a lesson approved is not editing its objective, and must
+    /// not be mistaken for the teacher having rewritten a field they only read.
+    func contentFingerprint(for field: LessonFieldExtractor.Field) -> String {
+        // Separators are control characters so ordinary text cannot forge a field boundary.
+        let unit = "\u{1F}", record = "\u{1E}"
+        switch field {
+        case .subject: return subject
+        case .gradeOrAgeRange: return gradeOrAgeRange
+        case .objective: return objective
+        case .materials: return materials.joined(separator: unit)
+        case .assessment: return assessmentSummary
+        case .differentiation: return differentiationSummary
+        case .steps:
+            return instructionalSequence.map { "\($0.title)\(record)\($0.notes)" }.joined(separator: unit)
+        }
+    }
+
+    /// Human-readable names for the fields this record had to work out from document structure.
+    var inferredFieldNames: [String] {
+        guard let inferredFields, !inferredFields.isEmpty else { return [] }
+        let names: [LessonFieldExtractor.Field: String] = [
+            .subject: "subject", .gradeOrAgeRange: "grade or age range", .objective: "learning objective",
+            .materials: "materials", .assessment: "assessment", .differentiation: "differentiation",
+            .steps: "instructional sequence"
+        ]
+        return inferredFields.compactMap { names[$0] }.sorted()
+    }
+}
+
 struct LessonRecord: Codable, Equatable, Identifiable {
     let id: UUID
     var status: LessonStatus

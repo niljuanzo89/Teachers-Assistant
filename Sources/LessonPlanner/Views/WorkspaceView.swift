@@ -2263,6 +2263,10 @@ struct DraftLessonView: View {
                         LessonWarningBanner(warnings: warnings)
                     }
 
+                    if !binding.wrappedValue.inferredFieldNames.isEmpty {
+                        LessonInferredFieldsBanner(fieldNames: binding.wrappedValue.inferredFieldNames)
+                    }
+
                     LessonEditorSectionCard(
                         title: "Core lesson",
                         systemImage: "book.closed",
@@ -2546,6 +2550,35 @@ private struct LessonWarningBanner: View {
     }
 }
 
+/// Names the fields the app had to read from document *structure* — phase headings — rather than
+/// from an explicit label. Driven by `LessonRecord.inferredFields` rather than hardcoded to any
+/// one field, so a future inferred field surfaces here without further work.
+///
+/// Deliberately distinct from `LessonWarningBanner`: a warning says something is missing, this
+/// says something is present but was worked out rather than read.
+private struct LessonInferredFieldsBanner: View {
+    var fieldNames: [String]
+
+    private var list: String {
+        ListFormatter.localizedString(byJoining: fieldNames)
+    }
+
+    var body: some View {
+        DSCard(radius: DS.radiusMD, padding: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Worked out from document structure", systemImage: "wand.and.stars")
+                    .font(DS.font(15, weight: .semibold))
+                    .foregroundStyle(DS.accent2_700)
+                Text("Your document did not label the \(list). The app read \(fieldNames.count == 1 ? "it" : "them") from the document's own headings, so check \(fieldNames.count == 1 ? "it" : "them") before approving this lesson.")
+                    .font(DS.font(13))
+                    .foregroundStyle(DS.accent2_700)
+            }
+        }
+        .background(DS.accent2_100)
+        .clipShape(RoundedRectangle(cornerRadius: DS.radiusMD))
+    }
+}
+
 private struct LessonEditorSectionCard<Content: View>: View {
     var title: String
     var systemImage: String
@@ -2639,6 +2672,16 @@ private struct LessonOutputControls: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             LessonExportReadinessView(report: readiness)
+            // Approval is the gate on every generated output, so this is the last honest moment
+            // to say which fields were worked out rather than read.
+            if !lesson.inferredFieldNames.isEmpty {
+                Label(
+                    "\(lesson.inferredFieldNames.count) field\(lesson.inferredFieldNames.count == 1 ? " was" : "s were") worked out from document structure: \(ListFormatter.localizedString(byJoining: lesson.inferredFieldNames)). Check before approving.",
+                    systemImage: "wand.and.stars"
+                )
+                .font(DS.font(12.5, weight: .semibold))
+                .foregroundStyle(DS.accent2_700)
+            }
             HStack(spacing: 10) {
                 Button("Save lesson") { saveLesson() }
                     .buttonStyle(.dsSecondary)

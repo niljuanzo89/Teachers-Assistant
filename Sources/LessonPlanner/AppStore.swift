@@ -1557,6 +1557,12 @@ final class AppStore: ObservableObject {
         lesson.differentiationSummary = extracted.differentiation ?? ""
         lesson.instructionalSequence = extracted.steps.map { InstructionalStep(id: UUID(), title: $0.title, notes: $0.notes) }
         lesson.aiReviewWarnings = LessonFieldExtractor.extractionWarnings(for: extracted)
+        // Only for fields whose stored value actually came from extraction. A teacher who typed an
+        // objective here overrode the extracted one, so marking it inferred would be a lie about
+        // their own words.
+        var markers = extracted.inferredFields
+        if !typedObjective.isEmpty { markers.remove(.objective) }
+        lesson.inferredFields = markers.isEmpty ? nil : markers
 
         lessons.append(lesson)
         mostRecentLessonID = lesson.id
@@ -1629,6 +1635,20 @@ final class AppStore: ObservableObject {
     func updateLessonFromTeacherEdit(_ lesson: LessonRecord) {
         var updated = lesson
         updated.origin = .teacherAuthored
+        // A field the teacher rewrote is theirs now, so its "worked out from structure" marker is
+        // no longer true. Keyed on the value actually changing rather than on a view reporting an
+        // edit, so edit paths added later are covered without having to remember this.
+        //
+        // Conservative by design in the other direction: a teacher who reads an inferred sequence,
+        // agrees with it, and saves without touching it keeps the marker. A stale "inferred" is a
+        // far cheaper error than a missing one.
+        if let markers = updated.inferredFields, !markers.isEmpty,
+           let stored = lessons.first(where: { $0.id == lesson.id }) {
+            let unchanged = markers.filter {
+                stored.contentFingerprint(for: $0) == updated.contentFingerprint(for: $0)
+            }
+            updated.inferredFields = unchanged.isEmpty ? nil : unchanged
+        }
         writeLesson(updated)
     }
 
@@ -1702,7 +1722,10 @@ final class AppStore: ObservableObject {
         lesson.instructionalSequence = steps.map {
             InstructionalStep(id: UUID(), title: $0.title, notes: $0.notes)
         }
-        if !inferred.isEmpty { lesson.inferredFields = inferred }
+        // Union rather than assign: a later inferred fill must not erase a marker set earlier.
+        if !inferred.isEmpty {
+            lesson.inferredFields = (lesson.inferredFields ?? []).union(inferred)
+        }
         return true
     }
 
