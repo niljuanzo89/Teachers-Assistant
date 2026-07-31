@@ -1258,6 +1258,12 @@ struct LessonRecord: Codable, Equatable, Identifiable {
     /// split confidently, in which case nothing is populated from it — see `LessonSourceSpan`.
     var sourceSpan: LessonSourceSpan? = nil
 
+    /// Fields whose value came from reading document *structure* (phase headings) rather than an
+    /// explicit label. Optional so existing saved lessons still decode; nil and empty both mean
+    /// "nothing was inferred". The UI uses this to avoid presenting a worked-out value with the
+    /// same confidence as one the document stated outright.
+    var inferredFields: Set<LessonFieldExtractor.Field>? = nil
+
     /// Falls back to the pre-provenance marker. Deliberately biased toward `.teacherAuthored`:
     /// wrongly regenerating a teacher's lesson destroys their work, while wrongly preserving an
     /// auto-derived one merely leaves a stale record they can delete.

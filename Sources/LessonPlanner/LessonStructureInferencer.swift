@@ -118,6 +118,13 @@ enum LessonStructureInferencer {
     /// Returns the phase title if this line reads as a phase heading. A duration annotation
     /// ("(20 min)") is treated as sufficient evidence on its own, since it reliably marks an
     /// instructional phase even when the phase name isn't one this code knows.
+    /// Whether this line reads as an instructional phase heading ("Warm-Up", "Mini-Lesson",
+    /// "Launch (10 min)"). Exposed so the label-based extractor can treat one as a value
+    /// terminator: in a "Component / Plan" table the phases sit between labeled rows with no
+    /// blank line and no recognized label to stop at, so without this a "Materials" list runs
+    /// on and absorbs the whole lesson body.
+    static func isPhaseHeading(_ line: String) -> Bool { phaseHeadingTitle(line) != nil }
+
     private static func phaseHeadingTitle(_ line: String) -> String? {
         guard !line.isEmpty, line.count <= 60 else { return nil }
         var candidate = line.trimmingCharacters(in: CharacterSet(charactersIn: "#*: \t"))

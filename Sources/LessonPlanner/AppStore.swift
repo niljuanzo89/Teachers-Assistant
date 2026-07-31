@@ -1187,6 +1187,7 @@ final class AppStore: ObservableObject {
         }
 
         var lesson = LessonRecord.draft(title: suggestion.pacingLessonTitle)
+        var populatedSteps = false
         if let source = sourceDocument(referencedIn: suggestion.sourceNotes) {
             lesson.subject = source.effectiveInferredSubject ?? ""
             // Without this the teacher cannot even fill the lesson in by hand: the "Fill empty
@@ -1200,6 +1201,7 @@ final class AppStore: ObservableObject {
                let sliced = span.resolvedText(in: source.extractedText) {
                 lesson.sourceSpan = span
                 lesson.sourceTextSnapshot = sliced
+                populatedSteps = Self.populateFields(from: sliced, into: &lesson)
             } else {
                 // Honest degradation: no confident split means the teacher sees the whole document
                 // and can judge it themselves, which is what happens for single-page sources.
@@ -1212,13 +1214,15 @@ final class AppStore: ObservableObject {
         lesson.status = .pendingReview
         lesson.origin = .autoDerived
         lesson.aiReviewWarnings = ["Auto-created from readable planning documents. Fill any blank or incorrect fields as needed."]
-        lesson.instructionalSequence = [
-            InstructionalStep(
-                id: UUID(),
-                title: suggestion.pacingLessonTitle,
-                notes: "Auto-filled from course pacing. Add details if needed."
-            )
-        ]
+        if !populatedSteps {
+            lesson.instructionalSequence = [
+                InstructionalStep(
+                    id: UUID(),
+                    title: suggestion.pacingLessonTitle,
+                    notes: "Auto-filled from course pacing. Add details if needed."
+                )
+            ]
+        }
         lessons.append(lesson)
         mostRecentLessonID = lesson.id
         saveLessons()
@@ -1637,6 +1641,53 @@ final class AppStore: ObservableObject {
         writeLesson(lesson)
     }
 
+    /// Fills a lesson's content fields from that lesson's own slice of its source document.
+    ///
+    /// **Strategy is split by field, not uniform.** Measured over the 25 lessons in the owner's
+    /// sample packet: label-only extraction fills objective, materials, assessment, and
+    /// differentiation at 25/25, and finds instructional steps at 0/25 — that corpus names its
+    /// phases "Warm-Up"/"Mini-Lesson"/"Guided Practice" rather than "Procedure", which only
+    /// `LessonStructureInferencer` recognizes (it scores 25/25 there). So inference is used for
+    /// steps alone; on the four labelled fields it would add judgment risk for no measured gain.
+    ///
+    /// Only empty fields are written, so a teacher edit always survives a re-run.
+    ///
+    /// Returns true when instructional steps were populated, so the caller can skip seeding the
+    /// placeholder step that would otherwise make this lesson look non-empty forever.
+    private static func populateFields(from spanText: String, into lesson: inout LessonRecord) -> Bool {
+        let labeled = LessonFieldExtractor.extract(from: spanText)
+
+        if lesson.subject.isEmpty { lesson.subject = labeled.subject ?? "" }
+        if lesson.gradeOrAgeRange.isEmpty { lesson.gradeOrAgeRange = labeled.gradeOrAgeRange ?? "" }
+        if lesson.objective.isEmpty { lesson.objective = labeled.objective ?? "" }
+        if lesson.materials.isEmpty { lesson.materials = labeled.materials }
+        if lesson.assessmentSummary.isEmpty { lesson.assessmentSummary = labeled.assessment ?? "" }
+        if lesson.differentiationSummary.isEmpty {
+            lesson.differentiationSummary = labeled.differentiation ?? ""
+        }
+
+        guard lesson.instructionalSequence.isEmpty else { return false }
+        var steps = labeled.steps
+        var inferred: Set<LessonFieldExtractor.Field> = []
+        if steps.isEmpty {
+            // Take `.steps` and nothing else. `fillingGaps` can also infer an objective, subject,
+            // grade, and assessment; those are deliberately discarded here, because the labeled
+            // pass above already covers them and an inferred value there would be a guess rather
+            // than a reading of document structure.
+            let structural = LessonStructureInferencer.fillingGaps(in: labeled, from: spanText)
+            if structural.inferredFields.contains(.steps), !structural.steps.isEmpty {
+                steps = structural.steps
+                inferred.insert(.steps)
+            }
+        }
+        guard !steps.isEmpty else { return false }
+        lesson.instructionalSequence = steps.map {
+            InstructionalStep(id: UUID(), title: $0.title, notes: $0.notes)
+        }
+        if !inferred.isEmpty { lesson.inferredFields = inferred }
+        return true
+    }
+
     private func writeLesson(_ lesson: LessonRecord) {
         guard let index = lessons.firstIndex(where: { $0.id == lesson.id }) else { return }
         var updated = lesson
@@ -1646,23 +1697,32 @@ final class AppStore: ObservableObject {
     }
 
     func fillEmptyLessonFieldsFromSource(_ lesson: LessonRecord) -> LessonRecord {
-        guard let sourceText = lesson.sourceTextSnapshot, !sourceText.isEmpty else {
+        guard let sourceText = currentSourceText(for: lesson), !sourceText.isEmpty else {
             lastError = "This lesson has no readable source text available."
             return lesson
         }
         var updated = lesson
-        let extracted = LessonFieldExtractor.extract(from: sourceText)
-        if updated.subject.isEmpty { updated.subject = extracted.subject ?? updated.subject }
-        if updated.gradeOrAgeRange.isEmpty { updated.gradeOrAgeRange = extracted.gradeOrAgeRange ?? updated.gradeOrAgeRange }
-        if updated.objective.isEmpty { updated.objective = extracted.objective ?? updated.objective }
-        if updated.materials.isEmpty { updated.materials = extracted.materials }
-        if updated.assessmentSummary.isEmpty { updated.assessmentSummary = extracted.assessment ?? updated.assessmentSummary }
-        if updated.differentiationSummary.isEmpty { updated.differentiationSummary = extracted.differentiation ?? updated.differentiationSummary }
-        if updated.instructionalSequence.isEmpty {
-            updated.instructionalSequence = extracted.steps.map { InstructionalStep(id: UUID(), title: $0.title, notes: $0.notes) }
-        }
+        // Same helper the automatic path uses, so the button and the import produce identical
+        // fields rather than two extraction rules that drift apart.
+        Self.populateFields(from: sourceText, into: &updated)
         updateLessonFromTeacherEdit(updated)
         return updated
+    }
+
+    /// This lesson's own slice of its source document.
+    ///
+    /// Re-resolved against the document's *current* text whenever the source is still imported,
+    /// because the stored snapshot was taken at placement time; the span carries its heading as
+    /// durable identity precisely so a re-import that shifts offsets still lands on the right day.
+    /// Falls back to the snapshot when the source is gone.
+    private func currentSourceText(for lesson: LessonRecord) -> String? {
+        if let span = lesson.sourceSpan,
+           let sourceID = span.sourceID,
+           let source = importedSources.first(where: { $0.id == sourceID }),
+           let resolved = span.resolvedText(in: source.extractedText) {
+            return resolved
+        }
+        return lesson.sourceTextSnapshot
     }
 
     func generateLessonPlanHTML(for lesson: LessonRecord) -> GeneratedOutputRecord? {
@@ -2156,7 +2216,7 @@ enum LessonFieldExtractor {
         var notes: String = ""
     }
 
-    enum Field: String, CaseIterable {
+    enum Field: String, CaseIterable, Codable {
         case subject, gradeOrAgeRange, objective, materials, assessment, differentiation, steps
     }
 
@@ -2181,8 +2241,17 @@ enum LessonFieldExtractor {
     private static let differentiationLabels = ["differentiated support", "differentiation", "accommodations", "scaffolds", "extensions", "supports"]
     private static let stepsLabels = ["instructional sequence", "instructional plan", "lesson sequence", "procedure", "activities", "steps"]
 
+    /// Rows this extractor does not turn into a field, but which must still *end* the previous
+    /// field's value. In a "Component / Plan" table these sit directly under a value with no
+    /// blank line and no phase heading between, so without them an assessment runs on and
+    /// absorbs the timing row verbatim. Terminators only — nothing reads them.
+    private static let terminatorOnlyLabels = [
+        "timing", "duration", "pacing", "standards", "standard", "topic", "homework", "reflection"
+    ]
+
     private static var allLabels: [String] {
-        subjectLabels + gradeLabels + objectiveLabels + materialsLabels + assessmentLabels + differentiationLabels + stepsLabels
+        subjectLabels + gradeLabels + objectiveLabels + materialsLabels + assessmentLabels
+            + differentiationLabels + stepsLabels + terminatorOnlyLabels
     }
 
     static func extract(from text: String) -> Result {
@@ -2197,7 +2266,8 @@ enum LessonFieldExtractor {
             materials: listValue(for: materialsLabels, in: lines),
             assessment: scalarValue(for: assessmentLabels, in: lines),
             differentiation: scalarValue(for: differentiationLabels, in: lines),
-            steps: listValue(for: stepsLabels, in: lines).map { ExtractedStep(title: $0) }
+            steps: listValue(for: stepsLabels, in: lines, stopAtPhaseHeadings: false)
+                .map { ExtractedStep(title: $0) }
         )
     }
 
@@ -2229,10 +2299,14 @@ enum LessonFieldExtractor {
     /// (bullet markers stripped, not further comma-split) — the natural shape of a bulleted
     /// or numbered list under a heading, where an individual item can itself contain a comma
     /// ("chart paper, any color").
-    private static func listValue(for labels: [String], in lines: [String]) -> [String] {
+    private static func listValue(
+        for labels: [String], in lines: [String], stopAtPhaseHeadings: Bool = true
+    ) -> [String] {
         guard let (index, remainder) = firstLabelMatch(labels, in: lines) else { return [] }
         if !remainder.isEmpty { return splitDenseList(remainder) }
-        let continuation = continuationLines(after: index, in: lines)
+        let continuation = continuationLines(
+            after: index, in: lines, stopAtPhaseHeadings: stopAtPhaseHeadings
+        )
         if continuation.count == 1 { return splitDenseList(continuation[0]) }
         return continuation.map(stripBulletMarker).filter { !$0.isEmpty }
     }
@@ -2272,13 +2346,19 @@ enum LessonFieldExtractor {
 
     /// Lines immediately after `index` up to (not including) a blank line or the next
     /// recognized label — the natural extent of a value that continues past its heading line.
-    private static func continuationLines(after index: Int, in lines: [String]) -> [String] {
+    /// - Parameter stopAtPhaseHeadings: whether an instructional phase heading ends the value.
+    ///   True for every field except the instructional-sequence list, whose *items* are
+    ///   legitimately phase names — stopping there would truncate that list to its first entry.
+    private static func continuationLines(
+        after index: Int, in lines: [String], stopAtPhaseHeadings: Bool = true
+    ) -> [String] {
         var collected: [String] = []
         var cursor = index + 1
         while cursor < lines.count {
             let line = lines[cursor]
             if line.isEmpty { break }
             if firstLabelMatch(allLabels, in: [line]) != nil { break }
+            if stopAtPhaseHeadings, LessonStructureInferencer.isPhaseHeading(line) { break }
             collected.append(line)
             cursor += 1
         }

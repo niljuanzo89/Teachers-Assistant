@@ -3073,3 +3073,62 @@ and legacy decode). Real `xcodebuild` succeeded; new file registered in `project
 
 **Next:** Batch D — populate lesson fields from the span, and settle labelled-only vs
 labelled-plus-inferred by measuring both against the sample packet.
+
+### Batch 046 — Batch D: lesson fields populated from spans
+
+**Compute: medium. Model shape: dual (Codex pre-review + debrief).**
+
+Closes the defect diagnosed in Batch 043: every lesson was empty on every content field
+because `ensureApprovedLesson` held the source document but never called the extractor.
+
+**The measurement that settled the reviewers' split.** Codex wanted labelled extraction plus
+structural inference; Gemini and Grok wanted labelled only. Deferred to measurement pending
+spans, which Batch 045 delivered. Across all 25 spans in the owner's sample packet:
+
+| Field | Labelled only | + inference |
+|---|---|---|
+| objective / materials / assessment / differentiation | 25/25 | 25/25 |
+| instructional steps | **0/25** | **25/25** |
+
+Neither position was wholly right, so the strategy is split **by field**: labelled-only for the
+four it already covers, labelled-then-inferred for steps alone. Steps score zero because this
+corpus names its phases "Warm-Up"/"Mini-Lesson"/"Guided Practice" rather than "Procedure".
+Only `.steps` is taken from `LessonStructureInferencer`; the objective/subject/assessment it
+may also infer are discarded, because the labelled pass already covers them and an inferred
+value there would be a guess rather than a reading of structure.
+
+**Codex's catch, worth keeping.** `ensureApprovedLesson` seeded a placeholder step titled with
+the pacing title, so `instructionalSequence.isEmpty` was never true and the never-overwrite
+rule would have silently blocked every real step forever. Fixed by not creating the
+placeholder at all when the source yields steps, rather than by special-casing it later.
+
+**Two correctness defects the non-empty measurement had hidden.** The first probe counted
+fields as populated when non-empty, which is exactly the trap the batch was meant to avoid:
+
+1. `materials` absorbed the whole lesson body, because a list value terminates only at a
+   *known label* and phase headings are not in that vocabulary. Fixed by ending a value at a
+   phase heading (`LessonStructureInferencer.isPhaseHeading`) — except for the
+   instructional-sequence list, whose items are legitimately phase names.
+2. `assessment` absorbed the "Timing" row, which is neither a known label nor a phase heading.
+   Fixed with `terminatorOnlyLabels` — rows that end a value without being read into any field.
+
+After both fixes, real-packet materials run 66 chars median / 76 max, and assessments stop at
+their own sentence. **Non-emptiness is not correctness; measure the value, not its length.**
+
+**Other decisions.** `inferredFields: Set<LessonFieldExtractor.Field>?` is structured state on
+`LessonRecord`, not more prose in `aiReviewWarnings` (which has already proven a poor carrier
+for machine-readable state three times). Optional, so existing saved lessons still decode —
+the Codable trap from Batch 025. Population is gated on `sourceSpan != nil` and re-resolves
+the span against the document's *current* text rather than trusting the stored snapshot.
+Status stays `pendingReview`: populating is not approving.
+
+The manual "Fill empty fields" button now routes through the same helper as the automatic
+path, so the two cannot drift apart.
+
+**Verification:** 216 tests passing (4 new), `xcodebuild` succeeds. Codex's rebuild-clobber
+concern was checked and has no live instance — every content-mutating UI path goes through
+`updateLessonFromTeacherEdit`, which promotes provenance.
+
+**Follow-up:** "Timing" is currently discarded rather than read into a field; the lesson model
+has no home for it yet. Materials repeat verbatim across the days of an ELA unit — believed
+faithful to the source, not yet confirmed against a second corpus.
