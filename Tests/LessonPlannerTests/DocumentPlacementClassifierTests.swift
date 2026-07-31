@@ -178,6 +178,47 @@ final class DocumentPlacementClassifierTests: XCTestCase {
         XCTAssertFalse(source("blank.pdf", " ").canProposeScheduledLesson)
     }
 
+    // MARK: - Subject fallback for documents imported before the field existed
+
+    private func source(_ text: String, storedSubject: String? = nil) -> ImportedSource {
+        ImportedSource(
+            id: UUID(), reference: FileReference(url: URL(fileURLWithPath: "/tmp/doc.pdf")),
+            extractionMethod: .embeddedText, confidence: nil, extractedText: text,
+            reviewStatus: .reviewed, importedAt: .now, updatedAt: .now, inferredSubject: storedSubject
+        )
+    }
+
+    func testLegacySourceResolvesItsSubjectOnRead() {
+        // Nothing was stored, because this document predates the field. It must still yield a
+        // subject rather than losing the strongest schedule-matching signal.
+        let legacy = source("""
+        Grade 5 Mathematics
+        5.NF.1 Add and subtract fractions with unlike denominators.
+        Students will be able to compare two fractions using models.
+        """)
+        XCTAssertNil(legacy.inferredSubject)
+        XCTAssertNotNil(legacy.effectiveInferredSubject)
+    }
+
+    func testStoredSubjectIsPreferredOverRecomputation() {
+        let stored = source("Grade 5 Mathematics\n5.NF.1 Add fractions.", storedSubject: "Science")
+        XCTAssertEqual(stored.effectiveInferredSubject, "Science",
+                       "a stored value stays authoritative; defining staleness belongs to derivation versioning")
+    }
+
+    func testBlankStoredSubjectIsTreatedAsAbsentRatherThanAsAValue() {
+        // Hand-edited or older JSON can carry "" instead of omitting the key; that must not
+        // suppress the fallback.
+        let blank = source("Grade 5 Mathematics\n5.NF.1 Add fractions.", storedSubject: "   ")
+        XCTAssertNotEqual(blank.effectiveInferredSubject, "   ")
+        XCTAssertNotNil(blank.effectiveInferredSubject)
+    }
+
+    func testSourceWithNoRecoverableSubjectYieldsNilRatherThanAGuess() {
+        let vague = source("Page 14. See the chart on the opposite page for details.")
+        XCTAssertNil(vague.effectiveInferredSubject, "no signal must mean no subject, not a wrong one")
+    }
+
     func testImportedSourceDecodesFilesSavedBeforeTheseFieldsExisted() throws {
         // Mirrors the persistence rule in MODEL_HANDOFF.txt: sources imported before placement
         // classification existed must still load, and classify on demand.

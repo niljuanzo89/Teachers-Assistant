@@ -168,6 +168,71 @@ final class DerivedRebuildTests: XCTestCase {
         XCTAssertFalse(store.progressSnapshots.isEmpty, "the operation must remain revertible")
     }
 
+    @MainActor
+    func testLegacySourceWithoutStoredSubjectStillPlacesIntoItsSubjectBlock() throws {
+        // Public-behaviour coverage for the subject fallback: this source carries no stored
+        // inferredSubject, exactly like every document imported before that field existed. Without
+        // the on-demand fallback, matching would drop to whole-document text scoring, which is
+        // what once put math content into the English block.
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Legacy subject", workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        let scheduleURL = repository.rootURL.appending(path: "Daily Schedule.docx")
+        let contentURL = repository.rootURL.appending(path: "Unit Packet.docx")
+        try makeDOCX(at: scheduleURL, paragraphs: [
+            "Sample Daily Schedule", "8:35 AM - 9:35 AM", "Reading", "9:45 AM - 10:45 AM", "Math"
+        ])
+        try makeDOCX(at: contentURL, paragraphs: [
+            "Grade 5 Mathematics",
+            "5.NF.1 Add and subtract fractions with unlike denominators.",
+            "Monday: Equivalent fractions",
+            "Tuesday: Comparing fractions"
+        ])
+        let store = AppStore(repository: repository)
+        store.importPlanningDocumentItems([scheduleURL])
+        XCTAssertTrue(store.hasImportedScheduleScaffold)
+        store.importContentDocumentItems([contentURL])
+
+        // Simulate a pre-existing import: strip the stored subject the way legacy data has it.
+        let stripped = store.importedSources.map { source -> ImportedSource in
+            var copy = source
+            copy.inferredSubject = nil
+            return copy
+        }
+        try repository.saveImportedSources(stripped)
+        let reloaded = AppStore(repository: repository)
+        XCTAssertTrue(reloaded.importedSources.allSatisfy { $0.inferredSubject == nil })
+
+        reloaded.rebuildDerivedPlanningData()
+
+        let calendar = Calendar.current
+        XCTAssertFalse(reloaded.weeklyPlan.assignments.isEmpty, "legacy sources must still schedule")
+        XCTAssertTrue(
+            reloaded.weeklyPlan.assignments.allSatisfy {
+                calendar.component(.hour, from: $0.start) == 9 && calendar.component(.minute, from: $0.start) == 45
+            },
+            "math content must land in the Math block, leaving the Reading block untouched"
+        )
+    }
+
+    private func makeDOCX(at destination: URL, paragraphs: [String]) throws {
+        let packageRoot = destination.deletingLastPathComponent().appending(path: "\(UUID().uuidString)-docx")
+        let wordFolder = packageRoot.appending(path: "word")
+        try FileManager.default.createDirectory(at: wordFolder, withIntermediateDirectories: true)
+        let body = paragraphs.map { "<w:p><w:r><w:t>\($0)</w:t></w:r></w:p>" }.joined()
+        try """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>\(body)</w:body></w:document>
+        """.write(to: wordFolder.appending(path: "document.xml"), atomically: true, encoding: .utf8)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        process.currentDirectoryURL = packageRoot
+        process.arguments = ["-qr", destination.path, "word"]
+        try process.run()
+        process.waitUntilExit()
+    }
+
     private static func lessonListSource() -> ImportedSource {
         ImportedSource(
             id: UUID(), reference: FileReference(url: URL(fileURLWithPath: "/tmp/unit.docx")),

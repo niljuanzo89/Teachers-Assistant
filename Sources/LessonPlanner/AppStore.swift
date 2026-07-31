@@ -1181,7 +1181,7 @@ final class AppStore: ObservableObject {
 
         var lesson = LessonRecord.draft(title: suggestion.pacingLessonTitle)
         if let source = sourceDocument(referencedIn: suggestion.sourceNotes) {
-            lesson.subject = source.inferredSubject ?? ""
+            lesson.subject = source.effectiveInferredSubject ?? ""
         }
         lesson.status = .approved
         lesson.sourceReferences = [suggestion.planningNote]
@@ -1291,7 +1291,7 @@ final class AppStore: ObservableObject {
         // recognizable subject keyword on their own. Fall back to the full extracted text
         // of the source document the lesson was proposed from, which usually does.
         if let source = sourceDocument(referencedIn: suggestion.sourceNotes) {
-            if let subject = source.inferredSubject,
+            if let subject = source.effectiveInferredSubject,
                let match = Self.matchedScheduleBlock(forSubjectText: subject.lowercased(), in: blocks) {
                 return match
             }

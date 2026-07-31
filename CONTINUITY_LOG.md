@@ -2576,3 +2576,48 @@ apply beyond lessons" — that was about *having* promotion, now done, not API s
 **Still open.** `inferredSubject` on-demand fallback; per-artifact derivation versions; automatic
 stale rebuild (still gated on a complete protection model and a tighter confirmation story); later
 the derived-proposal / teacher-overlay split.
+
+### Batch 041 — 2026-07-30 — `inferredSubject` on-demand fallback, and a finding that undercuts its premise
+
+Agreement reached on review pass 1 ("I accept the approach; my concerns are refinements").
+
+**What shipped.** `ImportedSource.effectiveInferredSubject` mirrors the existing
+`effectivePlacementEligibility` pattern: a stored value wins, otherwise the subject is computed on
+read. Both consumers (`ensureApprovedLesson` seeding a lesson's subject, and `bestScheduleBlock`'s
+first-pass match) now use it. This closes the last of the two inconsistent patterns — one field
+persisted *with* a fallback, one persisted *without*.
+
+Refinement taken from the review: a blank or whitespace-only stored value is treated as **absent**
+rather than as a subject, so hand-edited or older JSON carrying `""` still resolves. Also per the
+review: no backfill (that is versioning's job), and stored-but-stale values still win, because
+defining staleness belongs to the next batch rather than being half-solved here.
+
+**The finding that matters more than the change.** Verified against the owner's real profile, the
+fallback resolves **0 of 316** subjects. Investigating why:
+
+| Signal the subject inferencer looks for | Documents containing it |
+|---|---|
+| Strict CCSS standards codes (`5.NF.2`) | **0** of 316 |
+| Any looser `N.XX.` code shape | **0** of 316 |
+| A `Subject:` label | **0** of 316 |
+
+The signal is genuinely absent from this corpus, so this is not a defect in the fallback — there is
+nothing for it to recover. My synthetic fixture ("Grade 5 Mathematics / 5.NF.1 …") resolves a
+subject; the real documents do not contain anything of that shape. **The fixture-versus-reality gap
+again, caught this time only because the real-data check was run.**
+
+**Consequence for the plan.** "Populate `subject` at import" was carried through several revisions
+on the assumption that it would strengthen block matching. For this corpus it cannot, because no
+subject can be inferred from the documents at all. What is actually working is the existing
+content-vocabulary scoring in `matchedScheduleBlock`, which places 15 of 15 lessons in the Math
+block without any stored subject. Before investing further in subject inference, the next planning
+step should ask what genuinely identifies subject in real curriculum files — filename tokens and
+content vocabulary look far more promising than standards codes.
+
+**Verification.** 193 tests pass (188 + 5, including a public-behaviour integration test proving a
+source with no stored subject still places into its subject block). Real `xcodebuild` succeeded.
+Real-profile placements unchanged at 15/15 in the Math block — no regression, and no improvement.
+
+**Still open.** Per-artifact derivation versions; automatic stale rebuild; the derived-proposal /
+teacher-overlay split; and now the open question above about what subject inference should actually
+key on.

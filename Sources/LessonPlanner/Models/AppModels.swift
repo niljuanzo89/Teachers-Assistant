@@ -976,6 +976,25 @@ struct ImportedSource: Codable, Equatable, Identifiable {
         ).eligibility
     }
 
+    /// The document's subject, computed on read when nothing was stored.
+    ///
+    /// `inferredSubject` is only stamped at import, so it is nil for every document imported before
+    /// the field existed — 316 of 316 in the owner's real profile. Without this fallback those
+    /// sources silently lose the strongest signal for matching a lesson to the right schedule
+    /// block, and fall back to scoring whole-document text, which is what once put math content in
+    /// an English block.
+    ///
+    /// A stored value wins, but only if it is actually a value: a blank or whitespace-only string
+    /// is treated as absent rather than as a subject, so hand-edited or older JSON carrying `""`
+    /// still resolves. Stale-but-present values deliberately still win — defining staleness is the
+    /// job of derivation versioning, not of this accessor.
+    var effectiveInferredSubject: String? {
+        if let stored = inferredSubject?.trimmingCharacters(in: .whitespacesAndNewlines), !stored.isEmpty {
+            return stored
+        }
+        return LessonFieldExtractor.extractWithStructuralInference(from: extractedText).subject
+    }
+
     /// The single gate the planner must consult. Nothing but a placeable lesson may be scheduled.
     var canProposeScheduledLesson: Bool {
         effectivePlacementEligibility.canOccupyScheduleBlock
