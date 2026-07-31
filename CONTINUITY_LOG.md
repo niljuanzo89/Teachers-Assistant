@@ -2783,3 +2783,42 @@ implement → debrief loop.
 
 **Not reversed:** provenance and the explicit rebuild. Both closed real data-loss and repair paths
 and all three reviewers said to keep them.
+
+#### Refinement after sending the consensus back to Codex
+
+It confirmed the direction holds, and verified the one point where I contradicted Gemini:
+`WeeklyPacingSuggestion` builds its `id` from the pacing UUIDs but then exposes only title strings,
+and `ensureApprovedLesson` matches by normalized title and persists no pacing IDs. So the identity
+genuinely exists and is discarded — the correction was accurate, not self-defence.
+
+**A rubric for step 2, which I lacked.** Judge a real approved week against:
+
+1. Could a teacher use the weekly plan, lesson plan, deck, and differentiation guide tomorrow with
+   under ~10 minutes of cleanup per lesson?
+2. Are there invented specifics, false confidence, or fallback text that reads like real content?
+3. Does each artifact carry the minimum classroom-useful set — objective, sequence, materials,
+   assessment, differentiation, provenance?
+4. Is the deck actually teachable, or generic pedagogy wrapped around a title?
+5. Does the weekly package prep the week faster than opening the source PDFs by hand?
+
+**A specific risk it identified in the code.** `LessonPlanRenderer`'s HTML is careful about blanks
+(Batch 028 deliberately kept "not specified" honest), but the native PowerPoint path renders through
+`LessonOutputContent`, whose fallbacks turn a missing objective or assessment into confident
+student-facing sentences — "Explore the teacher-reviewed learning objective.", "Be ready to explain
+your model, answer, or reasoning." On a slide a student sees, that reads as real content. This is
+precisely the class of failure the matcher work could never have surfaced, and it makes criterion 2
+the first thing to check.
+
+**A caveat that could invalidate the whole test.** The 162 lessons in the repaired profile are
+auto-created shells — a title plus one placeholder instructional step. Generating outputs from them
+may simply prove the *content model is empty* rather than that the renderers are bad. So the review
+must separate "the artifact template is wrong" from "there was nothing to put in it," or it will
+draw the wrong conclusion. Judge at least one genuinely populated lesson alongside the shells.
+
+**Step 3 ordering, refined.** Do not build a polished drag UI first. Do Grok's exercise: hand-label
+~20 material→lesson links with the PDFs open. If a human cannot do that quickly, automation is
+fantasy and the feature should be dropped, not deferred. If they can, build the smallest manual path
+— unlinked list, lesson target, assign/unassign, teacher links preserved — and only then let
+automation *suggest* into it. Codex's framing, which corrects mine: with 96 of 174 materials having
+no resolvable key and auto-attach at 0, the automatic path was never "nearly working" — it was
+missing its product fallback.
