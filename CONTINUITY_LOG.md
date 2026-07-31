@@ -2282,3 +2282,61 @@ explicitly verified decision rather than silently rewriting teacher data.
 (`DocumentLessonKey`), not more title heuristics. Then attach supporting documents to grouped
 lessons for the differentiation attachment/printable-pack workflow. A visual check of the new
 import summary remains appropriate before a UI sign-off.
+
+### PLAN REVISION 3 (2026-07-30) — derived-state infrastructure, Codex-reviewed before implementation
+
+**Trigger.** Reviewing Batch 035 showed its improvements do not reach the owner's existing profile.
+It was verified by fresh-import simulation (162 records, 15/15 correct placements); re-run against a
+copy of the real profile it produced 173 records, 24 placements, malformed `Day…` fragments still
+placed, and `inferredSubject` empty on 0 of 316 sources. Cause: `configuration.json` already holds
+an auto-built pacing plan (315 units / 869 lessons, approved), and
+`syncReadableDocumentsIntoWeeklyPlanner` reuses a non-empty plan rather than rebuilding, so the new
+filtering never executes. The owner opening the app today still sees the reported bug.
+
+**Generalized problem.** The app persists derived state (pacing plan, auto-created lesson records,
+automatic placements, per-document classification fields) alongside source state, with no
+invalidation model. Every future extraction/classification improvement will silently fail to reach
+existing profiles the same way. The owner has stated they do not need this profile preserved and
+want solid infrastructure.
+
+**Codex review verdict.** The four-step shape is right and *not* over-engineered — provided it is
+built incrementally. The over-built version would be a global derivation-version migration that
+rewrites everything on launch **before** provenance exists. Two corrections to my draft:
+
+1. **Provenance must land before any versioned rebuild.** Auto-created lessons are identifiable
+   only by prose in `aiReviewWarnings` (`AppStore.swift:1034`); the pacing plan's origin only by
+   prose in `teacherRefinementNotes`. Codex found a third: automatic placements are detected via
+   `planningNotes.hasPrefix("Pacing:")` (`AppStore.swift:975`). All three are too weak for
+   migration-grade behavior. Rebuilding against them risks destroying teacher work.
+2. **Version per artifact, not one global constant** — `ImportedSource.classificationVersion`,
+   `CoursePacingPlan.derivationVersion` + `origin`, `LessonRecord.origin` (+ a stable link back to
+   the pacing lesson), `WeeklyLessonAssignment.origin`.
+
+**Codex also corrected my "don't persist the pacing plan at all" idea.** `CoursePacingPlan` already
+carries teacher-authored content — dates, skipped days, assessment windows, approval, refinement
+notes — so it is not purely derived. The clean end state is *persist the teacher overlay, derive the
+machine proposal*, which is too large a jump from here. Provenance first.
+
+**Also worth recording:** the app already mutates on load — `reload()` calls
+`syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: false)` (`AppStore.swift:173`). So
+launch-time mutation is not a new risk being introduced; what is missing is a principled
+invalidation model. Recompute cost is a non-issue at this scale (316 sources, ~3.6 MB of text, local
+string/regex work), but any rebuild that changes visible planner state should report what it did
+rather than silently rearranging the week.
+
+**Agreed build order.**
+
+1. **Provenance fields, all optional / default-decoding.** Mandatory infrastructure; everything else
+   depends on it. Replaces the three prose heuristics above with explicit origin.
+2. **Explicit rebuild command** that removes and regenerates only `autoDerived` pacing, lessons, and
+   placements. Use it to repair the owner's profile. This is what makes Batch 035 actually reach
+   them.
+3. **`inferredSubject` on-demand fallback**, matching the `effectivePlacementEligibility` pattern —
+   cheap, and immediately fixes legacy sources without a migration.
+4. **Per-artifact derivation versions and stale detection.**
+5. **Automatic rebuild-on-load** for clearly auto-derived stale artifacts, with a visible summary.
+6. **Later:** split persisted pacing into derived proposal + teacher overlay.
+
+**Most likely breakage, per Codex:** decoding old files with new non-optional fields (see the
+CRITICAL PERSISTENCE RULE — all new fields optional); treating a teacher-edited auto-created lesson
+as disposable; and moving weekly assignments the teacher manually adjusted.
