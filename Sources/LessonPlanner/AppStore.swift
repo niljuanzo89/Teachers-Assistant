@@ -1193,13 +1193,18 @@ final class AppStore: ObservableObject {
             // fields from labeled source text" action guards on this field being non-empty, so an
             // auto-created lesson was unreachable by both the automatic and the manual path.
             //
-            // Deliberately NOT auto-populating the lesson's fields from this text yet. The
-            // extractor is document-scoped while a lesson is day-scoped, so running it here would
-            // give every weekday lesson the whole week's content — measured at 20 instructional
-            // steps for a single day. Lesson-scoped source spans have to exist first; until then a
-            // teacher choosing to fill from source sees the whole document and can judge it, which
-            // is honest, whereas silently writing it into five lessons would not be.
-            lesson.sourceTextSnapshot = source.extractedText
+            // Scope the snapshot to this lesson's own slice when the document splits cleanly.
+            // Still no auto-population of fields here — that is the next batch — but the manual
+            // fill action now operates on one day rather than the whole week.
+            if let span = resolvedSourceSpan(for: suggestion, in: source),
+               let sliced = span.resolvedText(in: source.extractedText) {
+                lesson.sourceSpan = span
+                lesson.sourceTextSnapshot = sliced
+            } else {
+                // Honest degradation: no confident split means the teacher sees the whole document
+                // and can judge it themselves, which is what happens for single-page sources.
+                lesson.sourceTextSnapshot = source.extractedText
+            }
         }
         lesson.sourceReferences = [suggestion.planningNote]
         // Not `.approved`. The approval was only ever a mechanism to make the scheduling pass find
@@ -1322,6 +1327,33 @@ final class AppStore: ObservableObject {
 
     private func sourceDocumentText(referencedIn sourceNotes: String) -> String? {
         sourceDocument(referencedIn: sourceNotes)?.extractedText
+    }
+
+    /// The slice of `source` belonging to this suggestion, or nil when the document cannot be split
+    /// confidently.
+    ///
+    /// **Fails closed on a cardinality mismatch.** If the number of detected spans does not equal
+    /// the number of lessons the pacing plan derived from this same document, every lesson gets the
+    /// whole document instead of a guess. A partial or misaligned split is worse than none: it
+    /// silently hands one day another day's content, which the teacher has no way to detect.
+    private func resolvedSourceSpan(
+        for suggestion: WeeklyPacingSuggestion, in source: ImportedSource
+    ) -> LessonSourceSpan? {
+        let spans = LessonSourceSpanDetector.detect(in: source.extractedText)
+        guard !spans.isEmpty else { return nil }
+
+        let lessonsFromThisSource = (configuration?.coursePacingPlan?.units ?? [])
+            .flatMap(\.modules)
+            .flatMap(\.lessons)
+            .filter { $0.sourceNotes == suggestion.sourceNotes }
+        guard spans.count == lessonsFromThisSource.count else { return nil }
+
+        guard var match = spans.first(where: {
+            Self.normalizedLessonTitle($0.lessonTitle) == Self.normalizedLessonTitle(suggestion.pacingLessonTitle)
+        }) else { return nil }
+        match.sourceID = source.id
+        match.sourceDisplayName = source.reference.displayName
+        return match
     }
 
     private func sourceDocument(referencedIn sourceNotes: String) -> ImportedSource? {

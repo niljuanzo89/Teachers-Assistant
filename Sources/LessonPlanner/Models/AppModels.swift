@@ -1254,6 +1254,9 @@ struct LessonRecord: Codable, Equatable, Identifiable {
     /// Optional so records saved before this field existed still decode; `effectiveOrigin`
     /// classifies those from the legacy warning text.
     var origin: RecordOrigin? = nil
+    /// Which slice of its source document this lesson owns. Nil when the document could not be
+    /// split confidently, in which case nothing is populated from it — see `LessonSourceSpan`.
+    var sourceSpan: LessonSourceSpan? = nil
 
     /// Falls back to the pre-provenance marker. Deliberately biased toward `.teacherAuthored`:
     /// wrongly regenerating a teacher's lesson destroys their work, while wrongly preserving an

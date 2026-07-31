@@ -3028,3 +3028,48 @@ action, which is why the message explains the cause. Existing records are only r
 `pendingReview` through the explicit rebuild; nothing is silently migrated on load.
 
 **Next:** Batch C — lesson-scoped source spans, the prerequisite for any auto-population.
+
+### Batch 045 — Batch C: lesson-scoped source spans
+
+Agreement on review pass 1. The prerequisite all three reviewers named: without it, populating from
+source would give every weekday lesson the whole week.
+
+**Premise measured first.** All five sample subject documents (English, Math, Social Studies, Art,
+Science) carry exactly five weekday section headings — `Monday: Place value review` — each followed
+by a Component/Plan table, at identical line positions. The counter-measurement matters as much: the
+owner's 316 curriculum PDFs contain none of this, because each file is a single page already smaller
+than one lesson. Nothing to split there, and nothing should be invented.
+
+**What shipped.**
+
+- `LessonSourceSpan` — the slice of a document belonging to one lesson. `headingLabel` and
+  `lessonTitle` are the durable identity; offsets are a **cached derivation, validated against the
+  heading before use and recomputed when stale**. Per the review, this follows the same
+  stored-with-fallback pattern as `placementEligibility`, `inferredSubject` and `lessonKey`, each of
+  which needed one after stranding pre-existing data.
+- `LessonSourceSpanDetector` — weekday headings only, matching the logic `CoursePacingPlan.starter`
+  already uses to derive titles, so the two agree about where a lesson begins. Per the review's
+  caution it scans the **original extracted text**, not the trimmed/blank-filtered line array that
+  `starter` uses, because that transformation destroys the character positions offsets index into.
+- `LessonRecord.sourceSpan`, optional. Span lives with the lesson that uses it, not on the source.
+- **Hard cardinality guard.** If detected spans ≠ pacing lessons derived from that same document,
+  every lesson keeps the whole document. Per the review the comparison is scoped to the same source
+  rather than plan totals. Fails closed: a misaligned split silently hands one day another day's
+  content, which a teacher cannot detect.
+- `sourceTextSnapshot` becomes the slice when a span resolves; otherwise the whole document, so the
+  manual fill path still works and can be judged by eye.
+
+**Still no auto-population.** Spans land and are measured first; populating from them is Batch D,
+where labelled-only vs labelled-plus-inferred gets settled by measurement rather than argument. Per
+the review, Batch C stays out of extraction semantics entirely.
+
+**Verified against the real sample packet.** All 25 auto-created lessons received a span, **0 of 25
+contaminated** with another day's content, each slice ~870 characters against a 152-line source, and
+0 fell back to the whole document. Acceptance was correct-to-slice, not fields-non-empty: Monday's
+span contains "Place value review" and does not contain "Rounding in context".
+
+212 tests pass (205 + 7, including stale-offset recomputation, no-heading documents yielding nothing,
+and legacy decode). Real `xcodebuild` succeeded; new file registered in `project.pbxproj`.
+
+**Next:** Batch D — populate lesson fields from the span, and settle labelled-only vs
+labelled-plus-inferred by measuring both against the sample packet.
