@@ -33,9 +33,21 @@ For each substantive batch, in order:
 1. **Formulate the plan** — concrete steps, the risks, and what could break.
 2. **Send the plan to Codex for pre-execution review.** Do not start implementing until it comes
    back. Ask it to push back on scope and design, not just approve.
-3. **Implement**, incorporating the review.
-4. **Send the completed work to Codex for post-execution review**, and use that debrief to confirm
+3. **Assess the review for significant disagreement** (amended 2026-07-30, owner instruction). If
+   Codex disagrees with the *approach* rather than offering refinements, do not simply proceed with
+   adjustments folded in. Propose a revised or alternative plan and send it back, repeating until
+   both models agree on the approach — **hard limit of 3 review passes**. If no agreement is
+   reached by the third pass, stop and put the disagreement to the owner with both positions stated
+   plainly, rather than picking one unilaterally or burning further passes.
+4. **Implement**, incorporating the agreed plan.
+5. **Send the completed work to Codex for post-execution review**, and use that debrief to confirm
    what the next step should be.
+
+Distinguish disagreement from refinement. "Add a protection pass before deleting" is a refinement —
+fold it in and proceed. "This is the wrong layer / do not build this yet" is disagreement about
+approach and triggers another pass. Batch 038's review said the plan was *not safe as written* but
+did not dispute the approach, so it was a refinement; Batch 036's review said *do not build step 2
+on this yet*, which was disagreement and correctly stopped the work.
 
 This was adopted after external review twice caught defects a green test suite did not: Batch 033
 (three self-directed attempts oscillated; review found the flaw immediately) and Batch 036/037
@@ -2522,3 +2534,45 @@ are computed from live state rather than persisting references.
 4. Automatic stale rebuild — should wait until the protection model is complete and the
    confirmation story is tighter. The explicit rebuild makes it **less urgent, not unnecessary**.
 5. Later: derived-proposal / teacher-overlay split.
+
+### Batch 040 — 2026-07-30 — Provenance API hygiene: intent stated, not defaulted
+
+First batch under the amended workflow (review-until-agreement, max 3 passes). **Agreement reached
+on pass 1** — Codex opened with "I accept the approach; my concerns are refinements, not a reason to
+revise the plan before proceeding," so no further passes were spent.
+
+**Why this ranked above product work.** `rebuildDerivedPlanningData()` now deletes unprotected
+`.autoDerived` lessons, so a record's provenance decides whether it can be destroyed. A defaulted
+boolean guarding deletion eligibility is a data-loss risk sitting behind a call-site convention.
+Codex's framing, adopted: this is data-loss prevention, `inferredSubject` is product polish.
+
+**What shipped.**
+
+- `updateLesson(_:markingTeacherEdit:)` **removed outright** — not deprecated, so no call site can
+  inherit the old default. Replaced by `updateLessonFromTeacherEdit(_:)` and
+  `updateLessonFromAutomaticSync(_:)`, both delegating to a private `writeLesson(_:)`.
+- The automatic method's contract is documented explicitly per the review: it **preserves**
+  ownership — neither promoting to `.teacherAuthored` nor stamping `.autoDerived`.
+- All three call sites updated: `ensureApprovedLesson` → automatic; `fillEmptyLessonFieldsFromSource`
+  and the lesson-editor save → teacher edit.
+- **`updateCoursePacingPlan(_:)` renamed to `updateCoursePacingPlanFromTeacherEdit(_:)` and now
+  stamps `.teacherAuthored`.** Codex flagged it as the analogous pacing footgun: an unused generic
+  writer that silently preserved `.autoDerived`. It has no callers today, which is exactly why it
+  was worth fixing before one appears.
+
+**Test refinement from the review.** The automatic method's real contract is *preservation*, so its
+test asserts both directions — `.autoDerived` stays auto, `.teacherAuthored` stays teacher's —
+rather than only "does not promote."
+
+188 tests pass (186 + 2), real `xcodebuild` succeeded, and a grep confirms no `markingTeacherEdit`
+or bare `updateLesson(` remains anywhere in `Sources/`.
+
+**Scope confirmed by review, not assumed.** The other promotion sites (7 pacing mutators,
+`updateWeeklyAssignment`, lesson creators) do **not** need the same treatment: they are explicit
+assignments inside teacher-facing functions with no ambiguous parameter, so the failure mode this
+batch removes does not exist there. I had asked directly, since an earlier review said "this should
+apply beyond lessons" — that was about *having* promotion, now done, not API shape.
+
+**Still open.** `inferredSubject` on-demand fallback; per-artifact derivation versions; automatic
+stale rebuild (still gated on a complete protection model and a tighter confirmation story); later
+the derived-proposal / teacher-overlay split.

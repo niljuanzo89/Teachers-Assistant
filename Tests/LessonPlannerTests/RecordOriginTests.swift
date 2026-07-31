@@ -98,7 +98,7 @@ final class RecordOriginTests: XCTestCase {
         var edited = try XCTUnwrap(reloaded.lessons.first)
         XCTAssertEqual(edited.effectiveOrigin, .autoDerived)
         edited.objective = "Teacher rewrote this objective."
-        reloaded.updateLesson(edited)
+        reloaded.updateLessonFromTeacherEdit(edited)
 
         let saved = try XCTUnwrap(repository.loadLessons().first)
         XCTAssertEqual(saved.effectiveOrigin, .teacherAuthored, "a teacher's edit must take ownership of the record")
@@ -118,7 +118,7 @@ final class RecordOriginTests: XCTestCase {
 
         var updated = try XCTUnwrap(store.lessons.first)
         updated.status = .approved
-        store.updateLesson(updated, markingTeacherEdit: false)
+        store.updateLessonFromAutomaticSync(updated)
 
         let saved = try XCTUnwrap(repository.loadLessons().first)
         XCTAssertEqual(saved.effectiveOrigin, .autoDerived, "an automatic pass must not claim a record for the teacher")
@@ -213,6 +213,50 @@ final class RecordOriginTests: XCTestCase {
             extractedText: "Unit 1: Fractions\nLesson 1: Equivalent fractions\nLesson 2: Compare fractions",
             reviewStatus: .reviewed, importedAt: .now, updatedAt: .now
         )
+    }
+
+    @MainActor
+    func testAutomaticSyncPreservesOwnershipInBothDirections() throws {
+        // Preservation, not merely "does not promote", is this method's contract: an automatic pass
+        // must neither claim a teacher's lesson nor release its own into deletion eligibility.
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Provenance", workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        var auto = LessonRecord.draft(title: "Auto")
+        auto.origin = .autoDerived
+        var teacher = LessonRecord.draft(title: "Teacher")
+        teacher.origin = .teacherAuthored
+        try repository.saveLessons([auto, teacher])
+        let store = AppStore(repository: repository)
+
+        for lesson in store.lessons {
+            var updated = lesson
+            updated.status = .approved
+            store.updateLessonFromAutomaticSync(updated)
+        }
+
+        let saved = try repository.loadLessons()
+        XCTAssertEqual(saved.first { $0.title == "Auto" }?.origin, .autoDerived)
+        XCTAssertEqual(saved.first { $0.title == "Teacher" }?.origin, .teacherAuthored)
+    }
+
+    @MainActor
+    func testTeacherEditTakesOwnershipRegardlessOfPriorOrigin() throws {
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Provenance", workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        var auto = LessonRecord.draft(title: "Auto")
+        auto.origin = .autoDerived
+        try repository.saveLessons([auto])
+        let store = AppStore(repository: repository)
+
+        var edited = try XCTUnwrap(store.lessons.first)
+        edited.objective = "Teacher rewrote this."
+        store.updateLessonFromTeacherEdit(edited)
+
+        XCTAssertEqual(try repository.loadLessons().first?.origin, .teacherAuthored)
     }
 
     func testStarterStampsTheGeneratedPlanAsAutoDerived() {

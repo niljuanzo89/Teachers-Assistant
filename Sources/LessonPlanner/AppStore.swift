@@ -352,12 +352,19 @@ final class AppStore: ObservableObject {
         saveConfiguration()
     }
 
-    func updateCoursePacingPlan(_ plan: CoursePacingPlan) {
+    /// Persists a teacher's replacement pacing plan, transferring ownership to them.
+    ///
+    /// Named for intent for the same reason as `updateLessonFromTeacherEdit`: a plan's provenance
+    /// decides whether `rebuildDerivedPlanningData()` may regenerate over it. This path currently
+    /// has no callers, but leaving a generic writer that silently preserves `.autoDerived` would
+    /// be the pacing equivalent of the boolean this batch removed.
+    func updateCoursePacingPlanFromTeacherEdit(_ plan: CoursePacingPlan) {
         guard var configuration else {
             lastError = "Complete workspace setup before updating course pacing."
             return
         }
         var updatedPlan = plan
+        updatedPlan.origin = .teacherAuthored
         updatedPlan.updatedAt = .now
         configuration.coursePacingPlan = updatedPlan
         configuration.updatedAt = .now
@@ -1168,7 +1175,7 @@ final class AppStore: ObservableObject {
             var updated = existing
             updated.status = .approved
             // Automatic sync, not a teacher edit — must not promote this record's provenance.
-            updateLesson(updated, markingTeacherEdit: false)
+            updateLessonFromAutomaticSync(updated)
             return updated.id
         }
 
@@ -1555,13 +1562,32 @@ final class AppStore: ObservableObject {
         }.value
     }
 
-    /// `markingTeacherEdit` defaults to true deliberately. Forgetting it on an automatic path
-    /// merely leaves a record protected from rebuild; forgetting it on a teacher path would let a
-    /// rebuild destroy their work. The safe default is the one that preserves.
-    func updateLesson(_ lesson: LessonRecord, markingTeacherEdit: Bool = true) {
+    /// Persists a teacher's change and transfers ownership of the record to them.
+    ///
+    /// Provenance is no longer bookkeeping: `rebuildDerivedPlanningData()` deletes unprotected
+    /// `.autoDerived` lessons, so whether a record is marked as the teacher's decides whether it
+    /// can be destroyed. That is why this is a named method rather than a boolean argument — a
+    /// defaulted parameter guarding deletion eligibility is too easy to get wrong at a call site.
+    func updateLessonFromTeacherEdit(_ lesson: LessonRecord) {
+        var updated = lesson
+        updated.origin = .teacherAuthored
+        writeLesson(updated)
+    }
+
+    /// Persists a change made by automatic derivation, **preserving** the record's existing
+    /// ownership.
+    ///
+    /// Contract: this neither promotes to `.teacherAuthored` nor stamps `.autoDerived`. A lesson
+    /// the teacher already owns stays theirs even when an automatic pass touches it — approving it
+    /// during a sync, for instance, must not quietly make it eligible for deletion, and must not
+    /// quietly claim it either.
+    func updateLessonFromAutomaticSync(_ lesson: LessonRecord) {
+        writeLesson(lesson)
+    }
+
+    private func writeLesson(_ lesson: LessonRecord) {
         guard let index = lessons.firstIndex(where: { $0.id == lesson.id }) else { return }
         var updated = lesson
-        if markingTeacherEdit { updated.origin = .teacherAuthored }
         updated.updatedAt = .now
         lessons[index] = updated
         saveLessons()
@@ -1583,7 +1609,7 @@ final class AppStore: ObservableObject {
         if updated.instructionalSequence.isEmpty {
             updated.instructionalSequence = extracted.steps.map { InstructionalStep(id: UUID(), title: $0.title, notes: $0.notes) }
         }
-        updateLesson(updated)
+        updateLessonFromTeacherEdit(updated)
         return updated
     }
 

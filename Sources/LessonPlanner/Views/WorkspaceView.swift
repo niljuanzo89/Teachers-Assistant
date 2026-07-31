@@ -2462,7 +2462,7 @@ struct DraftLessonView: View {
             .filter { !$0.isEmpty }
         updated.printableResourcePrompt = printablePrompt
         lesson = updated
-        store.updateLesson(updated)
+        store.updateLessonFromTeacherEdit(updated)
     }
 }
 
