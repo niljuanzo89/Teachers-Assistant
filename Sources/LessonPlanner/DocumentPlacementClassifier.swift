@@ -77,7 +77,7 @@ enum DifferentiationRole: String, Codable, CaseIterable, Identifiable {
 /// lesson it belongs to. A far stronger signal than subject-keyword scoring: measured across a
 /// real 316-document import, 45% carried a resolvable identifier in the filename or text, versus
 /// keyword matching that mis-assigned math content to an English block.
-struct DocumentLessonKey: Codable, Equatable {
+struct DocumentLessonKey: Codable, Equatable, Hashable {
     var module: Int?
     var lesson: Int
 }

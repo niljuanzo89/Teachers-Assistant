@@ -22,6 +22,8 @@ protocol LocalRepositoryProtocol {
     func saveImportedSources(_ sources: [ImportedSource]) throws
     func loadGeneratedOutputs() throws -> [GeneratedOutputRecord]
     func saveGeneratedOutputs(_ outputs: [GeneratedOutputRecord]) throws
+    func loadLessonMaterialAttachments() throws -> [LessonMaterialAttachment]
+    func saveLessonMaterialAttachments(_ attachments: [LessonMaterialAttachment]) throws
     func loadProgressSnapshots() throws -> [PlanningProgressSnapshot]
     func saveProgressSnapshot(_ snapshot: PlanningProgressSnapshot) throws
 }
@@ -121,6 +123,14 @@ struct LocalRepository: LocalRepositoryProtocol {
 
     func saveGeneratedOutputs(_ outputs: [GeneratedOutputRecord]) throws {
         try save(outputs, to: dataRootURL().appending(path: "generated-outputs.json"))
+    }
+
+    func loadLessonMaterialAttachments() throws -> [LessonMaterialAttachment] {
+        try load([LessonMaterialAttachment].self, from: dataRootURL().appending(path: "lesson-material-attachments.json")) ?? []
+    }
+
+    func saveLessonMaterialAttachments(_ attachments: [LessonMaterialAttachment]) throws {
+        try save(attachments, to: dataRootURL().appending(path: "lesson-material-attachments.json"))
     }
 
     func loadProgressSnapshots() throws -> [PlanningProgressSnapshot] {

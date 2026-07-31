@@ -28,6 +28,9 @@ final class AppStore: ObservableObject {
     @Published private(set) var mostRecentLessonID: UUID?
     @Published private(set) var importedSources: [ImportedSource] = []
     @Published private(set) var generatedOutputs: [GeneratedOutputRecord] = []
+    /// Links from supporting materials to the lessons they serve. Kept separate from
+    /// `importedSources` because one material can support several lessons.
+    @Published private(set) var lessonMaterialAttachments: [LessonMaterialAttachment] = []
     @Published private(set) var progressSnapshots: [PlanningProgressSnapshot] = []
     @Published private(set) var teacherProfiles: [TeacherProfile] = []
     @Published private(set) var activeTeacherProfileID: UUID?
@@ -167,6 +170,7 @@ final class AppStore: ObservableObject {
             lessons = try repository.loadLessons()
             importedSources = try repository.loadImportedSources()
             generatedOutputs = try repository.loadGeneratedOutputs()
+            lessonMaterialAttachments = try repository.loadLessonMaterialAttachments()
             progressSnapshots = try repository.loadProgressSnapshots()
             configurationIsUnreadable = false
             lastError = nil
@@ -224,7 +228,8 @@ final class AppStore: ObservableObject {
             weeklyPlan: weeklyPlan,
             lessons: lessons,
             importedSources: importedSources,
-            generatedOutputs: generatedOutputs
+            generatedOutputs: generatedOutputs,
+            lessonMaterialAttachments: lessonMaterialAttachments
         )
         do {
             try repository.saveProgressSnapshot(snapshot)
@@ -268,7 +273,9 @@ final class AppStore: ObservableObject {
         mostRecentLessonID = nil
         importedSources = []
         generatedOutputs = []
+        lessonMaterialAttachments = []
         lastPresentationTemplatePlaceholderResolution = []
+        saveLessonMaterialAttachments()
 
         saveDailyPlan()
         saveWeeklyPlan()
@@ -1917,6 +1924,65 @@ final class AppStore: ObservableObject {
             try repository.saveImportedSources(importedSources)
             lastError = nil
         } catch { lastError = error.localizedDescription }
+    }
+
+    private func saveLessonMaterialAttachments() {
+        do {
+            try repository.saveLessonMaterialAttachments(lessonMaterialAttachments)
+            lastError = nil
+        } catch { lastError = error.localizedDescription }
+    }
+
+    /// Attaches supporting material to the lesson it belongs to, using the module/lesson identifier
+    /// already parsed at import.
+    ///
+    /// Only auto-derived attachments are recomputed; a teacher's own attachment is left alone, and
+    /// material whose identifier does not resolve is deliberately **left unattached** rather than
+    /// guessed onto a lesson. Measured coverage on a real import is 45%, so guessing would
+    /// mis-attach at scale — and the wrong reteach sheet on the wrong lesson is worse for a teacher
+    /// than an unattached one they can place in a click.
+    @discardableResult
+    func refreshAutomaticMaterialAttachments() -> Int {
+        let teacherAttachments = lessonMaterialAttachments.filter { $0.effectiveOrigin == .teacherAuthored }
+        let alreadyOwned = Set(teacherAttachments.map { AttachmentKey(lessonID: $0.lessonRecordID, sourceID: $0.importedSourceID) })
+
+        // Index lessons by the pacing identifier their titles were derived from.
+        var lessonsByKey: [DocumentLessonKey: [UUID]] = [:]
+        for lesson in lessons {
+            guard let key = DocumentPlacementClassifier.lessonKey(displayName: lesson.title, extractedText: "") else { continue }
+            lessonsByKey[key, default: []].append(lesson.id)
+        }
+
+        var automatic: [LessonMaterialAttachment] = []
+        for source in importedSources {
+            guard source.effectivePlacementEligibility == .supportingMaterial,
+                  let key = source.effectiveLessonKey,
+                  let candidates = lessonsByKey[key],
+                  candidates.count == 1,
+                  let lessonID = candidates.first
+            else { continue }
+            let attachmentKey = AttachmentKey(lessonID: lessonID, sourceID: source.id)
+            guard !alreadyOwned.contains(attachmentKey) else { continue }
+            automatic.append(LessonMaterialAttachment(
+                id: UUID(),
+                lessonRecordID: lessonID,
+                importedSourceID: source.id,
+                role: source.differentiationRole ?? .other,
+                pageRanges: nil,
+                pageLabel: nil,
+                origin: .autoDerived,
+                attachedAt: .now
+            ))
+        }
+
+        lessonMaterialAttachments = teacherAttachments + automatic
+        saveLessonMaterialAttachments()
+        return automatic.count
+    }
+
+    private struct AttachmentKey: Hashable {
+        var lessonID: UUID
+        var sourceID: UUID
     }
 
     private func saveGeneratedOutputs() {

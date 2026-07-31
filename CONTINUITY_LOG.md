@@ -2665,3 +2665,56 @@ lessons via `DocumentLessonKey`, and handling the measured 45% attachment covera
 
 Two open owner decisions still gate parts of that work: **cite vs. embed** for printable resources,
 and what to do with material whose lesson key does not resolve.
+
+### Batch 042 — 2026-07-30 — Material attachments: model and persistence land; auto-attach does not connect yet
+
+Agreement on review pass 1. Codex accepted PDF page assembly as the right direction and required two
+model changes before implementation, both taken:
+
+- **Structured `PageRange`, not a display string.** A free-text "pp. 12-13" cannot be executed, and a
+  workbook attached to several lessons without a range would merge the whole workbook into each one.
+  `PageRange.zeroBasedIndices(inDocumentOfLength:)` clamps to what the document actually has.
+- **Relationship provenance.** `LessonMaterialAttachment.origin` is genuinely distinct from
+  `ImportedSource.origin` (the document) and `LessonRecord.origin` (the lesson) — it describes the
+  *link*. Note its `effectiveOrigin` defaults to `.autoDerived`, the **opposite** of `LessonRecord`,
+  and deliberately: there, guessing "teacher" protects work from deletion; here, guessing "teacher"
+  would freeze a bad automatic attachment a rebuild should be free to correct.
+
+Also per review, step 1 included persistence properly: repository load/save, protocol entry,
+`PlanningProgressSnapshot` inclusion (optional, so older snapshots still decode), and clear/reset.
+
+**What works, verified.** 201 tests pass (193 + 8) and a real `xcodebuild` succeeds. The never-guess
+rules are covered: material with no resolvable identifier stays unattached; an identifier matching
+more than one lesson attaches to none; a teacher's attachment and its page ranges survive an
+automatic refresh; attachments round-trip through the repository.
+
+**What does not work, and why — measured on the owner's real profile.** Automatic attachment
+produces **0 of 174** supporting materials attached. Diagnosis:
+
+| | Resolved |
+|---|---|
+| Material identifiers | 78 of 174 (45%, matching the earlier measurement) |
+| Lesson identifiers from titles | 146 of 162 |
+| **Attachments made** | **0** |
+
+The keys do not intersect. Materials resolve to `module 5, lesson 1`; lessons resolve to
+`lesson 1` with **no module**, because a derived lesson's title is literally "Lesson 1" — the module
+context lives in the pacing plan's unit/module, not the title. `DocumentLessonKey` equality requires
+the module to match, so nothing joins.
+
+This is a design gap, not a bug, and matching lesson-number-only would be wrong: "Lesson 1" exists in
+every module, so it would attach module 5's reteach sheet to module 1's lesson.
+
+**A third instance of the same persistence pattern**, worth naming: `lessonKey` — like
+`placementEligibility` and `inferredSubject` before it — was stamped only at import and therefore nil
+on every pre-existing source. `effectiveLessonKey` was added to match. **Any future import-time field
+should ship with its on-demand fallback in the same batch**; three for three have needed one.
+
+**Next batch must resolve the join before any packet work.** The lesson side needs its module
+context. It is available — a derived lesson's `sourceReferences` carries the planning note
+("Pacing: Module 3 • Lesson 1 …") — so this is recoverable, but how to key it deserves its own
+review pass rather than being improvised. Guessing here mis-attaches at scale.
+
+**Deliberately not shipped:** the differentiation guide rendering (step 3) and the packet (step 4).
+Rendering attachments that do not exist would show an empty section, and the packet depends on the
+join working.

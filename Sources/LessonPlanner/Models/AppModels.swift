@@ -911,6 +911,9 @@ struct PlanningProgressSnapshot: Codable, Equatable, Identifiable {
     var lessons: [LessonRecord]
     var importedSources: [ImportedSource]
     var generatedOutputs: [GeneratedOutputRecord]
+    /// Optional so snapshots taken before attachments existed still decode; a restore from one of
+    /// those simply leaves attachments untouched rather than clearing them.
+    var lessonMaterialAttachments: [LessonMaterialAttachment]? = nil
 
     var displayName: String {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -998,6 +1001,19 @@ struct ImportedSource: Codable, Equatable, Identifiable {
             return stored
         }
         return LessonFieldExtractor.extractWithStructuralInference(from: extractedText).subject
+    }
+
+    /// The module/lesson identifier this document belongs to, computed on read when nothing was
+    /// stored.
+    ///
+    /// The third field to need this treatment, after `effectivePlacementEligibility` and
+    /// `effectiveInferredSubject`: anything stamped only at import is nil for every document
+    /// imported before that field existed, so attachment matching would silently find nothing on
+    /// an existing profile. Any future import-time field should ship with its fallback.
+    var effectiveLessonKey: DocumentLessonKey? {
+        lessonKey ?? DocumentPlacementClassifier.lessonKey(
+            displayName: reference.displayName, extractedText: extractedText
+        )
     }
 
     /// The single gate the planner must consult. Nothing but a placeable lesson may be scheduled.
@@ -2007,4 +2023,61 @@ struct DerivedRebuildPreview: Equatable {
         }
         return parts.joined(separator: " ")
     }
+}
+
+/// A contiguous run of pages within a source document, 1-based and inclusive.
+///
+/// Structured rather than a display string because the printable packet merges *actual pages*. A
+/// free-text "pp. 12-13" cannot be executed, and a workbook attached to several lessons without a
+/// range would merge the entire workbook into each one.
+struct PageRange: Codable, Equatable, Hashable {
+    var first: Int
+    var last: Int
+
+    var pageCount: Int { max(0, last - first + 1) }
+    var isValid: Bool { first >= 1 && last >= first }
+
+    /// 0-based indices for PDFKit, clamped to what the document actually contains so a stale or
+    /// over-long range cites fewer pages rather than crashing.
+    func zeroBasedIndices(inDocumentOfLength length: Int) -> [Int] {
+        guard isValid, length > 0 else { return [] }
+        let lower = min(first - 1, length - 1)
+        let upper = min(last - 1, length - 1)
+        guard lower <= upper else { return [] }
+        return Array(lower...upper)
+    }
+
+    var displayText: String { first == last ? "p. \(first)" : "pp. \(first)-\(last)" }
+}
+
+/// Links a supporting material to the lesson it serves, in a differentiation role.
+///
+/// Kept as its own record rather than a field on `LessonRecord` so one material can support several
+/// lessons, and so the *relationship* carries its own provenance: a teacher's manual attachment
+/// must survive a rebuild that regenerates automatic ones. That provenance is genuinely distinct
+/// from `ImportedSource.origin` (which describes the document) and `LessonRecord.origin` (which
+/// describes the lesson) — it describes the link between them.
+struct LessonMaterialAttachment: Codable, Equatable, Identifiable {
+    let id: UUID
+    var lessonRecordID: UUID
+    var importedSourceID: UUID
+    var role: DifferentiationRole
+    /// Pages to merge into a printable packet. Nil means the pages are unknown, in which case the
+    /// material is **cited rather than merged** — merging a whole document because no range was
+    /// resolved is worse than telling the teacher which file to open.
+    var pageRanges: [PageRange]?
+    /// Human-facing label, e.g. a publisher's own page numbering when it differs from PDF order.
+    var pageLabel: String?
+    var origin: RecordOrigin?
+    var attachedAt: Date
+
+    /// Defaults to `.autoDerived`: an attachment with no recorded origin was created by automatic
+    /// matching, since manual attachment did not exist before this field. Note this is the opposite
+    /// default from `LessonRecord.effectiveOrigin`, and deliberately so — there, guessing "teacher"
+    /// protects work from deletion; here, guessing "teacher" would wrongly freeze a bad automatic
+    /// attachment that a rebuild should be free to correct.
+    var effectiveOrigin: RecordOrigin { origin ?? .autoDerived }
+
+    /// Whether this attachment can contribute pages to a packet, as opposed to only a citation.
+    var isMergeable: Bool { (pageRanges ?? []).contains(where: \.isValid) }
 }
