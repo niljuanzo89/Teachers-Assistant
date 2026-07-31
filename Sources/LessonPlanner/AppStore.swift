@@ -1176,11 +1176,11 @@ final class AppStore: ObservableObject {
     private func ensureApprovedLesson(for suggestion: WeeklyPacingSuggestion) -> UUID {
         let normalizedSuggestionTitle = Self.normalizedLessonTitle(suggestion.pacingLessonTitle)
         if let existing = lessons.first(where: { Self.normalizedLessonTitle($0.title) == normalizedSuggestionTitle }) {
-            if existing.status == .approved {
+            if existing.status.isSchedulable {
                 return existing.id
             }
             var updated = existing
-            updated.status = .approved
+            updated.status = .pendingReview
             // Automatic sync, not a teacher edit — must not promote this record's provenance.
             updateLessonFromAutomaticSync(updated)
             return updated.id
@@ -1201,8 +1201,10 @@ final class AppStore: ObservableObject {
             // is honest, whereas silently writing it into five lessons would not be.
             lesson.sourceTextSnapshot = source.extractedText
         }
-        lesson.status = .approved
         lesson.sourceReferences = [suggestion.planningNote]
+        // Not `.approved`. The approval was only ever a mechanism to make the scheduling pass find
+        // this record; scheduling now keys on `isSchedulable`, so the status can tell the truth.
+        lesson.status = .pendingReview
         lesson.origin = .autoDerived
         lesson.aiReviewWarnings = ["Auto-created from readable planning documents. Fill any blank or incorrect fields as needed."]
         lesson.instructionalSequence = [
@@ -1632,8 +1634,8 @@ final class AppStore: ObservableObject {
     }
 
     func generateLessonPlanHTML(for lesson: LessonRecord) -> GeneratedOutputRecord? {
-        guard lesson.status == .approved else {
-            lastError = "Approve the lesson before generating an output."
+        guard lesson.status.allowsOutputGeneration else {
+            lastError = "Review and approve this lesson before generating outputs. Lessons created automatically from your documents start unreviewed."
             return nil
         }
         guard let outputURL = outputDirectoryURL() else {
@@ -1698,7 +1700,10 @@ final class AppStore: ObservableObject {
     }
 
     func generateDifferentiationGuideHTML(for lesson: LessonRecord) -> GeneratedOutputRecord? {
-        guard lesson.status == .approved else { lastError = "Approve the lesson before generating an output."; return nil }
+        guard lesson.status.allowsOutputGeneration else {
+            lastError = "Review and approve this lesson before generating outputs. Lessons created automatically from your documents start unreviewed."
+            return nil
+        }
         guard let outputURL = outputDirectoryURL() else { lastError = "Choose an output folder in Workspace before generating an output."; return nil }
         do {
             try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true)
@@ -1713,7 +1718,10 @@ final class AppStore: ObservableObject {
     }
 
     func generateSlideDeckPPTX(for lesson: LessonRecord) async -> GeneratedOutputRecord? {
-        guard lesson.status == .approved else { lastError = "Approve the lesson before generating an output."; return nil }
+        guard lesson.status.allowsOutputGeneration else {
+            lastError = "Review and approve this lesson before generating outputs. Lessons created automatically from your documents start unreviewed."
+            return nil
+        }
         guard let outputURL = outputDirectoryURL() else { lastError = "Choose an output folder in Workspace before generating an output."; return nil }
         let fileURL = outputURL.appending(path: "\(LessonPlanRenderer.safeFileStem(lesson.title))-slide-deck.pptx")
         let presentationTemplate = activePresentationTemplate

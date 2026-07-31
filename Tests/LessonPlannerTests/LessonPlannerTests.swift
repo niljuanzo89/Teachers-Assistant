@@ -2805,11 +2805,18 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertEqual(pacingPlan.reviewStatus, .approved)
         XCTAssertEqual(pacingPlan.lessonCount, 2)
         XCTAssertTrue(pacingPlan.teacherRefinementNotes.contains("Auto-built from readable document intake"))
-        let approvedLessons = try repository.loadLessons().filter { $0.status == .approved }
-        XCTAssertEqual(approvedLessons.count, 2)
+        // Auto-created lessons are scheduled but NOT approved: the app derived them, a teacher has
+        // not reviewed them, and they are empty shells until it has. They still occupy the week.
+        let derived = try repository.loadLessons()
+        XCTAssertEqual(derived.count, 2)
+        XCTAssertTrue(derived.allSatisfy { $0.status == .pendingReview })
+        XCTAssertTrue(derived.allSatisfy { $0.status.isSchedulable })
+        XCTAssertFalse(derived.contains { $0.status.allowsOutputGeneration })
         let savedWeeklyPlan = try XCTUnwrap(repository.loadWeeklyPlan(for: store.weeklyPlan.weekOf))
         XCTAssertEqual(savedWeeklyPlan.assignments.count, 2)
-        XCTAssertTrue(store.weeklyPackageReadinessReport.canGenerate)
+        // And the weekly package cannot be generated from unreviewed lessons — the point of the
+        // decoupling: placement proceeds automatically, output generation waits for a human.
+        XCTAssertFalse(store.weeklyPackageReadinessReport.canGenerate)
     }
 
     @MainActor
@@ -3261,7 +3268,7 @@ final class LessonPlannerTests: XCTestCase {
 
         let output = await store.generateSlideDeckPPTX(for: LessonRecord.draft(title: "Draft Lesson"))
         XCTAssertNil(output)
-        XCTAssertEqual(store.lastError, "Approve the lesson before generating an output.")
+        XCTAssertEqual(store.lastError, "Review and approve this lesson before generating outputs. Lessons created automatically from your documents start unreviewed.")
         XCTAssertTrue(try repository.loadGeneratedOutputs().isEmpty)
     }
 

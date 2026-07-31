@@ -801,7 +801,9 @@ struct WeeklyPacingSuggestionReport: Equatable {
             )
         }
 
-        let approvedLessons = lessons.filter { $0.status == .approved }
+        // Scheduling eligibility, not approval. A pending-review lesson still belongs on the week;
+        // whether it may generate outputs is a separate question answered at generation time.
+        let approvedLessons = lessons.filter(\.status.isSchedulable)
         let scheduledLessonIDs = Set(weeklyPlan.assignments.map(\.lessonRecordID))
         let weekInterval = DateInterval(start: weeklyPlan.weekOf, end: calendar.date(byAdding: .day, value: 7, to: weeklyPlan.weekOf) ?? weeklyPlan.weekOf.addingTimeInterval(604_800))
         let flattened = flatten(pacingPlan: pacingPlan, calendar: calendar)
@@ -922,7 +924,24 @@ struct PlanningProgressSnapshot: Codable, Equatable, Identifiable {
 }
 
 enum LessonStatus: String, Codable, CaseIterable {
+    /// Derived automatically from pacing and source intake: eligible to occupy a slot on the week,
+    /// but its content has not been reviewed by a teacher and it cannot generate outputs.
+    ///
+    /// Auto-created lessons were previously stamped `.approved` so the scheduling pass would find
+    /// them — the approval was a mechanism, not a judgement, and it meant an unreviewed shell could
+    /// generate a lesson plan, deck, and differentiation guide. Deliberately *not* called "placed":
+    /// the record is created before placement is attempted and placement can still fail when no
+    /// schedule block matches, so that name would assert something not yet true.
+    case pendingReview
     case draft, reviewed, approved, generated
+
+    /// Whether a lesson in this state may occupy a slot on the weekly planner. Broader than
+    /// approval on purpose: this is "where does it sit", not "is it good".
+    var isSchedulable: Bool { self != .draft }
+
+    /// Whether outputs may be generated. Deliberately still approval-only — this is what makes
+    /// `pendingReview` mean something operationally rather than being a decorative label.
+    var allowsOutputGeneration: Bool { self == .approved || self == .generated }
 }
 
 enum SourceExtractionMethod: String, Codable, CaseIterable {
@@ -1451,7 +1470,7 @@ struct WeeklyOutputSummary: Equatable {
         let lessonByID = Dictionary(uniqueKeysWithValues: lessons.map { ($0.id, $0) })
         let scheduledLessons = Array(Set(plan.assignments.map(\.lessonRecordID)))
             .compactMap { lessonByID[$0] }
-            .filter { $0.status == .approved }
+            .filter(\.status.isSchedulable)
         let linkSets = scheduledLessons.map { LessonOutputLinkSet.latest(for: $0.id, in: generatedOutputs) }
         return WeeklyOutputSummary(
             scheduledLessonCount: scheduledLessons.count,

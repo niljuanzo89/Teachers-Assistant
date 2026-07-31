@@ -2506,6 +2506,7 @@ private struct LessonStatusTag: View {
 
     private var title: String {
         switch status {
+        case .pendingReview: "Needs your review"
         case .draft: "Draft"
         case .reviewed: "Needs review"
         case .approved: "Approved"
@@ -2515,6 +2516,7 @@ private struct LessonStatusTag: View {
 
     private var variant: DSTag.Variant {
         switch status {
+        case .pendingReview: .accent2
         case .draft: .neutral
         case .reviewed: .accent2
         case .approved: .accent

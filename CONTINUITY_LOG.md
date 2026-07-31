@@ -2981,3 +2981,50 @@ slide is now correctly omitted — the fixture was made a complete lesson instea
 
 **Next:** Batch B (decouple placement from approval status), which carries real regression risk to
 the verified placement behaviour and needs before/after measurement against the real profile.
+
+### Batch 044 — Batch B: placement decoupled from approval
+
+Agreement on review pass 1, with one refinement that mattered.
+
+**The refinement.** I proposed calling the new state `placed`. Codex pointed out that
+`ensureApprovedLesson` creates the record *before* placement is attempted, and placement can still
+fail when no schedule block matches — so `placed` would have been a fresh lie introduced while
+fixing one. Renamed to **`pendingReview`**, which asserts only what is true: derived, not yet
+reviewed.
+
+**Premise measured first.** `.approved` was load-bearing for *placement*, not merely review:
+`WeeklyPacingSuggestionReport` filtered to approved lessons, matched pacing items by title, and
+marked unmatched ones `.needsApprovedLesson`; the sync then called `ensureApprovedLesson`, which
+stamped `.approved` **precisely so the next pass would find and schedule it**. The approval was a
+mechanism, not a judgement. That is why a naive demotion would have broken scheduling.
+
+**What shipped.**
+
+- New `LessonStatus.pendingReview`, plus `isSchedulable` and `allowsOutputGeneration` so the two
+  questions — *where does it sit* and *is it good* — stop being answered by one value.
+- Auto-created lessons are `pendingReview`. Scheduling keys on `isSchedulable`, so placement is
+  unaffected.
+- Output generation still requires approval, and the refusal now explains itself: "Review and
+  approve this lesson before generating outputs. Lessons created automatically from your documents
+  start unreviewed." Per the review, a bare disabled control would read as the app breaking.
+- `WeeklyOutputSummary` now counts all schedulable scheduled lessons. It previously filtered to
+  approved, which Codex flagged would let the summary report outputs as complete while unreviewed
+  scheduled lessons were missing theirs.
+
+**Verified on the owner's real profile — the regression this batch risked.** After rebuild: 162
+lessons, **15 assignments, all at 09:45 in the Math block, zero phantom slots** — identical to
+before. All 162 lessons now read `pendingReview` rather than falsely `approved`, and weekly-package
+generation is correctly blocked because every one of them is an unreviewed shell.
+
+205 tests pass; real `xcodebuild` succeeded. Two tests encoded the old behaviour and were updated to
+assert the new intent explicitly rather than having expectations lowered: auto-created lessons are
+schedulable but not output-eligible, and the weekly package cannot be generated from unreviewed
+lessons.
+
+**Owner-visible consequence, deliberate.** Every existing auto-created lesson can no longer generate
+outputs until reviewed. Given all 162 are empty shells, generating from them was the dishonesty
+Batch A stopped mid-flight — but this converts a silent bad-output problem into a visible blocked
+action, which is why the message explains the cause. Existing records are only re-created as
+`pendingReview` through the explicit rebuild; nothing is silently migrated on load.
+
+**Next:** Batch C — lesson-scoped source spans, the prerequisite for any auto-population.
