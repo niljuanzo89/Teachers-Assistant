@@ -2822,3 +2822,53 @@ fantasy and the feature should be dropped, not deferred. If they can, build the 
 automation *suggest* into it. Codex's framing, which corrects mine: with 96 of 174 materials having
 no resolvable key and auto-attach at 0, the automatic path was never "nearly working" — it was
 missing its product fallback.
+
+### DIAGNOSIS (2026-07-30) — why every derived lesson is empty
+
+Measured the premise before planning, per the new amendment. The premise ("an output review will tell
+us whether the renderers are good") is **false**, and the measurement found something much more
+important.
+
+**Finding 1 — every lesson is empty.** Across all 162 lessons in the repaired profile: objective 0%,
+≥2 instructional steps 0%, materials 0%, assessment 0%, differentiation 0%, subject 0%. Every record
+is a bare title plus one placeholder step.
+
+**Finding 2 — this is not an extraction failure.** Tested against the owner's *sample planning packet*
+(7 DOCX files, a second corpus — the one all three reviewers asked for). Importing them produced 25
+lessons, again 0/25 with an objective, 0/25 with real steps, 0/25 with an assessment. But running the
+extractor directly on the same math document returns:
+
+- objective: "Read, write, and compare whole numbers using base-ten reasoning."
+- instructional steps: **20**
+- assessment: "Use a 3-question exit ticket to identify regrouping or place-value needs."
+
+The content is present, well-structured (a Day / Lesson Focus / Student Objective / Quick Check
+table), and **successfully extracted**. It is then discarded.
+
+**Root cause.** `AppStore.ensureApprovedLesson` creates the lesson from the pacing suggestion's title
+alone:
+
+```swift
+var lesson = LessonRecord.draft(title: suggestion.pacingLessonTitle)
+lesson.instructionalSequence = [InstructionalStep(title: suggestion.pacingLessonTitle,
+                                                 notes: "Auto-filled from course pacing…")]
+```
+
+It never calls `LessonFieldExtractor` / `LessonStructureInferencer`, even though the originating
+`ImportedSource` is in hand. The extractor's results are used only to *decide the document is a
+lesson*, then thrown away when the lesson is built.
+
+**Making it worse:** `ensureApprovedLesson` also never sets `sourceTextSnapshot`. The manual
+"Fill empty fields from labeled source text" button guards on that field being non-empty, so for an
+auto-created lesson the teacher **cannot even fill it in by hand**. The content is unreachable by
+both paths.
+
+**This is the same pattern for the third time.** Information available at creation is discarded and
+then either re-derived from prose or lost entirely — module identity (Batch 042), subject
+(Batch 041), and now the entire lesson body. It is the actual teacher-visible defect, and five
+batches of placement and infrastructure work never touched it: placement was fixed so lessons land
+in the right block, but what lands there is empty.
+
+**Secondary finding.** The sample math document classifies as `planningDocument` because it contains
+the phrase "Pacing alignment:". It still contributes lessons via `canContributeLessonSequence`, so
+this is not currently breaking anything, but the classification is wrong and worth correcting.
