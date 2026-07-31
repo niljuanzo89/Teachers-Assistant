@@ -2195,3 +2195,48 @@ fragment factory. This was not in the original plan at all.
   self-directed attempts missed.
 - Sample a bucket before trusting its count. "154 inert" looked like a clean result and was
   actually the best differentiation material in the folder.
+
+### Batch 034 — 2026-07-29 — Verified the strict-placement fix against the owner's real import
+
+**The reported scatter is substantially fixed.** Verified end to end against a copy of the owner's
+real 316-document import, not fixtures.
+
+**Method.** Copied the real profile's `configuration.json` and `imported-sources.json` into a
+throwaway data root, deleted its weekly plan and lesson records so placement would re-run from
+scratch, and drove a real `AppStore` against it. No original PDFs were needed — the extracted text
+is already persisted — and the owner's live data was never touched.
+
+**Result.**
+
+| Measure | Before (reported) | After |
+|---|---|---|
+| Placements at the invented 9:00 AM slot | present, spread across days | **0** |
+| Placements in the Math block (09:45) | partial | **23 of 24** |
+| Placements in the ELA block (08:35) | several | **1** |
+| Times used that are not real blocks | yes | **none** |
+| Unplaced lessons reported to the teacher | 0 of 149 | **3, with a reason** |
+
+Every placement now lands in one of the teacher's own 12 imported blocks. The phantom-slot
+mechanism — the actual engine of the scatter — is gone, and `AutoPlacementSummary` reported
+"24 lessons scheduled. 3 left unscheduled because no matching subject block was found — those
+blocks were left unchanged."
+
+**The one remaining misplacement, identified precisely.** A single lesson still lands in the ELA
+block: a fragment titled "day, can he still meet his goal? Why or why not?", proposed from a
+challenge worksheet (filename marker `CHLG`). Two separate planned changes would each independently
+fix it:
+
+- The **classifier prefilter** would classify that document `supportingMaterial` on its filename
+  marker, so it would never propose a lesson at all. This raises the prefilter's priority: it is
+  not merely an optimization, it is what removes this exact class of failure.
+- **Populating `subject` at import** would tag the lesson as math, so block matching would resolve
+  it to the Math block rather than scoring English on incidental vocabulary.
+
+**Also confirmed unchanged:** 173 lesson records are still created from the import. The placement
+guarantee stops them corrupting the planner but does not stop them being manufactured — Codex's
+`CoursePacingPlan.starter` finding stands as the next code change.
+
+**Adjustment to the plan.** Move the classifier prefilter up: it is now evidenced as the fix for
+the last remaining misplacement, not a cleanup. It still must be reworked so it does not
+simultaneously exclude valid short packets and admit planning documents — verified against real
+documents this time, which is now cheap given the harness in this batch.
