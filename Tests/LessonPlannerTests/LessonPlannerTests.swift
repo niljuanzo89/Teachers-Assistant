@@ -3515,14 +3515,16 @@ final class LessonPlannerTests: XCTestCase {
         XCTAssertFalse(html.contains("Be ready to explain your model, answer, or reasoning."))
     }
 
-    func testDifferentiationRendererIncludesSubjectAndGradeSubtitleAndHint() {
+    func testDifferentiationRendererIncludesSubjectAndGradeSubtitle() {
         var lesson = LessonRecord.draft(title: "Fractions")
         lesson.subject = "Math"
         lesson.gradeOrAgeRange = "Grade 5"
         let html = LessonPlanRenderer.renderDifferentiationGuideHTML(for: lesson)
 
         XCTAssertTrue(html.contains("Differentiation Guide · Math · Grade 5"))
-        XCTAssertTrue(html.contains("Access and support, language and vocabulary, extension and challenge"))
+        // The standing hint ("Access and support, language and vocabulary...") was removed in
+        // Batch 048: it named every category a lesson *might* differentiate along, asserted
+        // nothing about this lesson, and read as content. See OutputFaithfulnessTests.
     }
 
     func testRendererFiltersBlankMaterialsEntries() {

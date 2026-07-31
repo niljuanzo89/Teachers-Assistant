@@ -3242,3 +3242,53 @@ does today; reordering steps clearly should, materials is a product call), and w
 output-quality review runs against the sample packet or a fresh import of the real curriculum.
 The approval-point line in `LessonOutputControls` remains visually unconfirmed — it sits below
 the fold and was not part of this sign-off.
+
+### Batch 048 — Batch F: output quality, measured against the source
+
+**Compute: medium. Model shape: dual (Codex pre-review + debrief).**
+
+The first batch where generated outputs could be judged at all — until Batch 046 every lesson
+was empty. Measured before planning: generated all three outputs from a lesson populated from a
+real span in the sample packet, and diffed them against the adjacent day's span.
+
+**Cross-day contamination is zero.** Vocabulary unique to the neighbouring lesson appears in
+none of the lesson-plan HTML, the differentiation guide, or the deck XML. Batches C-E hold.
+
+**Three user-visible defects, all found by looking at the rendered output rather than at field
+counts.**
+
+1. **The last inferred step absorbed the rest of the lesson.** `LessonStructureInferencer`'s
+   `phaseBody` ran to the next *phase heading* only, so "Assessment", "Timing", and
+   "Differentiation" — label rows, not phases — were swallowed into Independent Practice's notes.
+   The rendered plan then printed all three twice. **This is the third instance of the same
+   run-on class** (materials and assessment were fixed in Batch 046); I fixed those two and never
+   checked the inferencer's own body collection. Fixed by ending a phase body at a recognized
+   label row, via a new `LessonFieldExtractor.isRecognizedLabelLine(_:)` so the label grammar
+   stays in one place (Codex's shape).
+2. **The differentiation guide opened with boilerplate** naming every category a lesson might
+   differentiate along — asserting nothing, reading as content. Deleted. An existing test had
+   pinned it as a feature; that test now records why it is gone.
+3. **The student exit ticket printed the objective as its prompt.** "Read, write, and compare
+   whole numbers using base-ten reasoning" is a teacher's goal, not a task a child can do, so the
+   fallback produced an unusable worksheet that looked finished. The handout section is now
+   omitted when there is no prompt — the rule the deck already followed since Batch 028.
+
+**Codex on omission vs. substitution:** do not replace a missing section with "not specified in
+your document" in classroom-facing artifacts. That phrasing is honest but still creates a visible
+section the source never supported. Omit.
+
+**Now enforced rather than remembered:** `LessonWritePathTests` scans `Sources/LessonPlanner` for
+lesson writes outside `AppStore` (`lessons.append`, `lessons[index] =`, `saveLessons()`). The
+Batch 047 lifecycle invariant held only because every path was checked by hand, which lasts
+until the next view is added.
+
+**On the bleed check:** Codex rates it a sentinel, not proof of general faithfulness — it catches
+wrong-span content and nothing more. Built adversarially for that reason: the fixture gives each
+adjacent day a token appearing nowhere else, so a leak is unmistakable rather than a judgment
+call. Its own over-capture assertion is the sharper instrument for defect 1's class.
+
+**A test of mine was wrong in an instructive way:** it asserted the objective must not appear
+anywhere in the guide when the handout is omitted. But the objective belongs in the guide's own
+objective section — the claim is only that no *handout* was fabricated around it. Narrowed.
+
+**Verification:** 232 tests passing (6 new), `xcodebuild` succeeds.

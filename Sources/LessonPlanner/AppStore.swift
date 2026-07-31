@@ -2322,6 +2322,16 @@ enum LessonFieldExtractor {
         LessonStructureInferencer.fillingGaps(in: extract(from: text), from: text)
     }
 
+    /// Whether this line opens a recognized field row ("Objective", "Materials", "Timing").
+    ///
+    /// Exposed so `LessonStructureInferencer` can end a phase body at the next label row. Its own
+    /// phase-heading vocabulary does not include these, so without it the final inferred step
+    /// swallows the assessment, timing, and differentiation rows that follow it — the same
+    /// run-on class fixed for materials and assessment in Batch 046, one layer down.
+    static func isRecognizedLabelLine(_ line: String) -> Bool {
+        firstLabelMatch(allLabels, in: [line]) != nil
+    }
+
     /// The value for a prose field: the same line's remainder if the label has one, otherwise
     /// every following line up to a blank line or the next recognized label, joined into one
     /// paragraph — so an objective spanning 2-3 lines under its own heading is captured whole

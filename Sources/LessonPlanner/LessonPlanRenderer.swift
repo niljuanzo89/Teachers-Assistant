@@ -176,14 +176,20 @@ enum LessonPlanRenderer {
         let summary = lesson.differentiationSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "No differentiation notes have been entered yet."
             : escape(lesson.differentiationSummary)
-        let prompt = lesson.printableResourcePrompt?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let studentPrompt = prompt?.isEmpty == false ? escape(prompt!) : escape(lesson.objective.isEmpty ? "Show what you learned in this lesson." : lesson.objective)
+        // Omit the student handout rather than substituting the objective for its prompt. An
+        // objective is a teacher's goal — "Read, write, and compare whole numbers using base-ten
+        // reasoning" is not a task a child can do — so the fallback produced an unusable
+        // worksheet that looked finished. Same rule the deck already follows.
+        let prompt = lesson.printableResourcePrompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let studentSection = prompt.isEmpty ? "" : """
+        <section class="printable"><h2>Student Practice / Exit Ticket</h2><p><strong>Name:</strong> ________________________________ <strong>Date:</strong> __________________</p><p><strong>Prompt:</strong> \(escape(prompt))</p><div class="student-lines"></div></section>
+        """
         let materials = listHTML(content.materials, emptyMessage: "No materials listed.")
         let subtitle = [lesson.subject, lesson.gradeOrAgeRange].filter { !$0.isEmpty }.joined(separator: " · ")
         return """
         <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>\(escape(lesson.title)) — Differentiation Guide</title><style>
         :root{--ink:#201e1d;--muted:#6f6b69;--paper:#f3f2f2;--surface:#fff;--accent:#d6006c;--line:#d7d3d3}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:950px;margin:0 auto;padding:48px 56px}header{border-bottom:3px solid var(--accent);padding-bottom:22px;margin-bottom:24px}h1,h2{font-family:Georgia,serif}h1{font-size:36px;margin:0 0 8px}h2{font-size:21px;margin:0 0 10px}.sub,.muted{color:var(--muted)}.hint{color:var(--muted);font-size:13px;margin:-4px 0 14px}section{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:22px;margin:18px 0}.printable{margin-top:36px;border:2px dashed var(--accent);background:white}.student-lines{height:210px;border-top:1px solid var(--line);background:repeating-linear-gradient(transparent,transparent 33px,#d7d3d3 34px)}ul{margin:0;padding-left:22px}@media print{body{background:white}main{max-width:none;padding:0}.printable{break-before:page;margin-top:0;border:0}.student-lines{height:420px}}
-        </style></head><body><main><header><h1>\(escape(lesson.title))</h1><div class="sub">Differentiation Guide\(subtitle.isEmpty ? "" : " · \(escape(subtitle))")</div></header><section><h2>Learning objective</h2><p>\(escape(lesson.objective.isEmpty ? "Not specified" : lesson.objective))</p></section><section><h2>Teacher differentiation notes</h2><p class="hint">Access and support, language and vocabulary, extension and challenge, and small-group or partner structures — whatever applies to this lesson.</p><p>\(summary)</p></section><section><h2>Materials and resource provenance</h2>\(materials)</section><section><h2>Success check</h2><p>\(escape(lesson.assessmentSummary.isEmpty ? "Not specified" : lesson.assessmentSummary))</p></section><section class="printable"><h2>Student Practice / Exit Ticket</h2><p><strong>Name:</strong> ________________________________ <strong>Date:</strong> __________________</p><p><strong>Prompt:</strong> \(studentPrompt)</p><div class="student-lines"></div></section></main></body></html>
+        </style></head><body><main><header><h1>\(escape(lesson.title))</h1><div class="sub">Differentiation Guide\(subtitle.isEmpty ? "" : " · \(escape(subtitle))")</div></header><section><h2>Learning objective</h2><p>\(escape(lesson.objective.isEmpty ? "Not specified" : lesson.objective))</p></section><section><h2>Teacher differentiation notes</h2><p>\(summary)</p></section><section><h2>Materials and resource provenance</h2>\(materials)</section><section><h2>Success check</h2><p>\(escape(lesson.assessmentSummary.isEmpty ? "Not specified" : lesson.assessmentSummary))</p></section>\(studentSection)</main></body></html>
         """
     }
 

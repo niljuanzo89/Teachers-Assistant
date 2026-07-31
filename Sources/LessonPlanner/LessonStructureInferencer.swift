@@ -109,6 +109,9 @@ enum LessonStructureInferencer {
         while cursor < lines.count, collected.count < maximumPhaseBodyLines {
             let line = lines[cursor]
             if phaseHeadingTitle(line) != nil { break }
+            // A phase ends at the next labeled row too, not only at the next phase. Without this
+            // the last phase in a "Component / Plan" table absorbs every remaining row.
+            if LessonFieldExtractor.isRecognizedLabelLine(line) { break }
             if !line.isEmpty { collected.append(line) }
             cursor += 1
         }
