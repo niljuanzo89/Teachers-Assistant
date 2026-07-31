@@ -2438,15 +2438,10 @@ enum LessonFieldExtractor {
     static func extractionWarnings(for result: Result) -> [String]? {
         var warnings: [String] = []
 
-        let inferredNames = result.inferredFields
-            .sorted { $0.rawValue < $1.rawValue }
-            .map(displayName)
-        if !inferredNames.isEmpty {
-            warnings.append(
-                "Inferred from the document's structure rather than an explicit label: \(inferredNames.joined(separator: ", ")). Check these before approving."
-            )
-        }
-
+        // Inference is no longer reported here. `LessonRecord.inferredFields` carries it as
+        // structured state, and the lesson editor renders it from that — saying it twice, once
+        // as prose and once as a banner, reads as two separate problems rather than one fact.
+        // Missing fields stay: nothing else records those.
         var missing: [String] = []
         if result.objective == nil { missing.append("learning objective") }
         if result.steps.isEmpty { missing.append("instructional sequence") }

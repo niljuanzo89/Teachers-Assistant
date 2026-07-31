@@ -96,7 +96,7 @@ final class InferredFieldLifecycleTests: XCTestCase {
         XCTAssertEqual(try storedLesson(in: store).inferredFields, [.steps])
     }
 
-    /// Reordering the same steps is still an edit; identical text is not.
+    /// Saving without changing a character is not an edit.
     @MainActor
     func testAnIdenticalSaveKeepsTheMarker() throws {
         let (_, repository) = try makeStore()
@@ -108,6 +108,19 @@ final class InferredFieldLifecycleTests: XCTestCase {
         store.updateLessonFromTeacherEdit(lesson)
 
         XCTAssertEqual(try storedLesson(in: store).inferredFields, [.steps])
+    }
+
+    /// Reordering steps *is* an edit — the teacher decided this order, even though no word changed.
+    @MainActor
+    func testReorderingStepsClearsTheMarker() throws {
+        let (_, repository) = try makeStore()
+        var lesson = try seedInferredLesson(into: repository)
+        let store = AppStore(repository: repository)
+
+        lesson.instructionalSequence.reverse()
+        store.updateLessonFromTeacherEdit(lesson)
+
+        XCTAssertNil(try storedLesson(in: store).inferredFields)
     }
 
     /// The marker is persisted state, not a per-session flag.

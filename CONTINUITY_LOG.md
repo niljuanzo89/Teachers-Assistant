@@ -3203,3 +3203,31 @@ below the fold and is **not** yet visually confirmed. Owner visual sign-off stil
 **Process note:** two scripted edits in this batch silently did nothing — one because a `grep`
 in an `&&` chain failed and short-circuited the script that followed. The Batch 036 rule
 (assert every anchor) only helps if the script actually runs; check that it did.
+
+**Batch 047 follow-up (same batch, after Codex debrief).** Two fixes:
+
+1. **Duplicate provenance messaging.** `extractionWarnings` still emitted an "Inferred from the
+   document's structure..." prose line, which the new banner now renders from structured state.
+   Saying it twice reads as two separate problems rather than one fact. Removed from the prose;
+   missing-field warnings stay there, since nothing else records those.
+2. **A test comment promised more than the test did** ("reordering the same steps is still an
+   edit" on a test that only covered an identical save). Added the reorder test — reordering
+   *does* clear the marker, because the teacher chose that order even though no word changed.
+
+**Codex's structural suggestion, not yet done:** an architecture test scanning
+`Sources/LessonPlanner` for lesson writes outside the approved helpers (`lessons.append`,
+`lessons[index] =`, `saveLessons()`), so the "route every content write through an intent-named
+method" invariant is enforced rather than remembered. Its stronger form is
+`writeLesson(_:intent:)` with a `LessonWriteIntent` enum. Worth doing before the next batch that
+adds a view touching lesson content.
+
+**Codex on `contentFingerprint`:** the policy is right; it would prefer a typed
+`LessonFieldContent` enum over string joining with control separators. Functionally equivalent
+today. On semantics it confirmed ignoring step `id` is correct (UUID churn is not authorship)
+and that order-sensitive materials is defensible unless the product declares materials unordered.
+
+**Verification:** 227 tests passing, `xcodebuild` succeeds.
+
+**Batch F, per Codex:** output-quality review — source-faithfulness and contamination, not
+populated-field counts. Manual material linking stays downstream; if unresolved materials are
+contaminating outputs, Batch F surfaces that with evidence and justifies pulling it forward.
