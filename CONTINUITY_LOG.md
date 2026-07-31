@@ -3231,3 +3231,14 @@ and that order-sensitive materials is defensible unless the product declares mat
 **Batch F, per Codex:** output-quality review — source-faithfulness and contamination, not
 populated-field counts. Manual material linking stays downstream; if unresolved materials are
 contaminating outputs, Batch F surfaces that with evidence and justifies pulling it forward.
+
+**Owner visual sign-off, 2026-07-31:** the lesson-editor inference banner is approved
+(`Design Screenshots/2026-07-31/01-inferred-fields-banner.png`). Wording, alarm level, and
+placement all accepted as-is — including the banner sitting above the lesson rather than on the
+Instructional sequence card it refers to, which was raised explicitly and judged fine.
+
+Still open with the owner: whether reordering **materials** should count as a teacher edit (it
+does today; reordering steps clearly should, materials is a product call), and whether Batch F's
+output-quality review runs against the sample packet or a fresh import of the real curriculum.
+The approval-point line in `LessonOutputControls` remains visually unconfirmed — it sits below
+the fold and was not part of this sign-off.
