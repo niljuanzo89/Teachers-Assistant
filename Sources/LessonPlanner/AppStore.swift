@@ -2329,7 +2329,7 @@ enum LessonFieldExtractor {
     /// swallows the assessment, timing, and differentiation rows that follow it — the same
     /// run-on class fixed for materials and assessment in Batch 046, one layer down.
     static func isRecognizedLabelLine(_ line: String) -> Bool {
-        firstLabelMatch(allLabels, in: [line]) != nil
+        firstLabelMatch(allLabels, in: [line], strictBoundary: true) != nil
     }
 
     /// The value for a prose field: the same line's remainder if the label has one, otherwise
@@ -2372,7 +2372,15 @@ enum LessonFieldExtractor {
     /// than a substring — "goal" must not match a line starting "Goals for this unit," only
     /// "Goal:" / "Goal -" / "Goal " / a line that is exactly "Goal". Returns the line's index
     /// and whatever follows the label and its separator (":", "-", or whitespace).
-    private static func firstLabelMatch(_ labels: [String], in lines: [String]) -> (index: Int, remainder: String)? {
+    /// - Parameter strictBoundary: when true, a bare space after the label does **not** count as a
+    ///   separator. Several labels are ordinary English words — "supports", "extensions",
+    ///   "activities", "goal" — so a phase note that simply begins "Supports students as they
+    ///   compare halves..." matches the loose rule and, used as a terminator, silently truncates
+    ///   the note to nothing. Row labels in real documents end at a colon, dash, emphasis marker,
+    ///   or the end of the line, so requiring that costs nothing and removes the false positive.
+    private static func firstLabelMatch(
+        _ labels: [String], in lines: [String], strictBoundary: Bool = false
+    ) -> (index: Int, remainder: String)? {
         for (index, rawLine) in lines.enumerated() {
             let decorated = stripLeadingDecoration(rawLine)
             guard !decorated.isEmpty else { continue }
@@ -2386,7 +2394,7 @@ enum LessonFieldExtractor {
                 // allow a bolded heading's closing emphasis ("**Grade Level:** 5").
                 let isBoundary = boundary.isEmpty
                     || boundary.first == ":" || boundary.first == "-" || boundary.first == "*"
-                    || boundary.first?.isWhitespace == true
+                    || (!strictBoundary && boundary.first?.isWhitespace == true)
                 guard isBoundary else { continue }
                 let remainder = boundary.trimmingCharacters(in: CharacterSet(charactersIn: ":-* \t"))
                 return (index, remainder)

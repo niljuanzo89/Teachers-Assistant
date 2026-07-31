@@ -100,6 +100,30 @@ final class OutputFaithfulnessTests: XCTestCase {
         }
     }
 
+    /// Several label words are ordinary English — "supports", "extensions", "activities".
+    /// A phase note that merely *begins* with one is prose, not a new row, and treating it as a
+    /// terminator silently truncated the note to nothing.
+    @MainActor
+    func testProseBeginningWithALabelWordDoesNotEndAStep() throws {
+        let text = """
+        Monday: Fractions
+        Warm-Up
+        Supports students as they compare halves and fourths.
+        Mini-Lesson
+        Model equivalent fractions.
+        """
+        let result = LessonStructureInferencer.fillingGaps(
+            in: LessonFieldExtractor.extract(from: text), from: text
+        )
+        let warmUp = result.steps.first { $0.title.localizedCaseInsensitiveContains("warm") }
+        XCTAssertEqual(warmUp?.notes, "Supports students as they compare halves and fourths.")
+
+        // A real row still terminates: same word, followed by a colon rather than prose.
+        XCTAssertTrue(LessonFieldExtractor.isRecognizedLabelLine("Supports:"))
+        XCTAssertTrue(LessonFieldExtractor.isRecognizedLabelLine("Timing"))
+        XCTAssertFalse(LessonFieldExtractor.isRecognizedLabelLine("Supports students as they work."))
+    }
+
     /// An objective is a teacher's goal, not a task a child can do. Substituting it for a missing
     /// student prompt produced a worksheet that looked finished and was not usable.
     @MainActor

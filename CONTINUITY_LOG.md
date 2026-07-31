@@ -3292,3 +3292,40 @@ anywhere in the guide when the handout is omitted. But the objective belongs in 
 objective section — the claim is only that no *handout* was fabricated around it. Narrowed.
 
 **Verification:** 232 tests passing (6 new), `xcodebuild` succeeds.
+
+**Batch 048 follow-up (same batch, after Codex debrief).** Codex caught a regression I introduced
+in this batch, confirmed by measurement before fixing:
+
+**Making `phaseBody` stop at a label row widened the blast radius of a loose boundary rule.**
+`firstLabelMatch` accepted a bare space after a label as a valid separator, and several labels
+are ordinary English words — "supports", "extensions", "activities", "goal". A phase note simply
+beginning "Supports students as they compare halves and fourths." matched, so the step's notes
+came back **empty**. The looseness pre-existed inside label continuation; Batch 048 pushed it
+into structural step inference, where it silently destroyed content.
+
+Fixed with a `strictBoundary` mode used only by the terminator predicate: a row label must end at
+a colon, dash, emphasis marker, or end of line — never a bare space. Real documents label rows
+that way, so this costs nothing. Test pins both directions: prose beginning with a label word is
+kept, and `Supports:` / `Timing` still terminate.
+
+**Structural fix Codex proposed for the run-on class, not yet done:** one internal row classifier
+(`blank` / `recognizedLabel` / `phaseHeading` / `text`) with scalar, list, and phase-body
+collection all calling a single span collector with explicit terminator options. Today there are
+two separate `while` loops with their own rules, which is why the same defect appeared three
+times. Worth doing before adding a fourth collector.
+
+**Codex on `LessonWritePathTests`:** keep it, but it is a guardrail, not architecture. The
+`writeLesson(_:intent:)` enum form moves the invariant into the API; retire or narrow the scan
+once that exists.
+
+**Minor, noted not fixed:** `OutputFaithfulnessTests.deckText` reads raw `.pptx` bytes as UTF-8,
+which works only because the exporter writes uncompressed entries. OOXML-entry extraction would
+be durable.
+
+**Batch G, agreed with Codex: a second corpus.** Weekday span detection, label grammar,
+phase-heading inference, and terminator behaviour have all been tuned against one packet shape.
+Generality is now the highest-risk assumption in the system. A second corpus also settles whether
+"Timing" deserves a model field, a terminator-only label, or a broader pacing concept — a
+question that cannot be answered from inside one document family.
+
+**Verification:** 233 tests passing, `xcodebuild` succeeds.
