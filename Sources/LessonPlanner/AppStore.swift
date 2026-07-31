@@ -971,8 +971,10 @@ final class AppStore: ObservableObject {
                 continue
             }
             if let existingIndex = weeklyPlan.assignments.firstIndex(where: { $0.lessonRecordID == lessonID }) {
-                let existingNotes = weeklyPlan.assignments[existingIndex].planningNotes ?? ""
-                guard existingNotes.hasPrefix("Pacing:") else { continue }
+                // Provenance, not prose. An assignment the teacher created or moved is theirs and
+                // must never be silently relocated by an automatic pass; `effectiveOrigin` still
+                // recognises pre-provenance auto placements by their legacy note prefix.
+                guard weeklyPlan.assignments[existingIndex].effectiveOrigin == .autoDerived else { continue }
                 occupiedAutoSlots.remove(autoScheduleSlotKey(
                     date: weeklyPlan.assignments[existingIndex].date,
                     start: weeklyPlan.assignments[existingIndex].start,
@@ -987,6 +989,7 @@ final class AppStore: ObservableObject {
                 weeklyPlan.assignments[existingIndex].start = placement.start
                 weeklyPlan.assignments[existingIndex].end = placement.end
                 weeklyPlan.assignments[existingIndex].planningNotes = suggestion.planningNote
+                weeklyPlan.assignments[existingIndex].origin = .autoDerived
                 occupiedAutoSlots.insert(autoScheduleSlotKey(date: placement.date, start: placement.start, end: placement.end))
                 continue
             }
@@ -1001,7 +1004,8 @@ final class AppStore: ObservableObject {
                 date: placement.date,
                 start: placement.start,
                 end: placement.end,
-                planningNotes: suggestion.planningNote
+                planningNotes: suggestion.planningNote,
+                origin: .autoDerived
             ))
             occupiedAutoSlots.insert(autoScheduleSlotKey(date: placement.date, start: placement.start, end: placement.end))
         }
@@ -1021,7 +1025,8 @@ final class AppStore: ObservableObject {
             }
             var updated = existing
             updated.status = .approved
-            updateLesson(updated)
+            // Automatic sync, not a teacher edit — must not promote this record's provenance.
+            updateLesson(updated, markingTeacherEdit: false)
             return updated.id
         }
 
@@ -1031,6 +1036,7 @@ final class AppStore: ObservableObject {
         }
         lesson.status = .approved
         lesson.sourceReferences = [suggestion.planningNote]
+        lesson.origin = .autoDerived
         lesson.aiReviewWarnings = ["Auto-created from readable planning documents. Fill any blank or incorrect fields as needed."]
         lesson.instructionalSequence = [
             InstructionalStep(
@@ -1352,6 +1358,7 @@ final class AppStore: ObservableObject {
     func createDraftLesson(from proposal: LessonDraftProposal, source: ImportedSource) {
         let title = proposal.title.trimmingCharacters(in: .whitespacesAndNewlines)
         var lesson = LessonRecord.draft(title: title.isEmpty ? source.reference.displayName : title)
+        lesson.origin = .teacherAuthored
         lesson.subject = proposal.subject
         lesson.gradeOrAgeRange = proposal.gradeOrAgeRange
         lesson.objective = proposal.objective
@@ -1405,9 +1412,13 @@ final class AppStore: ObservableObject {
         }.value
     }
 
-    func updateLesson(_ lesson: LessonRecord) {
+    /// `markingTeacherEdit` defaults to true deliberately. Forgetting it on an automatic path
+    /// merely leaves a record protected from rebuild; forgetting it on a teacher path would let a
+    /// rebuild destroy their work. The safe default is the one that preserves.
+    func updateLesson(_ lesson: LessonRecord, markingTeacherEdit: Bool = true) {
         guard let index = lessons.firstIndex(where: { $0.id == lesson.id }) else { return }
         var updated = lesson
+        if markingTeacherEdit { updated.origin = .teacherAuthored }
         updated.updatedAt = .now
         lessons[index] = updated
         saveLessons()

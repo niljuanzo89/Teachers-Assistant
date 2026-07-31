@@ -2340,3 +2340,42 @@ rather than silently rearranging the week.
 **Most likely breakage, per Codex:** decoding old files with new non-optional fields (see the
 CRITICAL PERSISTENCE RULE — all new fields optional); treating a teacher-edited auto-created lesson
 as disposable; and moving weekly assignments the teacher manually adjusted.
+
+### Batch 036 — 2026-07-30 — Provenance: derived artifacts can now prove what they are
+
+Step 1 of the Codex-reviewed derived-state plan (PLAN REVISION 3). Mandatory infrastructure: the
+explicit rebuild in step 2 cannot be written safely until the app can prove which artifacts it owns.
+
+**Problem.** The app identified its own work by matching English sentences in three places — an
+auto-created lesson by a phrase in `aiReviewWarnings`, an auto-built pacing plan by a phrase in
+`teacherRefinementNotes`, and an automatic placement by `planningNotes.hasPrefix("Pacing:")`. A
+rebuild driven by those would risk destroying teacher-authored work.
+
+**What shipped.**
+
+| # | Change | Note |
+|---|---|---|
+| 1 | New `RecordOrigin` enum: `.teacherAuthored` / `.autoDerived` | |
+| 2 | `origin` added to `LessonRecord`, `CoursePacingPlan`, `WeeklyLessonAssignment` — all **Optional**, per the CRITICAL PERSISTENCE RULE | Files written before the field decode unchanged |
+| 3 | `effectiveOrigin` on each, falling back to the legacy prose marker | Existing data is classified correctly with no migration; the prose heuristics survive only as this fallback |
+| 4 | Origin stamped at every creation site: auto-created lessons and automatic placements as `.autoDerived`, `CoursePacingPlan.starter` output as `.autoDerived`, both teacher-initiated draft-lesson paths as `.teacherAuthored` | |
+| 5 | The automatic re-placement guard now reads provenance instead of `planningNotes.hasPrefix("Pacing:")` | An assignment the teacher moved by hand is no longer silently relocated |
+| 6 | `updateLesson(_:markingTeacherEdit:)` promotes an edited record to `.teacherAuthored` | |
+
+**Two deliberate safety choices.**
+
+- `markingTeacherEdit` **defaults to true.** Forgetting it on an automatic path merely leaves a
+  record protected from rebuild; forgetting it on a teacher path would let a rebuild destroy their
+  work. The default is the direction that preserves. The one genuinely automatic caller
+  (`ensureApprovedLesson` promoting an existing lesson to approved) passes `false` explicitly.
+- `effectiveOrigin` defaults to `.teacherAuthored` when neither the field nor a legacy marker is
+  present, for the same reason.
+
+**Verification.** 175 tests pass (167 + 8 new), real `xcodebuild` succeeded. Against a copy of the
+owner's real profile the legacy fallback classified **173/173 lessons, the pacing plan, and 24/24
+assignments as `.autoDerived`**, with nothing misclassified in either direction — so the step-2
+rebuild will be able to regenerate them safely, and would not have been able to before this batch.
+
+**Still open.** Steps 2-6 of PLAN REVISION 3: explicit rebuild command; `inferredSubject`
+on-demand fallback; per-artifact derivation versions; automatic stale rebuild with a visible
+summary; and later the derived-proposal / teacher-overlay split.

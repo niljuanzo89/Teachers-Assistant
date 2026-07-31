@@ -483,6 +483,21 @@ struct CoursePacingUnit: Codable, Equatable, Identifiable {
     var notes: String
 }
 
+/// Who owns a persisted artifact: the teacher, or the app's automatic derivation from imported
+/// documents. This exists so a rebuild can prove what it is allowed to regenerate.
+///
+/// Before this, the app identified its own work by matching English sentences — an auto-created
+/// lesson by a phrase in `aiReviewWarnings`, an auto-built pacing plan by a phrase in
+/// `teacherRefinementNotes`, and an automatic placement by `planningNotes.hasPrefix("Pacing:")`.
+/// Those heuristics are retained only as a fallback for records written before this field existed
+/// (see each type's `effectiveOrigin`); nothing new should depend on them.
+enum RecordOrigin: String, Codable, Equatable {
+    /// Created or subsequently edited by the teacher. Never regenerated or discarded by a rebuild.
+    case teacherAuthored
+    /// Produced by automatic derivation from imported documents. Safe to regenerate.
+    case autoDerived
+}
+
 struct CoursePacingPlan: Codable, Equatable, Identifiable {
     let id: UUID
     var sourceReferenceNames: [String]
@@ -491,6 +506,18 @@ struct CoursePacingPlan: Codable, Equatable, Identifiable {
     var reviewStatus: CoursePacingReviewStatus
     var createdAt: Date
     var updatedAt: Date
+    /// Optional so plans saved before this field existed still decode; `effectiveOrigin` classifies
+    /// those from the legacy note text.
+    var origin: RecordOrigin? = nil
+
+    /// Falls back to the pre-provenance marker so an existing auto-built plan is still recognised
+    /// as regenerable. A plan with neither the field nor the marker is treated as the teacher's.
+    var effectiveOrigin: RecordOrigin {
+        if let origin { return origin }
+        return teacherRefinementNotes.contains(Self.legacyAutoBuiltMarker) ? .autoDerived : .teacherAuthored
+    }
+
+    static let legacyAutoBuiltMarker = "Auto-built from readable document intake"
 
     var unitCount: Int { units.count }
     var moduleCount: Int { units.flatMap(\.modules).count }
@@ -565,7 +592,8 @@ struct CoursePacingPlan: Codable, Equatable, Identifiable {
             teacherRefinementNotes: "",
             reviewStatus: .draft,
             createdAt: .now,
-            updatedAt: .now
+            updatedAt: .now,
+            origin: .autoDerived
         )
     }
 
@@ -1164,6 +1192,20 @@ struct LessonRecord: Codable, Equatable, Identifiable {
     var assessmentSummary: String
     var createdAt: Date
     var updatedAt: Date
+    /// Optional so records saved before this field existed still decode; `effectiveOrigin`
+    /// classifies those from the legacy warning text.
+    var origin: RecordOrigin? = nil
+
+    /// Falls back to the pre-provenance marker. Deliberately biased toward `.teacherAuthored`:
+    /// wrongly regenerating a teacher's lesson destroys their work, while wrongly preserving an
+    /// auto-derived one merely leaves a stale record they can delete.
+    var effectiveOrigin: RecordOrigin {
+        if let origin { return origin }
+        let warnings = aiReviewWarnings ?? []
+        return warnings.contains { $0.contains(Self.legacyAutoCreatedMarker) } ? .autoDerived : .teacherAuthored
+    }
+
+    static let legacyAutoCreatedMarker = "Auto-created from readable planning documents"
 
     static func draft(title: String = "Untitled lesson") -> LessonRecord {
         LessonRecord(
@@ -1739,6 +1781,18 @@ struct WeeklyLessonAssignment: Codable, Equatable, Identifiable {
     var start: Date
     var end: Date
     var planningNotes: String?
+    /// Optional so assignments saved before this field existed still decode; `effectiveOrigin`
+    /// classifies those from the legacy note prefix.
+    var origin: RecordOrigin? = nil
+
+    /// Falls back to the pre-provenance marker. An assignment the teacher placed or moved by hand
+    /// has no such prefix and is therefore treated as theirs, which is the safe direction.
+    var effectiveOrigin: RecordOrigin {
+        if let origin { return origin }
+        return (planningNotes ?? "").hasPrefix(Self.legacyAutoPlacementPrefix) ? .autoDerived : .teacherAuthored
+    }
+
+    static let legacyAutoPlacementPrefix = "Pacing:"
 }
 
 struct WeeklyPlanningBrief: Codable, Equatable {
