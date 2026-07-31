@@ -3329,3 +3329,72 @@ Generality is now the highest-risk assumption in the system. A second corpus als
 question that cannot be answered from inside one document family.
 
 **Verification:** 233 tests passing, `xcodebuild` succeeds.
+
+### Batch 049 — Batch G: extraction preserves table structure
+
+**Compute: medium-high. Model shape: dual (Codex pre-review + debrief) after a four-model panel.**
+
+The blind corpus run (13 documents, a *second* family: 3rd-grade multiplication, inline
+`Label:` values, a three-column `Part | Time | Actions` procedure table) measured the parser
+frozen. Classification held at 13/13 and phantom lessons at 0, but **assessment was wrong on
+10/10 — wrong, not blank**: the procedure table's "Exit Ticket" row was returned in place of the
+document's own `Formative Assessment:` statement. Steps came back 4 of 6, and every step note
+carried the Time column glued to its front.
+
+All three traced to one cause the panel named: **`</w:p>` was replaced with a newline before
+anything else, and every table cell contains a paragraph** — so a three-column row became three
+lines and the column relationship was destroyed. The parser then rebuilt it by keyword guessing,
+which is where all five instances of the run-on/mismatch class came from.
+
+**What changed.** `flattenWordXML` is now a single left-to-right pass tracking cell depth: one
+row is one line, cells separated by tabs, and a paragraph break *inside* a cell joins with a
+space instead of splitting the cell out. `SourceTextLine` (new) parses that into
+`blank` / `paragraph` / `tableRow(cells:)`, and both `LessonFieldExtractor` and
+`LessonStructureInferencer` now read structure instead of inferring it.
+
+Two structural rules replaced vocabulary:
+- **A two-cell row is a label/value pair; a wider row is tabular data** whose leading cell is a
+  row heading. That alone fixes the assessment defect — an "Exit Ticket" row in a three-column
+  table is no longer a candidate for the assessment *label*.
+- **A phase is a wide data row**: leading cell is the name, trailing cell the body, middle cells
+  left alone. "Teacher Modeling" and "Small Group Sort" are now found despite appearing in no
+  phase-name list, and the Time column stays out of the notes.
+
+`ImportedSource.extractedText` remains a plain `String`, so all 63 consumers, stored span
+offsets, and the review UI are untouched. Codex's condition — lift the string into a typed row
+model immediately rather than scattering string splits — is honoured.
+
+**Measured after (same corpus, same frozen vocabulary, 10 lessons):**
+
+| | Before | After |
+|---|---|---|
+| Assessment correct | 0/10 | **10/10** |
+| Steps found | 4 of 6 | **full count, 10/10** |
+| Time-column bleed | 10/10 | **0/10** |
+| Objective / materials / differentiation | 10/10 | 10/10 |
+
+Against the panel's merged decision rule (false positives ≤2%, fields ≥85%, step separation
+≥80%, phantom lessons 0): **continue**, on every metric.
+
+**Regression check — the point of the batch, not an afterthought.** Old and new flattening
+compared across **all 20 documents in both families**: classification identical on all 20, span
+counts identical on all 20 (0 or 5 as before). No routing changed.
+
+**Resolved an open question from Batch 048:** the original family's materials, assessment, and
+differentiation genuinely *do* repeat verbatim across the days of a week — confirmed by reading
+the document. Only Topic, Objective, and Mini-Lesson vary. Identical values across lessons are
+faithful, not contamination.
+
+**Honest limitation in the scoring.** The step-count ground truth was derived with the same
+`isWideDataRow` predicate the parser uses, so that column is partly circular. The phase list for
+lesson 1 was verified by hand against the document (6 phases); the rest were not. The assessment
+score is *not* circular — ground truth came from the document's own `Formative Assessment:` line.
+
+**Verification:** 239 tests passing (6 new), `xcodebuild` succeeds after a 4-entry pbxproj
+registration for `SourceTextLine.swift`. No existing test needed changing — the plain-text
+fixtures parse as paragraphs exactly as before.
+
+**Still the highest-risk assumption:** both families are the owner's own. Nothing here has been
+tested against another teacher's formatting, a district template, a publisher packet, or a
+scanned PDF. The panel's gate stands — 5-10 documents from an outside source, ≥70% correct on
+core fields, false positives ≤10%.

@@ -2181,6 +2181,70 @@ final class AppStore: ObservableObject {
         return (recognizedPages.joined(separator: "\n\n"), confidence)
     }
 
+    /// Flattens Word XML to text **while keeping table rows intact**.
+    ///
+    /// The previous version replaced `</w:p>` with a newline before anything else, and every table
+    /// cell contains a paragraph — so a three-column row (Part | Time | Actions) came out as three
+    /// separate lines and the column relationship was destroyed. The parser then had to guess it
+    /// back from a keyword list, which is where every extraction defect in Batches 046-048 came
+    /// from: an "Exit Ticket" *table row* was indistinguishable from an "Assessment:" *label line*,
+    /// and a Time cell merged into the Actions text beside it.
+    ///
+    /// One row is now one line, cells separated by tabs. That requires knowing whether a paragraph
+    /// break is inside a cell, which a global find-and-replace cannot know — hence a single
+    /// left-to-right pass tracking cell depth.
+    /// Internal rather than private so the flattening shape can be tested directly — it is now
+    /// load-bearing for every downstream parse.
+    static func flattenWordXML(_ xml: String) -> String {
+        var out = ""
+        var cellDepth = 0
+        var index = xml.startIndex
+
+        while let open = xml[index...].firstIndex(of: "<") {
+            out += xml[index..<open]
+            guard let close = xml[open...].firstIndex(of: ">") else {
+                index = xml.endIndex
+                break
+            }
+            switch tagName(in: xml[xml.index(after: open)..<close]) {
+            case "w:tc": cellDepth += 1
+            case "/w:tc":
+                cellDepth = max(0, cellDepth - 1)
+                out += "\t"
+            case "/w:tr": out += "\n"
+            // A paragraph break inside a cell is a line break *within* that cell's value, not a
+            // new row — joining with a space keeps the cell on its own line.
+            case "/w:p": out += cellDepth > 0 ? " " : "\n"
+            case "w:tab": out += "\t"
+            case "w:br": out += "\n"
+            default: break
+            }
+            index = xml.index(after: close)
+        }
+        out += xml[index...]
+
+        // A row ends "</w:tc></w:tr>", so every line arrives with a trailing tab.
+        return out
+            .components(separatedBy: "\n")
+            .map { line in
+                var trimmed = Substring(line)
+                while trimmed.last == "\t" || trimmed.last == " " { trimmed = trimmed.dropLast() }
+                return String(trimmed)
+            }
+            .joined(separator: "\n")
+    }
+
+    /// The element name from a tag's interior, without attributes: `w:tc` from `w:tc `,
+    /// `/w:p` from `/w:p`, `w:tab` from `w:tab/`. Needed so `w:tcPr` is not mistaken for `w:tc`.
+    private static func tagName(in interior: Substring) -> String {
+        var name = interior
+        if let space = name.firstIndex(where: { $0 == " " || $0 == "\t" || $0 == "\n" }) {
+            name = name[..<space]
+        }
+        if name.hasSuffix("/") { name = name.dropLast() }
+        return String(name)
+    }
+
     private func extractDOCXText(from url: URL) throws -> String {
         let process = Process()
         let outputPipe = Pipe()
@@ -2201,13 +2265,7 @@ final class AppStore: ObservableObject {
             throw PDFTextExtractionError.unreadableWordDocument
         }
 
-        let withParagraphBreaks = xml
-            .replacingOccurrences(of: "</w:p>", with: "\n")
-            .replacingOccurrences(of: "</w:tr>", with: "\n")
-            .replacingOccurrences(of: "</w:tc>", with: "\t")
-            .replacingOccurrences(of: "<w:tab/>", with: "\t")
-            .replacingOccurrences(of: "<w:br/>", with: "\n")
-        let withoutTags = withParagraphBreaks.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        let withoutTags = Self.flattenWordXML(xml)
         let decoded = withoutTags
             .replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&lt;", with: "<")
@@ -2298,7 +2356,9 @@ enum LessonFieldExtractor {
     static func extract(from text: String) -> Result {
         // Blank lines are kept (not filtered) — they're the natural end-of-value boundary
         // for a multi-line value under a heading, alongside the start of another label.
-        let lines = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        // Parsed with table structure intact, so a "Objective | value" row is read as a row
+        // rather than reconstructed from two adjacent lines by guesswork.
+        let lines = SourceTextLine.parse(text)
 
         return Result(
             subject: scalarValue(for: subjectLabels, in: lines),
@@ -2329,14 +2389,14 @@ enum LessonFieldExtractor {
     /// swallows the assessment, timing, and differentiation rows that follow it — the same
     /// run-on class fixed for materials and assessment in Batch 046, one layer down.
     static func isRecognizedLabelLine(_ line: String) -> Bool {
-        firstLabelMatch(allLabels, in: [line], strictBoundary: true) != nil
+        firstLabelMatch(allLabels, in: SourceTextLine.parse(line), strictBoundary: true) != nil
     }
 
     /// The value for a prose field: the same line's remainder if the label has one, otherwise
     /// every following line up to a blank line or the next recognized label, joined into one
     /// paragraph — so an objective spanning 2-3 lines under its own heading is captured whole
     /// instead of only its first line.
-    private static func scalarValue(for labels: [String], in lines: [String]) -> String? {
+    private static func scalarValue(for labels: [String], in lines: [SourceTextLine]) -> String? {
         guard let (index, remainder) = firstLabelMatch(labels, in: lines) else { return nil }
         if !remainder.isEmpty { return remainder }
         let continuation = continuationLines(after: index, in: lines)
@@ -2351,7 +2411,7 @@ enum LessonFieldExtractor {
     /// or numbered list under a heading, where an individual item can itself contain a comma
     /// ("chart paper, any color").
     private static func listValue(
-        for labels: [String], in lines: [String], stopAtPhaseHeadings: Bool = true
+        for labels: [String], in lines: [SourceTextLine], stopAtPhaseHeadings: Bool = true
     ) -> [String] {
         guard let (index, remainder) = firstLabelMatch(labels, in: lines) else { return [] }
         if !remainder.isEmpty { return splitDenseList(remainder) }
@@ -2379,26 +2439,50 @@ enum LessonFieldExtractor {
     ///   the note to nothing. Row labels in real documents end at a colon, dash, emphasis marker,
     ///   or the end of the line, so requiring that costs nothing and removes the false positive.
     private static func firstLabelMatch(
-        _ labels: [String], in lines: [String], strictBoundary: Bool = false
+        _ labels: [String], in lines: [SourceTextLine], strictBoundary: Bool = false
     ) -> (index: Int, remainder: String)? {
-        for (index, rawLine) in lines.enumerated() {
-            let decorated = stripLeadingDecoration(rawLine)
-            guard !decorated.isEmpty else { continue }
-            let lower = decorated.lowercased()
-            for label in labels {
-                guard lower.hasPrefix(label) else { continue }
-                let afterLabel = decorated.index(decorated.startIndex, offsetBy: label.count)
-                let boundary = decorated[afterLabel...]
-                // The label must end here — at a separator or end of line — so "goal" doesn't
-                // match a line starting "Goals for this unit". "*" counts as a separator to
-                // allow a bolded heading's closing emphasis ("**Grade Level:** 5").
-                let isBoundary = boundary.isEmpty
-                    || boundary.first == ":" || boundary.first == "-" || boundary.first == "*"
-                    || (!strictBoundary && boundary.first?.isWhitespace == true)
-                guard isBoundary else { continue }
-                let remainder = boundary.trimmingCharacters(in: CharacterSet(charactersIn: ":-* \t"))
+        for (index, line) in lines.enumerated() {
+            // Only a two-cell row is a label/value pair. A wider row is tabular data whose leading
+            // cell is a row heading, not a field label — which is what stopped an "Exit Ticket"
+            // row inside a three-column procedure table being read as the lesson's assessment.
+            if case .tableRow = line {
+                guard line.isLabelValueRow,
+                      let heading = line.headingCell,
+                      let value = line.valueCell,
+                      matchedLabel(labels, atStartOf: heading, strictBoundary: true) != nil
+                else { continue }
+                // The value is the row's own cell, never a following line.
+                return (index, value)
+            }
+            if let remainder = matchedLabel(labels, atStartOf: line.text, strictBoundary: strictBoundary) {
                 return (index, remainder)
             }
+        }
+        return nil
+    }
+
+    /// The text following `labels` when `text` opens with one of them, or nil.
+    ///
+    /// One implementation, used for both prose lines and a table row's leading cell, so the two
+    /// cannot drift apart on what counts as a label.
+    private static func matchedLabel(
+        _ labels: [String], atStartOf text: String, strictBoundary: Bool
+    ) -> String? {
+        let decorated = stripLeadingDecoration(text)
+        guard !decorated.isEmpty else { return nil }
+        let lower = decorated.lowercased()
+        for label in labels {
+            guard lower.hasPrefix(label) else { continue }
+            let afterLabel = decorated.index(decorated.startIndex, offsetBy: label.count)
+            let boundary = decorated[afterLabel...]
+            // The label must end here — at a separator or end of line — so "goal" doesn't
+            // match a line starting "Goals for this unit". "*" counts as a separator to
+            // allow a bolded heading's closing emphasis ("**Grade Level:** 5").
+            let isBoundary = boundary.isEmpty
+                || boundary.first == ":" || boundary.first == "-" || boundary.first == "*"
+                || (!strictBoundary && boundary.first?.isWhitespace == true)
+            guard isBoundary else { continue }
+            return boundary.trimmingCharacters(in: CharacterSet(charactersIn: ":-* \t"))
         }
         return nil
     }
@@ -2409,16 +2493,19 @@ enum LessonFieldExtractor {
     ///   True for every field except the instructional-sequence list, whose *items* are
     ///   legitimately phase names — stopping there would truncate that list to its first entry.
     private static func continuationLines(
-        after index: Int, in lines: [String], stopAtPhaseHeadings: Bool = true
+        after index: Int, in lines: [SourceTextLine], stopAtPhaseHeadings: Bool = true
     ) -> [String] {
         var collected: [String] = []
         var cursor = index + 1
         while cursor < lines.count {
             let line = lines[cursor]
-            if line.isEmpty { break }
+            if line.isBlank { break }
             if firstLabelMatch(allLabels, in: [line]) != nil { break }
-            if stopAtPhaseHeadings, LessonStructureInferencer.isPhaseHeading(line) { break }
-            collected.append(line)
+            if stopAtPhaseHeadings, LessonStructureInferencer.isPhaseHeading(line.text) { break }
+            // A table row is its own record. Continuing a previous field's value into one would
+            // re-create the run-on this structure exists to prevent.
+            if case .tableRow = line { break }
+            collected.append(line.text)
             cursor += 1
         }
         return collected
