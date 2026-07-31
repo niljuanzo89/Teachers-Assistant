@@ -1979,7 +1979,7 @@ struct DerivedRebuildPreview: Equatable {
         }
         var parts = ["\(removableLessons) auto-created lesson\(removableLessons == 1 ? "" : "s") and \(removablePlacements) automatic placement\(removablePlacements == 1 ? "" : "s") will be rebuilt from your imported documents."]
         if preservedLessonTotal > 0 || preservedTeacherPlacements > 0 {
-            parts.append("\(preservedLessonTotal) lesson\(preservedLessonTotal == 1 ? "" : "s") and \(preservedTeacherPlacements) placement\(preservedTeacherPlacements == 1 ? "" : "s") you created, edited, or generated materials for will be kept unchanged.")
+            parts.append("\(preservedLessonTotal) lesson\(preservedLessonTotal == 1 ? "" : "s") and \(preservedTeacherPlacements) placement\(preservedTeacherPlacements == 1 ? "" : "s") you created, edited, or generated materials for will be kept, including where they sit in your week.")
         }
         return parts.joined(separator: " ")
     }

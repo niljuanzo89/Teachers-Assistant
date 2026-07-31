@@ -2480,3 +2480,45 @@ bypass their save paths; the seams let a test construct a starting state without
 **Still open.** Steps 3-6 of PLAN REVISION 3 — `inferredSubject` on-demand fallback, per-artifact
 derivation versions, automatic stale rebuild with a visible summary, and later the
 derived-proposal / teacher-overlay split — plus the `updateLesson` explicit-API refactor.
+
+### Batch 039 — 2026-07-30 — Corrections from the Batch 038 debrief
+
+The post-execution debrief confirmed Batch 038's protection requirements were genuinely met rather
+than approximated — non-mutating preview, real refusal on teacher-authored pacing, snapshot strictly
+before deletion, and both protection sets applied. It also found three things.
+
+**1. A defect I introduced (fixed).** The rebuild deleted *every* auto-derived placement, including
+those belonging to a lesson it had just protected. So a lesson the teacher generated materials for
+survived, but its day and time could be regenerated — while the confirmation copy promised it would
+be "kept unchanged." Both halves were wrong: placements of protected lessons are now preserved
+(the original assignment survives, not a regenerated one), and the copy now says "kept, including
+where they sit in your week," which is what the code does.
+
+**2. Daily-plan links were an unprotected integrity surface (fixed).** `ScheduleBlock` and
+`DailyTask` both persist an optional `linkedLessonRecordID`. Nothing populates them today, so this
+was latent rather than live, but the model allows it and a rebuild ignoring them would leave
+dangling references the moment anything does. Both are now protection sources.
+
+**3. The confirmation boundary is UI-level, not an API invariant (accepted, not fixed).**
+`rebuildDerivedPlanningData()` remains directly callable and recomputes its own preview, so nothing
+enforces "the confirmed preview is the operation executed." Codex called this acceptable for the
+current single-button scope. Recorded rather than fixed, because tightening it well means
+threading a confirmed-preview token through the call, which is more machinery than one button
+justifies today.
+
+Also confirmed **not** missed: `WeeklyPlanningBrief` carries no lesson IDs, and readiness reports
+are computed from live state rather than persisting references.
+
+186 tests pass (184 + 2, one per fix), real `xcodebuild` succeeded.
+
+**Debrief's recommended order for what comes next**, adopted:
+
+1. **API hygiene first** — split `updateLesson(_:markingTeacherEdit:)` into two explicitly named
+   methods. That boolean now guards provenance, rebuild safety, *and* deletion eligibility; it is
+   too load-bearing to remain a call-site convention. This is a promotion from "nice to have" —
+   the rebuild is what made it consequential.
+2. `inferredSubject` on-demand fallback.
+3. Per-artifact derivation versions.
+4. Automatic stale rebuild — should wait until the protection model is complete and the
+   confirmation story is tighter. The explicit rebuild makes it **less urgent, not unnecessary**.
+5. Later: derived-proposal / teacher-overlay split.

@@ -88,6 +88,55 @@ final class DerivedRebuildTests: XCTestCase {
     }
 
     @MainActor
+    func testAutomaticPlacementOfAProtectedLessonKeepsItsSlot() throws {
+        // A lesson protected because the teacher generated materials for it should not have its
+        // day and time silently regenerated: the summary promises it is kept, week position
+        // included, and moving it still disrupts a real week.
+        let repository = try makeRepository()
+        let store = try makeStore(repository)
+        let lesson = autoLesson("Has a printed deck")
+        store.replaceLessonsForTesting([lesson])
+        store.replaceGeneratedOutputsForTesting([GeneratedOutputRecord(
+            id: UUID(), lessonRecordID: lesson.id, kind: .slideDeckPPTX,
+            displayName: "deck.pptx", filePath: "/tmp/deck.pptx", templateDisplayName: nil, createdAt: .now
+        )])
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let placement = WeeklyLessonAssignment(
+            id: UUID(), lessonRecordID: lesson.id, date: date, start: date,
+            end: date.addingTimeInterval(2_700), planningNotes: "Pacing: Module 1", origin: .autoDerived
+        )
+        store.weeklyPlan.assignments = [placement]
+
+        XCTAssertEqual(store.previewDerivedRebuild().removablePlacements, 0)
+        store.rebuildDerivedPlanningData()
+
+        let kept = store.weeklyPlan.assignments.first { $0.lessonRecordID == lesson.id }
+        XCTAssertEqual(kept?.id, placement.id, "the placement itself must survive, not be regenerated")
+        XCTAssertEqual(kept?.start, placement.start)
+    }
+
+    @MainActor
+    func testDailyPlanLinkProtectsAnAutoDerivedLesson() throws {
+        // Nothing populates `linkedLessonRecordID` today, but the model allows it and a rebuild
+        // that ignored it would leave dangling daily-plan references the moment anything does.
+        let repository = try makeRepository()
+        let store = try makeStore(repository)
+        let lesson = autoLesson("Linked from today's plan")
+        store.replaceLessonsForTesting([lesson])
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        store.dailyPlan.scheduleBlocks = [ScheduleBlock(
+            id: UUID(), title: "Math", start: date, end: date.addingTimeInterval(2_700),
+            type: "lesson", linkedLessonRecordID: lesson.id, notes: ""
+        )]
+
+        XCTAssertEqual(store.previewDerivedRebuild().removableLessons, 0)
+        store.rebuildDerivedPlanningData()
+
+        XCTAssertTrue(store.lessons.contains { $0.id == lesson.id },
+                      "a lesson linked from the daily plan must not be deleted")
+    }
+
+    @MainActor
     func testRebuildRefusesWhenThePacingPlanCarriesTeacherEdits() throws {
         let repository = try makeRepository()
         var configuration = AppConfiguration(

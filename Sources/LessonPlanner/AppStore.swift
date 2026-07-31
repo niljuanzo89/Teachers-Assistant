@@ -960,7 +960,12 @@ final class AppStore: ObservableObject {
                 .filter { $0.effectiveOrigin == .teacherAuthored }
                 .map(\.lessonRecordID)
         )
-        let outputLinked = Set(generatedOutputs.compactMap(\.lessonRecordID))
+        var outputLinked = Set(generatedOutputs.compactMap(\.lessonRecordID))
+        // `ScheduleBlock` and `DailyTask` both persist an optional `linkedLessonRecordID`. Nothing
+        // populates them today, but the model allows it, and a rebuild that ignored them would
+        // leave dangling daily-plan references the moment anything does.
+        outputLinked.formUnion(dailyPlan.scheduleBlocks.compactMap(\.linkedLessonRecordID))
+        outputLinked.formUnion(dailyPlan.tasks.compactMap(\.linkedLessonRecordID))
         return (assignmentLinked, outputLinked)
     }
 
@@ -981,7 +986,13 @@ final class AppStore: ObservableObject {
             else { removable += 1 }
         }
 
-        let removablePlacements = weeklyPlan.assignments.filter { $0.effectiveOrigin == .autoDerived }.count
+        // An automatic placement for a protected lesson is preserved too. The lesson is protected
+        // because the teacher invested in it — generated materials, or scheduled it by hand — and
+        // silently moving it to a different day still disrupts a real week.
+        let protectedLessons = protectedIDs.outputLinked.union(protectedIDs.assignmentLinked)
+        let removablePlacements = weeklyPlan.assignments.filter {
+            $0.effectiveOrigin == .autoDerived && !protectedLessons.contains($0.lessonRecordID)
+        }.count
         return DerivedRebuildPreview(
             removableLessons: removable,
             removablePlacements: removablePlacements,
@@ -1022,7 +1033,10 @@ final class AppStore: ObservableObject {
                 && !protectedIDs.outputLinked.contains(lesson.id)
                 && !protectedIDs.assignmentLinked.contains(lesson.id)
         }
-        weeklyPlan.assignments.removeAll { $0.effectiveOrigin == .autoDerived }
+        let protectedLessons = protectedIDs.outputLinked.union(protectedIDs.assignmentLinked)
+        weeklyPlan.assignments.removeAll {
+            $0.effectiveOrigin == .autoDerived && !protectedLessons.contains($0.lessonRecordID)
+        }
         saveLessons()
         saveWeeklyPlan()
 
