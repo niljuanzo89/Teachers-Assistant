@@ -2872,3 +2872,66 @@ in the right block, but what lands there is empty.
 **Secondary finding.** The sample math document classifies as `planningDocument` because it contains
 the phrase "Pacing alignment:". It still contributes lessons via `canContributeLessonSequence`, so
 this is not currently breaking anything, but the classification is wrong and worth correcting.
+
+### PLAN REVISION 6 (2026-07-30) — panel review: segmentation is the real bug
+
+Codex, Grok and Gemini each reviewed the proposed fix. **All three said do not implement it as
+written.** The unanimous objection: it would replace empty lessons with *wrong* lessons.
+
+**Unanimous findings.**
+
+1. **Question 3 was the real bug, not a follow-up.** The extractor is *document*-scoped; lessons are
+   *day*-scoped. "Call the extractor at lesson creation" would give all five weekday lessons the same
+   whole-week extract — the 20 steps observed. Grok: this would "industrialize mis-attribution."
+   Gemini: "a tool that assigns Friday's exit ticket to Monday's lesson is dangerous."
+2. **`.approved` on auto-created lessons is a lie and must stop.** All three independently flagged
+   that the code already violates the project's own "nothing is auto-approved" rule. The fix is to
+   **decouple calendar placement from content review** — two concepts currently squeezed into one
+   status. A lesson can be *placed* without being *reviewed*.
+3. **`sourceTextSnapshot` must be the lesson's slice, not the whole document.** Otherwise the manual
+   fill button re-imports the same contamination, and re-running it overwrites the teacher's own
+   edits with whole-document soup.
+4. **Kill the PowerPoint confidence fallbacks.** Grok: "fabrication with better copywriting." An
+   empty objective should omit the slide, not assert "Explore the teacher-reviewed learning
+   objective." All three noted this compounds the lie, since the text also claims teacher review.
+5. **A source-span concept is missing entirely.** A lesson needs a pointer to the segment it came
+   from — table row, day block, character range — not just a document reference.
+
+**Where they split, and why it does not matter yet.** On how much to auto-populate, Grok and Gemini
+argued for (a) *labelled values only* — Grok: an "inferred" badge is "a developer distinction, not a
+teacher distinction under Friday-3pm pressure"; Gemini: "correcting plausible lies takes vastly more
+mental energy than filling a blank field." Codex argued for (b) *labelled + inferred, clearly
+marked*, calling (a) too conservative for semi-structured curriculum. **But Codex conditioned (b) on
+segmentation existing first.** So the disagreement is moot until then, and the decision is deferred
+rather than settled prematurely.
+
+**Revised sequence.**
+
+*Safe now, no segmentation required:*
+
+1. Stop creating auto-lessons as `.approved`. Add a placed-but-unreviewed state; keep planner
+   placement working off schedule slot rather than approval, and gate *exports* on review.
+2. Remove the confident fallbacks from the PowerPoint path so a missing objective omits content
+   instead of asserting it. Audit the HTML renderers for the same pattern.
+3. Set `sourceTextSnapshot` — to the best-known span, falling back to the whole document only when
+   the file could not be split, and **in that case populate nothing**. This restores the manual path
+   without industrialising wrong fills.
+
+*The actual feature:*
+
+4. Lesson-scoped source spans. Extend the pacing suggestion to carry the span it was derived from —
+   Grok's point that "the pacing suggester is part of the bug: it emits titles without spans." For a
+   table-shaped source the splitter is row grouping by day/lesson key, not prose heuristics.
+5. Populate only from the slice, and only then revisit (a) vs (b).
+6. **Cardinality guard:** if a single day's slice yields an implausible count (Grok suggests >8
+   steps, or ≠1 objective), abort population and flag rather than shipping it.
+7. Gemini's pragmatic split: a 1:1 document (one file, one lesson) can populate immediately; only
+   1:N documents need the splitter. Do not block the easy case on the hard one.
+
+**Acceptance metric, before any of this ships.** Grok's warning: measuring "fields non-empty" would
+celebrate contamination. The bar is **correct-to-slice fill rate** on the 25-lesson sample packet,
+plus a cardinality assertion, plus zero decks containing the current fallback phrasing.
+
+**Also raised, not yet planned:** re-import idempotency. Re-deriving pacing will duplicate lessons or
+overwrite teacher edits unless lesson identity is stable and merge rules exist. This is the same
+identity gap found in Batch 042, now with a second consequence.
