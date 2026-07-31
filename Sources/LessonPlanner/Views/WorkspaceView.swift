@@ -3129,6 +3129,7 @@ struct ConfigurationSummaryView: View {
     @State private var snapshotName = ""
     @State private var selectedSnapshotID: UUID?
     @State private var isShowingClearConfirmation = false
+    @State private var rebuildPreview: DerivedRebuildPreview?
     @State private var progressActionMessage: String?
 
     var body: some View {
@@ -3170,6 +3171,29 @@ struct ConfigurationSummaryView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will wipe the current profile's imported documents, lessons, generated-output history, daily plan, weekly planner, registered source folders, and pacing model. Save current progress first if you may need to reload it.")
+        }
+        .confirmationDialog(
+            "Rebuild planning data?",
+            isPresented: Binding(
+                get: { rebuildPreview != nil },
+                set: { if !$0 { rebuildPreview = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if rebuildPreview?.isBlockedByTeacherAuthoredPacing == true {
+                Button("OK", role: .cancel) { rebuildPreview = nil }
+            } else {
+                Button("Rebuild") {
+                    if let result = store.rebuildDerivedPlanningData() {
+                        progressActionMessage = "Planning data rebuilt. \(result.summaryLine)"
+                        selectedPacingUnitID = nil
+                    }
+                    rebuildPreview = nil
+                }
+                Button("Cancel", role: .cancel) { rebuildPreview = nil }
+            }
+        } message: {
+            Text(rebuildPreview?.summaryLine ?? "")
         }
     }
 
@@ -3242,6 +3266,15 @@ struct ConfigurationSummaryView: View {
                     .buttonStyle(.dsSecondary)
                     .disabled(selectedSnapshot == nil)
                 }
+                Button("Rebuild planning data from imported documents") {
+                    // Preview first: this removes records, and any generated files already in the
+                    // teacher's output folder are outside the snapshot safety net.
+                    rebuildPreview = store.previewDerivedRebuild()
+                }
+                .buttonStyle(.dsSecondary)
+                Text("Regenerates the course pacing, auto-created lessons, and automatic placements from the documents you have already imported. Anything you created, edited, or generated materials for is kept.")
+                    .font(DS.font(12))
+                    .foregroundStyle(DS.neutral600)
                 Button("Clear documents and entries", role: .destructive) {
                     isShowingClearConfirmation = true
                 }

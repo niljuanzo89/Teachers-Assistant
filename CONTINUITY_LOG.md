@@ -2435,3 +2435,48 @@ fields the teacher did not edit"); that needs per-field dirty tracking or the pr
 split, and a third enum case would not solve it. Step 2 should therefore be artifact-level.
 
 **Still open.** Steps 2-6 of PLAN REVISION 3, plus the explicit-API refactor above.
+
+### Batch 038 — 2026-07-30 — Step 2: explicit rebuild of derived planning data
+
+First batch run under the standing plan → pre-review → implement → debrief workflow.
+
+**Pre-execution review changed the design.** Codex judged the original plan **"not safe as written"**
+and required a protection pass before any deletion. Incorporated in full:
+
+| Required change | Why |
+|---|---|
+| Never delete an auto-derived lesson that any `GeneratedOutputRecord` points at | The generated file already exists in the teacher's output folder and is **outside the snapshot safety net** — snapshots capture app records, not files on disk |
+| Never delete an auto-derived lesson referenced by a `.teacherAuthored` assignment | Would create exactly the dangling state `WeeklyPackageReadinessReport` already reports as a missing scheduled lesson. Referential integrity outranks provenance purity |
+| Refuse outright when the pacing plan is `.teacherAuthored` | Silently discarding hand-edited dates and skipped days is the worst available outcome |
+| A real preview with counts, not a vague warning, before executing | The operation is visibly destructive |
+| Cut from scope: stable-key reconciliation, per-artifact versions, automatic rebuild, deleting output files | Kept the batch narrow; reconciliation on normalized titles would be too weak to serve as migration-grade identity |
+
+**What shipped.** `AppStore.previewDerivedRebuild()` computes the operation without mutating
+anything; `rebuildDerivedPlanningData()` snapshots first, deletes only unprotected auto-derived
+lessons and auto-derived placements, then re-runs the existing sync with `rebuildExistingPacing:
+true`. A Workspace button shows the counted preview in a confirmation dialog before anything runs.
+
+**Verification against a copy of the owner's real profile — the point of the whole exercise:**
+
+| | Before | After |
+|---|---|---|
+| Lesson records | 173 | **162** |
+| Pacing units / lessons | 315 / 869 | **54 / 567** |
+| Placements | 24 | **15** |
+| Placements in the Math block | 23 (+1 in ELA) | **15 of 15** |
+| Phantom slots | — | **0** |
+| Malformed `Day…` titles | present | **0** |
+
+These are **exactly** Batch 035's fresh-import numbers (162 records, 15 placements). An existing
+profile now converges to the same state a fresh import produces, which is the entire purpose of
+this step. The ELA misplacement is also gone.
+
+184 tests pass (179 + 5 new, one per protection rule), real `xcodebuild` succeeded.
+
+**Note on the test seams.** `replaceLessonsForTesting` / `replaceGeneratedOutputsForTesting` are
+`#if DEBUG` only. `lessons` and `generatedOutputs` are `private(set)` so production code cannot
+bypass their save paths; the seams let a test construct a starting state without weakening that.
+
+**Still open.** Steps 3-6 of PLAN REVISION 3 — `inferredSubject` on-demand fallback, per-artifact
+derivation versions, automatic stale rebuild with a visible summary, and later the
+derived-proposal / teacher-overlay split — plus the `updateLesson` explicit-API refactor.

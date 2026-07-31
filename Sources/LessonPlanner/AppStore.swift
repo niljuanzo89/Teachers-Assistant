@@ -936,6 +936,101 @@ final class AppStore: ObservableObject {
         return .built(blockCount: blockCount)
     }
 
+    /// Lessons an automatic rebuild must not delete, even though the app derived them.
+    ///
+    /// Artifact-level ownership is the rule, but referential integrity outranks provenance purity:
+    /// a teacher-owned artifact keeps alive the record it depends on. Two protections, both
+    /// evidence of teacher investment rather than app authorship:
+    ///
+    /// - a teacher-placed or teacher-moved assignment pointing at the lesson — deleting it would
+    ///   create the dangling reference `WeeklyPackageReadinessReport` already reports as a missing
+    ///   scheduled lesson;
+    /// - any generated output pointing at the lesson, because the corresponding file already
+    ///   exists in the teacher's output folder and is outside the snapshot safety net.
+    #if DEBUG
+    /// Test-only seams. `lessons` and `generatedOutputs` are `private(set)` so production code
+    /// cannot bypass their save paths; these let a test construct a starting state directly.
+    func replaceLessonsForTesting(_ newLessons: [LessonRecord]) { lessons = newLessons }
+    func replaceGeneratedOutputsForTesting(_ outputs: [GeneratedOutputRecord]) { generatedOutputs = outputs }
+    #endif
+
+    private func rebuildProtectedLessonIDs() -> (assignmentLinked: Set<UUID>, outputLinked: Set<UUID>) {
+        let assignmentLinked = Set(
+            weeklyPlan.assignments
+                .filter { $0.effectiveOrigin == .teacherAuthored }
+                .map(\.lessonRecordID)
+        )
+        let outputLinked = Set(generatedOutputs.compactMap(\.lessonRecordID))
+        return (assignmentLinked, outputLinked)
+    }
+
+    /// Computes what `rebuildDerivedPlanningData()` would do, without changing anything.
+    func previewDerivedRebuild() -> DerivedRebuildPreview {
+        let plan = configuration?.coursePacingPlan
+        let blocked = plan.map { $0.effectiveOrigin == .teacherAuthored } ?? false
+        let protectedIDs = rebuildProtectedLessonIDs()
+
+        var removable = 0
+        var preservedTeacher = 0
+        var preservedOutput = 0
+        var preservedAssignment = 0
+        for lesson in lessons {
+            guard lesson.effectiveOrigin == .autoDerived else { preservedTeacher += 1; continue }
+            if protectedIDs.outputLinked.contains(lesson.id) { preservedOutput += 1 }
+            else if protectedIDs.assignmentLinked.contains(lesson.id) { preservedAssignment += 1 }
+            else { removable += 1 }
+        }
+
+        let removablePlacements = weeklyPlan.assignments.filter { $0.effectiveOrigin == .autoDerived }.count
+        return DerivedRebuildPreview(
+            removableLessons: removable,
+            removablePlacements: removablePlacements,
+            preservedTeacherLessons: preservedTeacher,
+            preservedOutputLinkedLessons: preservedOutput,
+            preservedAssignmentLinkedLessons: preservedAssignment,
+            preservedTeacherPlacements: weeklyPlan.assignments.count - removablePlacements,
+            pacingUnitsBefore: plan?.units.count ?? 0,
+            pacingLessonsBefore: plan?.lessonCount ?? 0,
+            isBlockedByTeacherAuthoredPacing: blocked
+        )
+    }
+
+    /// Regenerates only the planning data the app owns, from documents already imported. No file
+    /// access and no re-import: extracted text is already persisted.
+    ///
+    /// Exists because improving derivation logic otherwise never reaches an existing profile — a
+    /// stored pacing plan short-circuits the rebuild path, so a teacher keeps seeing results
+    /// produced by code that has since been fixed.
+    ///
+    /// Returns the preview describing what was done, or nil when the rebuild was refused.
+    @discardableResult
+    func rebuildDerivedPlanningData() -> DerivedRebuildPreview? {
+        let preview = previewDerivedRebuild()
+        guard !preview.isBlockedByTeacherAuthoredPacing else {
+            lastError = "This course pacing plan includes your own edits, so it was not rebuilt. Clear or replace it first if you want to start from the imported documents again."
+            return nil
+        }
+
+        // Revertible through the existing restore path. Note this covers app records only —
+        // already-generated output files on disk are not captured, which is why lessons with
+        // generated outputs are protected from deletion above rather than relying on this.
+        saveCurrentProgressSnapshot(named: "Before rebuilding planning data")
+
+        let protectedIDs = rebuildProtectedLessonIDs()
+        lessons.removeAll { lesson in
+            lesson.effectiveOrigin == .autoDerived
+                && !protectedIDs.outputLinked.contains(lesson.id)
+                && !protectedIDs.assignmentLinked.contains(lesson.id)
+        }
+        weeklyPlan.assignments.removeAll { $0.effectiveOrigin == .autoDerived }
+        saveLessons()
+        saveWeeklyPlan()
+
+        syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: true)
+        lastError = nil
+        return preview
+    }
+
     private func syncReadableDocumentsIntoWeeklyPlanner(rebuildExistingPacing: Bool) {
         guard var configuration else { return }
         let readableSources = importedSources.filter { !$0.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

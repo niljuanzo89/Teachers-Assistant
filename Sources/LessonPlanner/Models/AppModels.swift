@@ -1945,3 +1945,42 @@ struct AutoPlacementSummary: Equatable {
             + "subject block was found — those blocks were left unchanged."
     }
 }
+
+/// What an explicit rebuild of derived planning data would do, or has just done. Computed before
+/// execution so the teacher confirms against real counts rather than a vague warning — this
+/// operation removes records, and generated output files already written to their output folder
+/// are outside the snapshot safety net entirely.
+struct DerivedRebuildPreview: Equatable {
+    var removableLessons: Int
+    var removablePlacements: Int
+    var preservedTeacherLessons: Int
+    /// Auto-derived lessons kept because a generated lesson plan, deck, or differentiation guide
+    /// points at them. A teacher who generated and possibly printed materials has invested in that
+    /// lesson, and the files on disk would be orphaned by deleting it.
+    var preservedOutputLinkedLessons: Int
+    /// Auto-derived lessons kept because a teacher-placed or teacher-moved assignment references
+    /// them. Deleting these would produce exactly the dangling state
+    /// `WeeklyPackageReadinessReport` already reports as a missing scheduled lesson.
+    var preservedAssignmentLinkedLessons: Int
+    var preservedTeacherPlacements: Int
+    var pacingUnitsBefore: Int
+    var pacingLessonsBefore: Int
+    /// True when the active pacing plan is the teacher's. A rebuild refuses rather than discarding
+    /// hand-edited dates, skipped days, and refinement notes.
+    var isBlockedByTeacherAuthoredPacing: Bool
+
+    var preservedLessonTotal: Int {
+        preservedTeacherLessons + preservedOutputLinkedLessons + preservedAssignmentLinkedLessons
+    }
+
+    var summaryLine: String {
+        if isBlockedByTeacherAuthoredPacing {
+            return "This course pacing plan has your own edits, so it will not be rebuilt automatically."
+        }
+        var parts = ["\(removableLessons) auto-created lesson\(removableLessons == 1 ? "" : "s") and \(removablePlacements) automatic placement\(removablePlacements == 1 ? "" : "s") will be rebuilt from your imported documents."]
+        if preservedLessonTotal > 0 || preservedTeacherPlacements > 0 {
+            parts.append("\(preservedLessonTotal) lesson\(preservedLessonTotal == 1 ? "" : "s") and \(preservedTeacherPlacements) placement\(preservedTeacherPlacements == 1 ? "" : "s") you created, edited, or generated materials for will be kept unchanged.")
+        }
+        return parts.joined(separator: " ")
+    }
+}
