@@ -3132,3 +3132,30 @@ concern was checked and has no live instance — every content-mutating UI path 
 **Follow-up:** "Timing" is currently discarded rather than read into a field; the lesson model
 has no home for it yet. Materials repeat verbatim across the days of an ELA unit — believed
 faithful to the source, not yet confirmed against a second corpus.
+
+**Batch 046 follow-up (same batch, after Codex debrief).** Two defects Codex found in the
+landed work, both fixed before moving on:
+
+1. **I broke a documented UI contract.** The lesson editor's "Fill empty fields from labeled
+   source text" button promises in its tooltip that it "does not infer missing content", and
+   `LessonFieldExtractor`'s own doc comment names that button as the caller that must never
+   infer. Routing it through the shared helper made it infer steps. Fixed with an explicit
+   `allowStructuralInference:` parameter — false for the button, true for automatic placement —
+   so the two paths still share one set of field rules and cannot drift, without the sharing
+   silently breaking the promise. A test now asserts the button does not infer.
+2. **Raw `.isEmpty` as the "teacher already filled this" test.** A field wiped to whitespace,
+   or `materials == [""]`, read as filled and would have blocked population permanently. Now
+   uses the same trimmed blank semantics as `LessonExportReadinessReport`.
+
+**Deferred to Batch E, per Codex:** `inferredFields` has no lifecycle (a teacher editing an
+inferred field does not clear its marker), and the older `createDraftLesson` path infers via
+`extractWithStructuralInference` without recording `inferredFields` at all — so the structured
+state is not yet app-wide. Both must land *with* the UI surfacing, not after it.
+
+**On the terminator list:** Codex agrees it is sound tactically but will grow, and advises
+against inverting to "short line followed by a longer one is a label" — that would false-stop
+on legitimately short values ("Counters", "Exit ticket"). Recommended shape instead: keep
+explicit labels, and add an audit that reports unknown heading-like lines seen in real packets,
+promoting terms only from measured misses. Not started.
+
+**Verification:** 218 tests passing (6 new), `xcodebuild` succeeds.

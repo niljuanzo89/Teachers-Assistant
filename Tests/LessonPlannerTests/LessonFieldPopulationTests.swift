@@ -110,7 +110,7 @@ final class LessonFieldPopulationTests: XCTestCase {
     /// this is the one field the measurement showed needs structural inference.
     @MainActor
     func testInstructionalStepsComeFromPhaseHeadingsAndAreMarkedInferred() throws {
-        let (store, source, _) = try makeStore()
+        let (_, source, _) = try makeStore()
         guard var monday = LessonSourceSpanDetector.detect(in: weekText)
             .first(where: { $0.lessonTitle.contains("Place value") }),
               let mondayText = monday.resolvedText(in: source.extractedText) else {
@@ -124,10 +124,10 @@ final class LessonFieldPopulationTests: XCTestCase {
                 + "inference fallback below is no longer the thing under test"
         )
 
-        var lesson = LessonRecord.draft(title: "Place value review")
-        lesson.sourceSpan = monday
-        lesson.sourceTextSnapshot = mondayText
-        let filled = store.fillEmptyLessonFieldsFromSource(lesson)
+        var filled = LessonRecord.draft(title: "Place value review")
+        filled.sourceSpan = monday
+        filled.sourceTextSnapshot = mondayText
+        AppStore.populateFields(from: mondayText, into: &filled, allowStructuralInference: true)
 
         let titles = filled.instructionalSequence.map(\.title)
         XCTAssertTrue(titles.contains { $0.localizedCaseInsensitiveContains("warm-up") }, "got \(titles)")
@@ -188,5 +188,51 @@ final class LessonFieldPopulationTests: XCTestCase {
 
         XCTAssertEqual(filled.objective, "Compare three-digit numbers using base-ten reasoning.")
         XCTAssertFalse(filled.objective.contains("Stale"), "used the stale snapshot instead of the span")
+    }
+
+    /// The lesson editor's button promises explicit labels only. It shares the population helper
+    /// with the automatic path so their field rules cannot drift, and that sharing is exactly how
+    /// the promise could be broken silently — so it is asserted here.
+    @MainActor
+    func testTheManualButtonDoesNotInferSteps() throws {
+        let (store, source, _) = try makeStore()
+        guard var monday = LessonSourceSpanDetector.detect(in: weekText)
+            .first(where: { $0.lessonTitle.contains("Place value") }),
+              let mondayText = monday.resolvedText(in: source.extractedText) else {
+            return XCTFail("Monday span not detected")
+        }
+        monday.sourceID = source.id
+
+        var lesson = LessonRecord.draft(title: "Place value review")
+        lesson.sourceSpan = monday
+        lesson.sourceTextSnapshot = mondayText
+        let filled = store.fillEmptyLessonFieldsFromSource(lesson)
+
+        XCTAssertTrue(filled.instructionalSequence.isEmpty, "the button inferred steps it promised not to")
+        XCTAssertNil(filled.inferredFields, "nothing was inferred, so nothing may be marked inferred")
+        XCTAssertFalse(filled.objective.isEmpty, "labeled fields should still fill")
+    }
+
+    /// A field wiped to whitespace reads as filled under a raw `.isEmpty` test, which would block
+    /// population permanently.
+    @MainActor
+    func testWhitespaceOnlyFieldsAreTreatedAsEmpty() throws {
+        let (store, source, _) = try makeStore()
+        guard var monday = LessonSourceSpanDetector.detect(in: weekText)
+            .first(where: { $0.lessonTitle.contains("Place value") }),
+              let mondayText = monday.resolvedText(in: source.extractedText) else {
+            return XCTFail("Monday span not detected")
+        }
+        monday.sourceID = source.id
+
+        var lesson = LessonRecord.draft(title: "Place value review")
+        lesson.sourceSpan = monday
+        lesson.sourceTextSnapshot = mondayText
+        lesson.objective = "   "
+        lesson.materials = [""]
+        let filled = store.fillEmptyLessonFieldsFromSource(lesson)
+
+        XCTAssertEqual(filled.objective, "Compare three-digit numbers using base-ten reasoning.")
+        XCTAssertEqual(filled.materials, ["Base-ten blocks", "whiteboards", "exit ticket"])
     }
 }

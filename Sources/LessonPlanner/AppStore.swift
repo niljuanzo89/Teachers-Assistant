@@ -1201,7 +1201,9 @@ final class AppStore: ObservableObject {
                let sliced = span.resolvedText(in: source.extractedText) {
                 lesson.sourceSpan = span
                 lesson.sourceTextSnapshot = sliced
-                populatedSteps = Self.populateFields(from: sliced, into: &lesson)
+                populatedSteps = Self.populateFields(
+                    from: sliced, into: &lesson, allowStructuralInference: true
+                )
             } else {
                 // Honest degradation: no confident split means the teacher sees the whole document
                 // and can judge it themselves, which is what happens for single-page sources.
@@ -1654,22 +1656,38 @@ final class AppStore: ObservableObject {
     ///
     /// Returns true when instructional steps were populated, so the caller can skip seeding the
     /// placeholder step that would otherwise make this lesson look non-empty forever.
-    private static func populateFields(from spanText: String, into lesson: inout LessonRecord) -> Bool {
+    /// - Parameter allowStructuralInference: whether phase headings may supply instructional
+    ///   steps. False for the lesson editor's manual button, whose tooltip promises explicit
+    ///   labels only — both paths share this helper so their field rules cannot drift, but that
+    ///   sharing must not quietly break the promise the button makes to the teacher.
+    ///
+    /// Internal rather than private so tests can exercise both modes directly.
+    @discardableResult
+    static func populateFields(
+        from spanText: String, into lesson: inout LessonRecord, allowStructuralInference: Bool
+    ) -> Bool {
+        // A field a teacher wiped to spaces reads as filled under a raw `.isEmpty` test, which
+        // would then block population forever. Same blank semantics as `LessonExportReadinessReport`.
+        func blank(_ value: String) -> Bool {
+            value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
         let labeled = LessonFieldExtractor.extract(from: spanText)
 
-        if lesson.subject.isEmpty { lesson.subject = labeled.subject ?? "" }
-        if lesson.gradeOrAgeRange.isEmpty { lesson.gradeOrAgeRange = labeled.gradeOrAgeRange ?? "" }
-        if lesson.objective.isEmpty { lesson.objective = labeled.objective ?? "" }
-        if lesson.materials.isEmpty { lesson.materials = labeled.materials }
-        if lesson.assessmentSummary.isEmpty { lesson.assessmentSummary = labeled.assessment ?? "" }
-        if lesson.differentiationSummary.isEmpty {
-            lesson.differentiationSummary = labeled.differentiation ?? ""
+        if blank(lesson.subject) { lesson.subject = labeled.subject ?? lesson.subject }
+        if blank(lesson.gradeOrAgeRange) { lesson.gradeOrAgeRange = labeled.gradeOrAgeRange ?? lesson.gradeOrAgeRange }
+        if blank(lesson.objective) { lesson.objective = labeled.objective ?? lesson.objective }
+        if lesson.materials.allSatisfy(blank) { lesson.materials = labeled.materials }
+        if blank(lesson.assessmentSummary) { lesson.assessmentSummary = labeled.assessment ?? lesson.assessmentSummary }
+        if blank(lesson.differentiationSummary) {
+            lesson.differentiationSummary = labeled.differentiation ?? lesson.differentiationSummary
         }
 
-        guard lesson.instructionalSequence.isEmpty else { return false }
+        let sequenceIsBlank = lesson.instructionalSequence
+            .allSatisfy { blank($0.title) && blank($0.notes) }
+        guard sequenceIsBlank else { return false }
         var steps = labeled.steps
         var inferred: Set<LessonFieldExtractor.Field> = []
-        if steps.isEmpty {
+        if steps.isEmpty, allowStructuralInference {
             // Take `.steps` and nothing else. `fillingGaps` can also infer an objective, subject,
             // grade, and assessment; those are deliberately discarded here, because the labeled
             // pass above already covers them and an inferred value there would be a guess rather
@@ -1702,9 +1720,9 @@ final class AppStore: ObservableObject {
             return lesson
         }
         var updated = lesson
-        // Same helper the automatic path uses, so the button and the import produce identical
-        // fields rather than two extraction rules that drift apart.
-        Self.populateFields(from: sourceText, into: &updated)
+        // Same helper the automatic path uses, so the two cannot drift apart — but label-only,
+        // because this button's tooltip promises exactly that.
+        Self.populateFields(from: sourceText, into: &updated, allowStructuralInference: false)
         updateLessonFromTeacherEdit(updated)
         return updated
     }
