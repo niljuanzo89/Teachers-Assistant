@@ -1249,3 +1249,21 @@ LessonPlanner is a local-first macOS application for turning teacher-reviewed so
 - Verification: `swift test -Xswiftc -gnone` — 143/143 passed. Real `xcodebuild` succeeded.
   Both the recovery screen (against a synthetic corrupted data root) and normal startup
   (against real data) confirmed by screenshot.
+
+### 2026-07-30 — Import filtering, subject stamping, and placement feedback
+
+- `CoursePacingPlan.starter` no longer manufactures a placeholder lesson, module, or unit for
+  a readable source that does not yield a usable lesson title. Malformed worksheet prose that
+  merely begins with `Day` is no longer accepted as a heading.
+- The document-placement classifier now participates in automatic pacing: supporting material
+  is excluded, short two-entry weekly packets remain accepted, and schedules/calendars retain
+  their planning-only path.
+- Imported sources now persist an optional inferred subject, populated from explicit labels or
+  standards codes. New lesson records receive that subject and scheduling consults it before
+  falling back to broad full-text scoring.
+- Document Intake now displays the last automatic-placement summary after an import.
+- Verified against a copied local profile in `/tmp` using only persisted extracted text: after
+  simulating fresh import metadata, all 15 scheduled lessons landed in the Math block; no
+  placement used a non-schedule time. The live workspace was not modified.
+- Verification: permanent Swift suite passed 167 tests with 0 failures. Real Debug Xcode build
+  succeeded.

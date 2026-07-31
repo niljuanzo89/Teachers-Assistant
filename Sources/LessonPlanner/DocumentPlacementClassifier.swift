@@ -39,11 +39,10 @@ enum LessonPlacementEligibility: String, Codable, CaseIterable, Identifiable {
     var canOccupyScheduleBlock: Bool { self == .placeableLesson }
 
     /// Whether this document may contribute lessons to the course pacing sequence. Broader than
-    /// `canOccupyScheduleBlock`, and deliberately expressed as an exclusion: a lesson page, a
-    /// lesson list, and a planning document (a scope-and-sequence *is* the canonical lesson list)
-    /// all legitimately yield a sequence. What must never yield one is supporting material — the
-    /// answer keys and practice pages that turned 316 documents into 173 fragment lessons — or a
-    /// document with nothing usable in it.
+    /// `canOccupyScheduleBlock`: a lesson page, lesson list, or true scope-and-sequence may
+    /// establish a sequence. The pacing builder independently skips documents that yield no
+    /// named lessons, which keeps schedules and generic planning references from manufacturing
+    /// placeholder records while preserving legitimate scope-and-sequence files.
     var canContributeLessonSequence: Bool {
         self != .supportingMaterial && self != .inert
     }
@@ -106,8 +105,10 @@ enum DocumentPlacementClassifier {
         let name = displayName.lowercased()
         let lessonKey = lessonKey(displayName: displayName, extractedText: trimmedText)
 
-        // 1. Planning documents keep their existing, working pathway.
-        if let phrase = planningPhrase(in: "\(name) \(trimmedText.prefix(3_000).lowercased())") {
+        let planningText = "\(name) \(trimmedText.prefix(3_000).lowercased())"
+
+        // 1. Schedules and calendars govern the scaffold; their rows are never lessons.
+        if let phrase = schedulePlanningPhrase(in: planningText) {
             return DocumentPlacementClassification(
                 eligibility: .planningDocument,
                 differentiationRole: nil,
@@ -117,7 +118,7 @@ enum DocumentPlacementClassifier {
         }
 
         // 2. Nothing readable means nothing to place or attach.
-        guard trimmedText.count >= minimumUsableTextLength else {
+        guard !trimmedText.isEmpty else {
             return DocumentPlacementClassification(
                 eligibility: .inert,
                 differentiationRole: nil,
@@ -133,6 +134,36 @@ enum DocumentPlacementClassifier {
                 differentiationRole: role,
                 lessonKey: lessonKey,
                 rationale: "The file name identifies this as \(role.displayName.lowercased()) material, so it supports a lesson instead of filling a block."
+            )
+        }
+
+        let sequenceCount = enumeratedLessonCount(in: trimmedText)
+        if let phrase = sequencePlanningPhrase(in: planningText), sequenceCount == nil {
+            return DocumentPlacementClassification(
+                eligibility: .planningDocument,
+                differentiationRole: nil,
+                lessonKey: lessonKey,
+                rationale: "Reads as a planning document (\"\(phrase)\"); no explicit lesson list was found."
+            )
+        }
+
+        // A legitimate weekly packet may be shorter than the normal body-text floor. Its two
+        // dated entries are a stronger signal than length, so inspect them before rejecting it.
+        if let count = sequenceCount, trimmedText.count < minimumUsableTextLength {
+            return DocumentPlacementClassification(
+                eligibility: .lessonSequence,
+                differentiationRole: nil,
+                lessonKey: lessonKey,
+                rationale: "Reads as a short lesson list: found \(count) lesson entries."
+            )
+        }
+
+        guard trimmedText.count >= minimumUsableTextLength else {
+            return DocumentPlacementClassification(
+                eligibility: .inert,
+                differentiationRole: nil,
+                lessonKey: lessonKey,
+                rationale: "No usable text or lesson structure could be read from this short file, so it is kept on file but not used."
             )
         }
 
@@ -156,7 +187,7 @@ enum DocumentPlacementClassifier {
         }
 
         // 5. Not a lesson itself, but enumerates several — a content packet or unit lesson list.
-        if let count = enumeratedLessonCount(in: trimmedText) {
+        if let count = sequenceCount {
             return DocumentPlacementClassification(
                 eligibility: .lessonSequence,
                 differentiationRole: nil,
@@ -194,16 +225,23 @@ enum DocumentPlacementClassifier {
     /// same failure that classified 315 of 316 documents as `lessonMaterial` — but it is load
     /// bearing for the existing pacing pathway and should be tightened as its own change, with
     /// its own verification, rather than as a side effect of this work.
-    private static let planningPhrases = [
-        "pacing guide", "scope and sequence", "scope & sequence", "year at a glance",
-        "year-at-a-glance", "curriculum map", "standards map", "course map", "unit sequence",
+    private static let schedulePlanningPhrases = [
         "instructional calendar", "district calendar", "school calendar", "daily schedule",
         "class schedule", "instructional schedule", "assessment calendar", "assessment schedule",
         "quiz schedule", "instructional days"
     ]
 
-    private static func planningPhrase(in haystack: String) -> String? {
-        planningPhrases.first { haystack.contains($0) }
+    private static let sequencePlanningPhrases = [
+        "pacing guide", "scope and sequence", "scope & sequence", "year at a glance",
+        "year-at-a-glance", "curriculum map", "standards map", "course map", "unit sequence"
+    ]
+
+    private static func schedulePlanningPhrase(in haystack: String) -> String? {
+        schedulePlanningPhrases.first { haystack.contains($0) }
+    }
+
+    private static func sequencePlanningPhrase(in haystack: String) -> String? {
+        sequencePlanningPhrases.first { haystack.contains($0) }
     }
 
     /// Below this, extraction has effectively failed — a page of running heads and a page number.
@@ -276,7 +314,7 @@ enum DocumentPlacementClassifier {
     /// A document enumerating several lesson titles — day-keyed ("Monday: Place value review"),
     /// numbered ("Lesson 3: Rounding"), or a unit list. Requires at least this many entries so a
     /// single incidental "Lesson 2:" line in prose cannot make a worksheet look like a sequence.
-    private static let minimumEnumeratedLessons = 3
+    private static let minimumEnumeratedLessons = 2
 
     private static func enumeratedLessonCount(in text: String) -> Int? {
         let patterns = [

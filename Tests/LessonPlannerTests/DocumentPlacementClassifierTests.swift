@@ -112,6 +112,12 @@ final class DocumentPlacementClassifierTests: XCTestCase {
         XCTAssertTrue(result.eligibility.canContributeLessonSequence)
     }
 
+    func testShortTwoEntryWeeklyPacketIsASequenceBeforeTextLengthFloor() {
+        let result = classify("weekly.pdf", "Unit 1\nMonday: Compare fractions\nTuesday: Model fractions")
+        XCTAssertEqual(result.eligibility, .lessonSequence)
+        XCTAssertTrue(result.eligibility.canContributeLessonSequence)
+    }
+
     func testSupportingMaterialAndInertNeverContributeALessonSequence() {
         XCTAssertFalse(classify("lesson5-reteach.pdf", lessonBody).eligibility.canContributeLessonSequence)
         XCTAssertFalse(classify("scan.pdf", " ").eligibility.canContributeLessonSequence)
@@ -119,6 +125,15 @@ final class DocumentPlacementClassifierTests: XCTestCase {
         let scope = classify("Scope and Sequence.docx", "Scope and Sequence\nUnit 1: Fractions\nLesson 1: Equivalent fractions")
         XCTAssertEqual(scope.eligibility, .planningDocument)
         XCTAssertTrue(scope.eligibility.canContributeLessonSequence)
+    }
+
+    func testLegacyImportedSourceDecodesWithoutInferredSubject() throws {
+        let legacyJSON = """
+        {"id":"9F1E2D3C-0000-4000-8000-000000000001","reference":{"id":"9F1E2D3C-0000-4000-8000-000000000002","displayName":"lesson.pdf","path":"/tmp/lesson.pdf"},"extractionMethod":"embeddedText","extractedText":"placeholder","reviewStatus":"reviewed","importedAt":"2026-07-01T12:00:00Z","updatedAt":"2026-07-01T12:00:00Z"}
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        XCTAssertNil(try decoder.decode(ImportedSource.self, from: Data(legacyJSON.utf8)).inferredSubject)
     }
 
     // MARK: - Attachment key

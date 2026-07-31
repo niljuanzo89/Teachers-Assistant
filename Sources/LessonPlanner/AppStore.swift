@@ -776,13 +776,19 @@ final class AppStore: ObservableObject {
         } else {
             extraction = (method: .embeddedText, text: text, confidence: nil)
         }
+        let classification = DocumentPlacementClassifier.classify(displayName: url.lastPathComponent, extractedText: extraction.text)
+        let inferred = LessonFieldExtractor.extractWithStructuralInference(from: extraction.text)
         let source = ImportedSource(
             id: UUID(), reference: FileReference(url: url),
             setupRole: roleOverride ?? ImportedSourceRole.infer(displayName: url.lastPathComponent, extractedText: extraction.text),
             extractionMethod: extraction.method,
             confidence: extraction.confidence, extractedText: extraction.text,
             reviewStatus: extraction.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .imported : .reviewed,
-            importedAt: .now, updatedAt: .now
+            importedAt: .now, updatedAt: .now,
+            placementEligibility: classification.eligibility,
+            differentiationRole: classification.differentiationRole,
+            lessonKey: classification.lessonKey,
+            inferredSubject: inferred.subject
         )
         importedSources.insert(source, at: 0)
         saveImportedSources()
@@ -791,12 +797,18 @@ final class AppStore: ObservableObject {
     private func importDOCX(_ url: URL, roleOverride: ImportedSourceRole?) {
         do {
             let text = try extractDOCXText(from: url)
+            let classification = DocumentPlacementClassifier.classify(displayName: url.lastPathComponent, extractedText: text)
+            let inferred = LessonFieldExtractor.extractWithStructuralInference(from: text)
             let source = ImportedSource(
                 id: UUID(), reference: FileReference(url: url),
                 setupRole: roleOverride ?? ImportedSourceRole.infer(displayName: url.lastPathComponent, extractedText: text),
                 extractionMethod: .embeddedText,
                 confidence: nil, extractedText: text,
-                reviewStatus: .reviewed, importedAt: .now, updatedAt: .now
+                reviewStatus: .reviewed, importedAt: .now, updatedAt: .now,
+                placementEligibility: classification.eligibility,
+                differentiationRole: classification.differentiationRole,
+                lessonKey: classification.lessonKey,
+                inferredSubject: inferred.subject
             )
             importedSources.insert(source, at: 0)
             saveImportedSources()
@@ -911,17 +923,15 @@ final class AppStore: ObservableObject {
                 return approvedPlan
             }()
         } else {
-            // Left on `setupRole` deliberately. Filtering these sources through the placement
-            // classifier was tried and reverted: it is simultaneously too strict (a valid
-            // 75-character weekly packet fell under a minimum-text floor) and too permissive (a
-            // planning document began contributing lessons it previously did not), and tuning it
-            // to fit the existing fixtures produced a rotating set of failures. The hard safety
-            // guarantee now lives at placement instead, which is where the reported scatter
-            // actually occurred. Revisit this prefilter as its own change, verified against real
-            // imported documents rather than fixtures.
-            let lessonMaterialSources = readableSources.filter { $0.effectiveSetupRole == .lessonMaterial }
+            // Content folders commonly contain supporting pages alongside lesson material. Only
+            // a lesson-shaped source or explicit lesson list may establish pacing; schedules and
+            // supporting pages stay available without manufacturing lesson records.
+            let lessonMaterialSources = readableSources.filter {
+                $0.effectiveSetupRole == .lessonMaterial && $0.canContributeLessonSequence
+            }
             let pacingSequenceSources = readableSources.filter { source in
                 [.pacingGuide, .curriculumMap].contains(source.effectiveSetupRole)
+                    && source.canContributeLessonSequence
             }
             let lessonPlanningSources = lessonMaterialSources.isEmpty ? pacingSequenceSources : lessonMaterialSources
             var starterPlan = CoursePacingPlan.starter(from: lessonPlanningSources.isEmpty ? readableSources : lessonPlanningSources)
@@ -1016,6 +1026,9 @@ final class AppStore: ObservableObject {
         }
 
         var lesson = LessonRecord.draft(title: suggestion.pacingLessonTitle)
+        if let source = sourceDocument(referencedIn: suggestion.sourceNotes) {
+            lesson.subject = source.inferredSubject ?? ""
+        }
         lesson.status = .approved
         lesson.sourceReferences = [suggestion.planningNote]
         lesson.aiReviewWarnings = ["Auto-created from readable planning documents. Fill any blank or incorrect fields as needed."]
@@ -1122,17 +1135,25 @@ final class AppStore: ObservableObject {
         // Lesson titles are often terse ("Equivalent fractions", "Day 3") and carry no
         // recognizable subject keyword on their own. Fall back to the full extracted text
         // of the source document the lesson was proposed from, which usually does.
-        if let sourceText = sourceDocumentText(referencedIn: suggestion.sourceNotes) {
-            return Self.matchedScheduleBlock(forSubjectText: sourceText.lowercased(), in: blocks)
+        if let source = sourceDocument(referencedIn: suggestion.sourceNotes) {
+            if let subject = source.inferredSubject,
+               let match = Self.matchedScheduleBlock(forSubjectText: subject.lowercased(), in: blocks) {
+                return match
+            }
+            return Self.matchedScheduleBlock(forSubjectText: source.extractedText.lowercased(), in: blocks)
         }
         return nil
     }
 
     private func sourceDocumentText(referencedIn sourceNotes: String) -> String? {
+        sourceDocument(referencedIn: sourceNotes)?.extractedText
+    }
+
+    private func sourceDocument(referencedIn sourceNotes: String) -> ImportedSource? {
         let prefix = "Proposed from "
         guard sourceNotes.hasPrefix(prefix) else { return nil }
         let displayName = String(sourceNotes.dropFirst(prefix.count))
-        return importedSources.first { $0.reference.displayName == displayName }?.extractedText
+        return importedSources.first { $0.reference.displayName == displayName }
     }
 
     private struct SubjectVocabulary {

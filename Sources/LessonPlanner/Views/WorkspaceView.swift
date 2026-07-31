@@ -384,6 +384,14 @@ struct SourceImportView: View {
                     }
                     .padding(.horizontal, 18)
 
+                    if let summary = store.lastAutoPlacementSummary {
+                        Label(summary.summaryLine, systemImage: summary.hasUnplaced ? "exclamationmark.circle" : "checkmark.circle")
+                            .font(DS.font(12.5, weight: .medium))
+                            .foregroundStyle(summary.hasUnplaced ? DS.accent2_700 : DS.accent700)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 18)
+                    }
+
                     ImportedSourceRoleSummaryView(sources: store.importedSources) {
                         isShowingClearConfirmation = true
                     }

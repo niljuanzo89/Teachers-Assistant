@@ -913,3 +913,26 @@ PROCESS NOTE FROM BATCH 029, worth internalizing: earlier in that same session I
 the enrichment layer was "not started," based on reading `OUTPUT_ENRICHMENT_PLAN.md` rather than
 grepping the code. `LessonFieldExtractor` had existed for many batches. A plan document states
 intent, not what shipped — check the code before reporting a roadmap item's status.
+
+## Batch 035 update — 2026-07-30
+
+Automatic content import now consults `DocumentPlacementClassifier` before building pacing.
+Supporting material is excluded; short two-entry weekly packets remain valid; schedules and
+calendars remain planning-only. `CoursePacingPlan.starter(from:)` no longer invents placeholder
+lessons or empty units/modules for sources that yield no valid title, and malformed worksheet
+prose beginning `Day` no longer passes as a heading.
+
+`ImportedSource.inferredSubject` is optional for decoding safety and is written during new
+PDF/DOCX imports using `LessonStructureInferencer`. It feeds both new LessonRecord subjects and
+schedule-block matching. `AutoPlacementSummary` is now shown in Document Intake after import.
+
+Real-data verification used a copied local profile under `/tmp`, not original curriculum files:
+after simulated fresh-import metadata, 15/15 automatic placements landed in the Math block and
+all used real schedule blocks. The profile copy reduced generated records from 172 to 162 and
+removed the measured malformed Day fragments. Permanent suite: 167 passing. Real Xcode Debug
+build: passed.
+
+Important limitation: the optional inferred subject is populated at future import, not backfilled
+into an existing teacher workspace. Do not add a silent migration; make any backfill an explicit,
+verified action. Next high-value work is grouping remaining page-level documents by
+`DocumentLessonKey`, then attaching supporting materials to those grouped lessons.

@@ -2600,6 +2600,62 @@ final class LessonPlannerTests: XCTestCase {
     }
 
     @MainActor
+    func testContentImportUsesStoredStandardsSubjectAndSkipsSupportingPages() throws {
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Diagnostic Workspace",
+            workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        let scheduleURL = repository.rootURL.appending(path: "Daily Schedule.docx")
+        let packetURL = repository.rootURL.appending(path: "Unit Packet.docx")
+        let challengeURL = repository.rootURL.appending(path: "CHLG Fraction Practice.docx")
+        try makeDOCX(at: scheduleURL, paragraphs: [
+            "Sample Daily Schedule", "8:35 AM - 9:35 AM", "Reading", "9:45 AM - 10:45 AM", "Math"
+        ])
+        try makeDOCX(at: packetURL, paragraphs: [
+            "5.NF.A.1", "Monday: Add fractions", "Tuesday: Compare fractions"
+        ])
+        try makeDOCX(at: challengeURL, paragraphs: [
+            "5.NF.A.1", "Lesson 7: Challenge fraction puzzle", "Students solve an extension problem with fraction models."
+        ])
+        let store = AppStore(repository: repository)
+
+        store.importPlanningDocumentItems([scheduleURL])
+        store.importContentDocumentItems([packetURL, challengeURL])
+
+        XCTAssertEqual(store.lessons.map(\.title), ["Add fractions", "Compare fractions"])
+        XCTAssertTrue(store.lessons.allSatisfy { $0.subject == "Math" })
+        XCTAssertEqual(store.importedSources.first { $0.reference.displayName == "Unit Packet.docx" }?.inferredSubject, "Math")
+        XCTAssertEqual(store.importedSources.first { $0.reference.displayName == "CHLG Fraction Practice.docx" }?.effectivePlacementEligibility, .supportingMaterial)
+        let calendar = Calendar.current
+        XCTAssertTrue(store.weeklyPlan.assignments.allSatisfy {
+            calendar.component(.hour, from: $0.start) == 9 && calendar.component(.minute, from: $0.start) == 45
+        })
+    }
+
+    func testStarterSkipsReadableSourceWithoutLessonTitles() {
+        let source = ImportedSource(
+            id: UUID(), reference: FileReference(url: URL(fileURLWithPath: "/tmp/support.pdf")),
+            setupRole: .lessonMaterial, extractionMethod: .embeddedText, confidence: nil,
+            extractedText: "Teacher notes\nUse visual supports during small-group work.", reviewStatus: .reviewed,
+            importedAt: .now, updatedAt: .now
+        )
+        let plan = CoursePacingPlan.starter(from: [source])
+        XCTAssertTrue(plan.units.isEmpty)
+        XCTAssertTrue(plan.sourceReferenceNames.isEmpty)
+    }
+
+    func testStarterRejectsWorksheetProseThatOnlyStartsWithDay() {
+        let source = ImportedSource(
+            id: UUID(), reference: FileReference(url: URL(fileURLWithPath: "/tmp/prompt.pdf")),
+            setupRole: .lessonMaterial, extractionMethod: .embeddedText, confidence: nil,
+            extractedText: "Days in the unit\nDay, can a learner explain the answer?\nReview the model before responding.",
+            reviewStatus: .reviewed, importedAt: .now, updatedAt: .now
+        )
+        XCTAssertTrue(CoursePacingPlan.starter(from: [source]).units.isEmpty)
+    }
+
+    @MainActor
     func testContentImportSchedulesReadingLessonsIntoReadingBlockNotMath() throws {
         // The reverse direction of the same guarantee: non-math content, again with no literal
         // subject keyword in filename or lesson titles, must land in the Reading block and must

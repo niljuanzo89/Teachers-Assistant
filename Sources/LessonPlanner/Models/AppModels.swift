@@ -517,7 +517,11 @@ struct CoursePacingPlan: Codable, Equatable, Identifiable {
                 .filter { !$0.isEmpty }
             let unitTitle = firstHeading(in: lines, prefixes: ["unit", "module"]) ?? source.reference.displayName
             let lessonTitles = lessonTitleCandidates(in: lines)
-            let lessons = (lessonTitles.isEmpty ? ["Teacher-reviewed lesson sequence needed"] : lessonTitles).enumerated().map { index, title in
+            // A readable page is not automatically a lesson. Creating a placeholder for every
+            // page without a real title was the upstream fragment factory. Skip both the lesson
+            // and its otherwise-empty unit/module, since neither gives a teacher useful work.
+            guard !lessonTitles.isEmpty else { continue }
+            let lessons = lessonTitles.enumerated().map { index, title in
                 CoursePacingLesson(
                     id: UUID(),
                     sequence: index + 1,
@@ -533,7 +537,7 @@ struct CoursePacingPlan: Codable, Equatable, Identifiable {
                 title: firstHeading(in: lines, prefixes: ["module"]) ?? "Module 1",
                 estimatedInstructionalDays: max(lessons.count, 1),
                 lessons: lessons,
-                notes: lessonTitles.isEmpty ? "Review the source and replace this placeholder with the real lesson sequence." : ""
+                notes: ""
             )
             units.append(CoursePacingUnit(
                 id: UUID(),
@@ -549,9 +553,14 @@ struct CoursePacingPlan: Codable, Equatable, Identifiable {
             ))
         }
 
+        let contributingSourceNames = Set<String>(units.flatMap(\.modules).flatMap(\.lessons).compactMap { lesson in
+            let prefix = "Proposed from "
+            guard lesson.sourceNotes.hasPrefix(prefix) else { return nil }
+            return String(lesson.sourceNotes.dropFirst(prefix.count))
+        })
         return CoursePacingPlan(
             id: UUID(),
-            sourceReferenceNames: reviewedSources.map { $0.reference.displayName },
+            sourceReferenceNames: reviewedSources.map(\.reference.displayName).filter(contributingSourceNames.contains),
             units: units,
             teacherRefinementNotes: "",
             reviewStatus: .draft,
@@ -606,7 +615,17 @@ struct CoursePacingPlan: Codable, Equatable, Identifiable {
     private static func headingCandidates(in lines: [String], prefixes: [String]) -> [String] {
         lines.compactMap { line in
             let lowercased = line.lowercased()
-            guard prefixes.contains(where: { lowercased.hasPrefix($0) }) else { return nil }
+            guard let prefix = prefixes.first(where: { lowercased.hasPrefix($0) }) else { return nil }
+            let afterPrefix = lowercased.dropFirst(prefix.count)
+            // "Day, can ..." and "Days ..." are ordinary worksheet prose, not lesson
+            // headings. A heading label must end or be followed by whitespace, a number, or a
+            // conventional separator before it may contribute a lesson title.
+            guard afterPrefix.isEmpty
+                || afterPrefix.first?.isWhitespace == true
+                || afterPrefix.first?.isNumber == true
+                || afterPrefix.first == ":"
+                || afterPrefix.first == "-"
+            else { return nil }
             return line.count > 120 ? String(line.prefix(120)) : line
         }
     }
@@ -913,6 +932,9 @@ struct ImportedSource: Codable, Equatable, Identifiable {
     var differentiationRole: DifferentiationRole? = nil
     /// Module/lesson identifier used to attach supporting material to the right lesson.
     var lessonKey: DocumentLessonKey? = nil
+    /// Subject inferred once from labels or a standards code at import time. Optional so files
+    /// saved before this field existed remain decodable.
+    var inferredSubject: String? = nil
 
     var effectiveSetupRole: ImportedSourceRole {
         setupRole ?? ImportedSourceRole.infer(displayName: reference.displayName, extractedText: extractedText)
@@ -929,6 +951,10 @@ struct ImportedSource: Codable, Equatable, Identifiable {
     /// The single gate the planner must consult. Nothing but a placeable lesson may be scheduled.
     var canProposeScheduledLesson: Bool {
         effectivePlacementEligibility.canOccupyScheduleBlock
+    }
+
+    var canContributeLessonSequence: Bool {
+        effectivePlacementEligibility.canContributeLessonSequence
     }
 }
 

@@ -2240,3 +2240,45 @@ guarantee stops them corrupting the planner but does not stop them being manufac
 the last remaining misplacement, not a cleanup. It still must be reworked so it does not
 simultaneously exclude valid short packets and admit planning documents — verified against real
 documents this time, which is now cheap given the harness in this batch.
+
+### Batch 035 — 2026-07-30 — Activated import filtering and document-level subject stamping
+
+**Compute:** high. **Model shape:** single-model implementation with real-profile verification.
+
+1. Changed `CoursePacingPlan.starter(from:)` so a readable source with no extractable lesson
+   titles produces no placeholder lesson and no empty unit/module. This is deliberate: an
+   orphaned container is still clutter, not useful pacing work.
+2. Found that blank placeholder removal alone did not catch every fragment: worksheet prose such
+   as a sentence beginning `Day, ...` was being accepted by a prefix-only heading parser.
+   Required a real heading boundary (end, whitespace, number, colon, or dash) after `day`,
+   `lesson`, and `session`.
+3. Reworked the classifier prefilter: filename-marked supporting material is excluded;
+   schedules/calendars remain planning-only; short two-entry weekly packets are recognized before
+   the general text-length floor; genuine scope-and-sequence documents still contribute named
+   lessons.
+4. Added `ImportedSource.inferredSubject` as an optional persisted field and populated it at
+   PDF/DOCX import using `LessonStructureInferencer`. New automatic lesson records receive the
+   saved source subject; schedule matching consults it before full-text scoring.
+5. Added Document Intake feedback using `AutoPlacementSummary.summaryLine`.
+6. Added generic regression coverage for short packets, legacy decoding without the new subject
+   field, support-page exclusion, standards-derived Math placement, blank-source skipping, and
+   malformed `Day` worksheet prose.
+7. Ran a temporary test against a copied local profile in `/tmp`, with no original PDFs and no
+   writes to the live workspace. After simulating fresh-import metadata, 15/15 placements landed
+   in the Math block, all were real schedule blocks, and malformed Day fragments fell to 0.
+   Generated lesson records fell from 172 to 162 in that profile copy.
+8. Removed the temporary real-data harness before commit; no curriculum content, filenames, or
+   extracted text was committed.
+9. Verification: permanent Swift suite 167/167 passing; real Debug Xcode build succeeded.
+
+**Dead ends / notes.** The first copied-profile run looked unchanged because the copied
+configuration still contained its old pacing plan, so AppStore correctly reused it. Clearing the
+course pacing plan in the `/tmp` copy was necessary to exercise the new source-selection path.
+Existing already-imported sources do not receive `inferredSubject` retroactively by this batch;
+the new behavior applies to future imports. A migration/backfill should be a separate,
+explicitly verified decision rather than silently rewriting teacher data.
+
+**Still open.** Improve the remaining page-level records through document grouping
+(`DocumentLessonKey`), not more title heuristics. Then attach supporting documents to grouped
+lessons for the differentiation attachment/printable-pack workflow. A visual check of the new
+import summary remains appropriate before a UI sign-off.
