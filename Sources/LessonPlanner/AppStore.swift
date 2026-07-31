@@ -372,6 +372,10 @@ final class AppStore: ObservableObject {
         }
         plan.teacherRefinementNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         plan.updatedAt = .now
+        // A teacher edit takes ownership: `starter` stamps `.autoDerived`, and an explicit origin
+        // beats the legacy-notes fallback forever, so without this an edited plan would stay
+        // rebuild-owned and a future rebuild would discard the teacher's dates and skipped days.
+        plan.origin = .teacherAuthored
         configuration.coursePacingPlan = plan
         configuration.updatedAt = .now
         self.configuration = configuration
@@ -385,6 +389,10 @@ final class AppStore: ObservableObject {
         }
         plan.reviewStatus = .approved
         plan.updatedAt = .now
+        // A teacher edit takes ownership: `starter` stamps `.autoDerived`, and an explicit origin
+        // beats the legacy-notes fallback forever, so without this an edited plan would stay
+        // rebuild-owned and a future rebuild would discard the teacher's dates and skipped days.
+        plan.origin = .teacherAuthored
         configuration.coursePacingPlan = plan
         configuration.updatedAt = .now
         self.configuration = configuration
@@ -421,6 +429,10 @@ final class AppStore: ObservableObject {
             .filter { !$0.isEmpty }
         plan.units[unitIndex].notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         plan.updatedAt = .now
+        // A teacher edit takes ownership: `starter` stamps `.autoDerived`, and an explicit origin
+        // beats the legacy-notes fallback forever, so without this an edited plan would stay
+        // rebuild-owned and a future rebuild would discard the teacher's dates and skipped days.
+        plan.origin = .teacherAuthored
         configuration.coursePacingPlan = plan
         configuration.updatedAt = .now
         self.configuration = configuration
@@ -442,6 +454,10 @@ final class AppStore: ObservableObject {
             plan.units[unitIndex].skippedDays.sort()
         }
         plan.updatedAt = .now
+        // A teacher edit takes ownership: `starter` stamps `.autoDerived`, and an explicit origin
+        // beats the legacy-notes fallback forever, so without this an edited plan would stay
+        // rebuild-owned and a future rebuild would discard the teacher's dates and skipped days.
+        plan.origin = .teacherAuthored
         configuration.coursePacingPlan = plan
         configuration.updatedAt = .now
         self.configuration = configuration
@@ -459,6 +475,10 @@ final class AppStore: ObservableObject {
         }
         plan.units[unitIndex].skippedDays.removeAll { Calendar.current.isDate($0, inSameDayAs: date) }
         plan.updatedAt = .now
+        // A teacher edit takes ownership: `starter` stamps `.autoDerived`, and an explicit origin
+        // beats the legacy-notes fallback forever, so without this an edited plan would stay
+        // rebuild-owned and a future rebuild would discard the teacher's dates and skipped days.
+        plan.origin = .teacherAuthored
         configuration.coursePacingPlan = plan
         configuration.updatedAt = .now
         self.configuration = configuration
@@ -494,6 +514,10 @@ final class AppStore: ObservableObject {
         plan.units[unitIndex].modules[moduleIndex].estimatedInstructionalDays = max(1, estimatedInstructionalDays)
         plan.units[unitIndex].modules[moduleIndex].notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         plan.updatedAt = .now
+        // A teacher edit takes ownership: `starter` stamps `.autoDerived`, and an explicit origin
+        // beats the legacy-notes fallback forever, so without this an edited plan would stay
+        // rebuild-owned and a future rebuild would discard the teacher's dates and skipped days.
+        plan.origin = .teacherAuthored
         configuration.coursePacingPlan = plan
         configuration.updatedAt = .now
         self.configuration = configuration
@@ -533,6 +557,10 @@ final class AppStore: ObservableObject {
         plan.units[unitIndex].modules[moduleIndex].lessons[lessonIndex].dependencyNotes = dependencyNotes.trimmingCharacters(in: .whitespacesAndNewlines)
         plan.units[unitIndex].modules[moduleIndex].lessons[lessonIndex].sourceNotes = sourceNotes.trimmingCharacters(in: .whitespacesAndNewlines)
         plan.updatedAt = .now
+        // A teacher edit takes ownership: `starter` stamps `.autoDerived`, and an explicit origin
+        // beats the legacy-notes fallback forever, so without this an edited plan would stay
+        // rebuild-owned and a future rebuild would discard the teacher's dates and skipped days.
+        plan.origin = .teacherAuthored
         configuration.coursePacingPlan = plan
         configuration.updatedAt = .now
         self.configuration = configuration
@@ -591,6 +619,9 @@ final class AppStore: ObservableObject {
         weeklyPlan.assignments[index].start = start
         weeklyPlan.assignments[index].end = end
         weeklyPlan.assignments[index].planningNotes = planningNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Without this the automatic re-placement guard still treats a hand-moved assignment as
+        // its own and relocates it — the precise failure this provenance work exists to stop.
+        weeklyPlan.assignments[index].origin = .teacherAuthored
         weeklyPlan.assignments.sort { $0.date == $1.date ? $0.start < $1.start : $0.date < $1.date }
         saveWeeklyPlan()
     }
@@ -718,6 +749,7 @@ final class AppStore: ObservableObject {
 
     func saveDraftLesson(title: String, objective: String) {
         var lesson = LessonRecord.draft(title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled lesson" : title)
+        lesson.origin = .teacherAuthored
         lesson.objective = objective
         lessons.append(lesson)
         mostRecentLessonID = lesson.id
@@ -726,6 +758,7 @@ final class AppStore: ObservableObject {
 
     func createDraftLesson(from pacingSuggestion: WeeklyPacingSuggestion) {
         var lesson = LessonRecord.draft(title: pacingSuggestion.pacingLessonTitle)
+        lesson.origin = .teacherAuthored
         lesson.sourceReferences = [pacingSuggestion.planningNote]
         lesson.aiReviewWarnings = ["Created from approved course pacing. Add teacher-reviewed lesson content before approval."]
         lesson.instructionalSequence = [
@@ -1336,6 +1369,7 @@ final class AppStore: ObservableObject {
         let typedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let typedObjective = objective.trimmingCharacters(in: .whitespacesAndNewlines)
         var lesson = LessonRecord.draft(title: typedTitle.isEmpty ? source.reference.displayName : typedTitle)
+        lesson.origin = .teacherAuthored
         lesson.objective = typedObjective
         lesson.sourceReferences = [source.reference.path]
         lesson.sourceTextSnapshot = source.extractedText

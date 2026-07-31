@@ -124,6 +124,97 @@ final class RecordOriginTests: XCTestCase {
         XCTAssertEqual(saved.effectiveOrigin, .autoDerived, "an automatic pass must not claim a record for the teacher")
     }
 
+    // MARK: - Ownership promotion (gaps found by external review of the first attempt)
+
+    @MainActor
+    func testTeacherPacingEditPromotesAnAutoDerivedPlan() throws {
+        let repository = try makeRepository()
+        var plan = CoursePacingPlan.starter(from: [Self.lessonListSource()])
+        plan.reviewStatus = .approved
+        XCTAssertEqual(plan.origin, .autoDerived)
+        var configuration = AppConfiguration(
+            workspaceName: "Promotion", workspaceReference: FileReference(url: repository.rootURL)
+        )
+        configuration.coursePacingPlan = plan
+        try repository.saveConfiguration(configuration)
+        let store = AppStore(repository: repository)
+
+        store.updateCoursePacingRefinementNotes("Shifted unit 2 after the field trip.")
+
+        let saved = try XCTUnwrap(repository.loadConfiguration()?.coursePacingPlan)
+        XCTAssertEqual(saved.effectiveOrigin, .teacherAuthored,
+                       "an edited plan must not stay rebuild-owned, or a rebuild would discard the teacher's work")
+    }
+
+    @MainActor
+    func testTeacherSkippedDayEditAlsoPromotesThePlan() throws {
+        let repository = try makeRepository()
+        let plan = CoursePacingPlan.starter(from: [Self.lessonListSource()])
+        var configuration = AppConfiguration(
+            workspaceName: "Promotion", workspaceReference: FileReference(url: repository.rootURL)
+        )
+        configuration.coursePacingPlan = plan
+        try repository.saveConfiguration(configuration)
+        let store = AppStore(repository: repository)
+        let unitID = try XCTUnwrap(store.configuration?.coursePacingPlan?.units.first?.id)
+
+        store.addSkippedDayToCoursePacingUnit(unitID: unitID, date: Date(timeIntervalSince1970: 1_700_000_000))
+
+        let saved = try XCTUnwrap(repository.loadConfiguration()?.coursePacingPlan)
+        XCTAssertEqual(saved.effectiveOrigin, .teacherAuthored)
+    }
+
+    @MainActor
+    func testMovingAnAutomaticAssignmentMakesItTheTeachersAndProtectsItFromRelocation() throws {
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Promotion", workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        let store = AppStore(repository: repository)
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let assignment = WeeklyLessonAssignment(
+            id: UUID(), lessonRecordID: UUID(), date: date, start: date,
+            end: date.addingTimeInterval(2_700), planningNotes: "Pacing: Module 1", origin: .autoDerived
+        )
+        store.weeklyPlan.assignments = [assignment]
+
+        store.updateWeeklyAssignment(
+            assignment, date: date, start: date.addingTimeInterval(3_600),
+            end: date.addingTimeInterval(6_300), planningNotes: "Moved for the assembly"
+        )
+
+        let moved = try XCTUnwrap(store.weeklyPlan.assignments.first)
+        XCTAssertEqual(moved.effectiveOrigin, .teacherAuthored,
+                       "a hand-moved assignment must stop being eligible for automatic relocation")
+    }
+
+    @MainActor
+    func testEveryTeacherInitiatedLessonCreatorStampsOriginExplicitly() throws {
+        let repository = try makeRepository()
+        try repository.saveConfiguration(AppConfiguration(
+            workspaceName: "Promotion", workspaceReference: FileReference(url: repository.rootURL)
+        ))
+        let store = AppStore(repository: repository)
+
+        store.saveDraftLesson(title: "Typed by hand", objective: "")
+        store.createDraftLesson(from: Self.lessonListSource(), title: "From a source", objective: "")
+
+        XCTAssertEqual(store.lessons.count, 2)
+        for lesson in store.lessons {
+            XCTAssertEqual(lesson.origin, .teacherAuthored,
+                           "teacher-created lessons must be stamped, not left to the fallback")
+        }
+    }
+
+    private static func lessonListSource() -> ImportedSource {
+        ImportedSource(
+            id: UUID(), reference: FileReference(url: URL(fileURLWithPath: "/tmp/unit.docx")),
+            extractionMethod: .embeddedText, confidence: nil,
+            extractedText: "Unit 1: Fractions\nLesson 1: Equivalent fractions\nLesson 2: Compare fractions",
+            reviewStatus: .reviewed, importedAt: .now, updatedAt: .now
+        )
+    }
+
     func testStarterStampsTheGeneratedPlanAsAutoDerived() {
         let source = ImportedSource(
             id: UUID(), reference: FileReference(url: URL(fileURLWithPath: "/tmp/unit.docx")),

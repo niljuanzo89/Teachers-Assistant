@@ -2379,3 +2379,42 @@ rebuild will be able to regenerate them safely, and would not have been able to 
 **Still open.** Steps 2-6 of PLAN REVISION 3: explicit rebuild command; `inferredSubject`
 on-demand fallback; per-artifact derivation versions; automatic stale rebuild with a visible
 summary; and later the derived-proposal / teacher-overlay split.
+
+### Batch 037 — 2026-07-30 — Close the ownership holes Codex found in Batch 036
+
+Batch 036 was sent for external review before step 2 was built on it. The verdict was **"do not
+build step 2 on top of this yet"** — the model direction was right, but promotion was implemented
+for lessons only, leaving pacing plans and weekly assignments still rebuild-owned after a teacher
+edited them. Fixing that here, before the rebuild command exists.
+
+**Holes found and closed.**
+
+| Severity | Hole | Fix |
+|---|---|---|
+| High | Six teacher-facing pacing mutators (refinement notes, unit, module, lesson, add/remove skipped day) never promoted the plan. Since `starter` stamps `.autoDerived` explicitly and an explicit origin beats the legacy fallback permanently, an edited plan stayed rebuild-owned **forever** — a rebuild would have discarded the teacher's dates and skipped days | All seven teacher save points (including `approveCoursePacingPlan`) now set `.teacherAuthored`; the automatic path uses different locals and is untouched |
+| High | `updateWeeklyAssignment` never promoted. A teacher moving a placement through the UI left it `.autoDerived`, so the automatic re-placement guard would still relocate it — **the exact bug this provenance work exists to prevent** | Promotes on edit |
+| Medium | `saveDraftLesson`, `createDraftLesson(from pacingSuggestion:)`, and `createDraftLesson(from source:title:objective:)` left `origin` nil, relying on the fallback | All three stamp `.teacherAuthored` explicitly |
+
+**Process failure worth recording.** One of Batch 036's stamps silently did not apply: the edit
+script used `assert` on most replacements but not on two, and a non-matching `str.replace` fails
+silently. The function had been rewritten since, so the anchor no longer matched. **Every scripted
+source edit must assert its anchor matched.** Codex caught the resulting gap; a green test suite did
+not, because no test covered that path.
+
+**Verification.** 179 tests pass (175 + 4 new covering each closed hole), real `xcodebuild`
+succeeded.
+
+**Deliberately not done, and why.** Codex also recommended replacing
+`updateLesson(_:markingTeacherEdit:)` with two explicitly named methods before step 2, on the
+grounds that a defaulted boolean is easy to misuse as the codebase grows. That is a reasonable
+API-hygiene change but it is not a correctness gap — the default is already the preserving
+direction, and every current call site is now covered by a test. Recorded as a follow-up rather
+than bundled into a batch that was fixing real data-safety holes.
+
+**Codex's judgement on the model, for step 2's benefit.** `.teacherAuthored` / `.autoDerived` is
+sufficient **if step 2's rule is artifact-level** — rebuild only what the app owns, preserve
+anything the teacher touched. It is *not* sufficient for field-level merging ("re-derive only the
+fields the teacher did not edit"); that needs per-field dirty tracking or the proposal/overlay
+split, and a third enum case would not solve it. Step 2 should therefore be artifact-level.
+
+**Still open.** Steps 2-6 of PLAN REVISION 3, plus the explicit-API refactor above.
