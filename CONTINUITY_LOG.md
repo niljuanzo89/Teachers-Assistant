@@ -2718,3 +2718,68 @@ review pass rather than being improvised. Guessing here mis-attaches at scale.
 **Deliberately not shipped:** the differentiation guide rendering (step 3) and the packet (step 4).
 Rendering attachments that do not exist would show an empty section, and the packet depends on the
 join working.
+
+### PLAN REVISION 5 (2026-07-30) — three-model direction review; the matcher track stops
+
+Reviewed by Codex, Grok, and Gemini independently. They converged, and the convergence contradicts
+the direction the last several batches were taking.
+
+**Where all three agreed.**
+
+1. **The diagnosis is directionally right but incomplete.** Identity that existed at creation was
+   discarded and then re-derived from prose; both failures share that root.
+2. **It is the wrong priority.** The owner's actual complaint — scattered placements — is fixed. The
+   remaining backlog is self-generated. Grok: "You fixed the real bug. You are now building a
+   curriculum knowledge graph for one publisher-shaped folder and calling it product direction."
+3. **This is overfitting to one corpus.** Standards codes, key shapes, the 45% coverage figure, and
+   the assumption that materials and lessons share a joinable key space are all one-publisher
+   artifacts. Grok: "one teacher's publisher pack is a test fixture, not a schema."
+4. **Identity should be provenance, not parsed prose.** Store pacing unit/module/lesson UUIDs (they
+   already exist) plus the originating `ImportedSource.id`. Demote title matching
+   (`normalizedLessonTitle`) to display/fallback only — never two competing authorities.
+5. **The highest-value next work is the output path**, not more intake intelligence. Gemini: the
+   teacher does not use this app to classify 316 PDFs; they use it to generate tomorrow's lesson
+   plan, deck, and differentiation guide. Whether those are actually good is untested.
+
+**What Grok caught that I had wrong.** My proposed correction claimed structured identity would
+"dissolve both failures". It would not fix subject: the sources themselves carry no subject either
+(0 of 316), so inheriting subject from the source is "a longer pipe to the same empty tank." Only
+the attachment join is plausibly fixed by identity.
+
+**What Gemini caught that all three of us missed.** We were arguing about *automation strategy*.
+The real gap is that **there is no way for the teacher to fix any of this by hand.** When
+auto-attach returns 0 of 174, the deeper failure is not a naive matcher — it is that the app offers
+no "unlinked materials" view and no way to drag a reteach sheet onto a lesson in two seconds. Two
+batches went into heuristics for something a human does instantly with the PDF open.
+
+Gemini also argued that storing structured fields yields "clean, structured NULLs" when the parser
+never found the structure. **Partly right, and worth being precise:** on the *material* side it
+holds — 96 of 174 have no resolvable key at all, and no storage fixes that. On the *lesson* side it
+does not: `CoursePacingUnit`, `CoursePacingModule`, and `CoursePacingLesson` each carry a real
+`UUID`, and `ensureApprovedLesson` holds them at creation. That identity exists and is being thrown
+away. But the conclusion still stands, because roughly half the materials will need human linking
+regardless — **so the manual path is required either way, and should come first.**
+
+**Revised direction.**
+
+1. **Stop the matcher/inference track.** No more subject scorers, key parsers, or attachment
+   heuristics. Freeze intake at "correct block, correct type, readable title" — which now works.
+2. **Move to output quality.** Generate the three artifacts for a real approved week from the
+   repaired profile and judge whether a teacher would actually use them. This is the product loop
+   and it has never been examined end to end.
+3. **If attachments resume, build the manual linking UI first** — an unlinked-materials view with
+   drag/assign — and only then consider automation for the portion that reliably resolves. Automatic
+   attachment becomes an accelerator for a working manual path, never the only path.
+4. **Thin provenance only, no new matchers**, if lesson records are touched: pacing UUIDs +
+   `originatingSourceID`. Justified because that data genuinely exists at creation; not justified as
+   a foundation for more inference.
+5. **A second corpus before any further inference work** — a different subject or publisher. Until
+   then, heuristics stay behind teacher-visible override and must not silently drive placement.
+
+**Process amendment, adopted:** *measure the premise, then plan.* Two counts against the real corpus
+— subject signals present, and normalized material keys against normalized lesson keys — would have
+falsified both dead ends before a line was written. Add this ahead of the existing plan → review →
+implement → debrief loop.
+
+**Not reversed:** provenance and the explicit rebuild. Both closed real data-loss and repair paths
+and all three reviewers said to keep them.
