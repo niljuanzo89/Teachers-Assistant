@@ -26,6 +26,23 @@ test run, a file created, a verification performed. Number them and log each one
 Stop early — before 20 — if any of the stop conditions below are met. Do not pad a batch
 to reach 20, and do not run past 20 to finish "just one more thing."
 
+### 1b. Standing workflow: plan → review → implement → review (owner instruction, 2026-07-30)
+
+For each substantive batch, in order:
+
+1. **Formulate the plan** — concrete steps, the risks, and what could break.
+2. **Send the plan to Codex for pre-execution review.** Do not start implementing until it comes
+   back. Ask it to push back on scope and design, not just approve.
+3. **Implement**, incorporating the review.
+4. **Send the completed work to Codex for post-execution review**, and use that debrief to confirm
+   what the next step should be.
+
+This was adopted after external review twice caught defects a green test suite did not: Batch 033
+(three self-directed attempts oscillated; review found the flaw immediately) and Batch 036/037
+(provenance was implemented for lessons only, leaving pacing plans and weekly assignments still
+rebuild-owned after a teacher edit — a data-loss path). Treat a passing suite as necessary but not
+sufficient evidence.
+
 ### 2. Stop when human intervention is needed
 
 Stop work immediately and notify the owner when:
