@@ -100,11 +100,23 @@ enum LessonStructureInferencer {
         // its leading cell the name and its trailing cell the body. Read structurally, so a phase
         // the vocabulary has never heard of ("Teacher Modeling") is still found, and a timing
         // column in between is left where it belongs instead of being glued onto the body.
-        let tabulated = lines.filter(\.isWideDataRow).compactMap { row -> LessonFieldExtractor.ExtractedStep? in
-            guard let title = row.headingCell, !title.isEmpty, let body = row.valueCell else { return nil }
-            return LessonFieldExtractor.ExtractedStep(title: title, notes: body)
+        //
+        // Scoped to a single table. Collecting wide rows across the whole document would let an
+        // unrelated table — a pacing grid, a materials matrix — become the instructional sequence.
+        // When a document has several procedure-shaped tables, the longest wins: a sequence is the
+        // main body of a lesson, not an aside.
+        let candidates = SourceTableRun.runs(in: lines).filter(\.looksLikeProcedure)
+        // A timed table is a procedure; an untimed one might be a pacing grid that merely happens
+        // to have more rows. Prefer timing, and only fall back to size when nothing is timed.
+        let timed = candidates.filter(\.hasDurationColumn)
+        if let procedure = (timed.isEmpty ? candidates : timed)
+            .max(by: { $0.dataRows.count < $1.dataRows.count }) {
+            let steps = procedure.dataRows.compactMap { row -> LessonFieldExtractor.ExtractedStep? in
+                guard let title = row.first, !title.isEmpty, let body = row.last, body != title else { return nil }
+                return LessonFieldExtractor.ExtractedStep(title: title, notes: body)
+            }
+            if steps.count >= 2 { return steps }
         }
-        if tabulated.count >= 2 { return tabulated }
 
         var steps: [LessonFieldExtractor.ExtractedStep] = []
         for (index, line) in lines.enumerated() {

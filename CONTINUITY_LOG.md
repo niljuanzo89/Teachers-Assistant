@@ -3398,3 +3398,46 @@ fixtures parse as paragraphs exactly as before.
 tested against another teacher's formatting, a district template, a publisher packet, or a
 scanned PDF. The panel's gate stands — 5-10 documents from an outside source, ≥70% correct on
 core fields, false positives ≤10%.
+
+**Batch 049 follow-up (same batch, after Codex debrief).** Codex's central finding was correct
+and material: Batch 049 preserved **rows** but not **tables**. Consumers had to infer table
+boundaries from individual rows, which forced two guesses — a 40-character threshold to tell a
+header from a data row, and a global "two or more wide rows anywhere in the document are the
+phases" rule. The second is a live false-positive risk: any unrelated wide table could become
+the instructional sequence.
+
+**`SourceTableRun` (new)** groups contiguous table rows into one actual table, splits header from
+data rows, and is now the unit phase detection works on. Both guesses are gone.
+
+**My scoring was circular, and it was hiding a real miss.** Step-count ground truth used the same
+`isWideDataRow` predicate the parser used. Codex's cheapest-fix suggestion — hand-label phase
+*titles* only — took ten minutes and immediately showed lessons 3 and 9 had **six** phases while
+the run reported five as if complete. The 40-character threshold had silently dropped a row whose
+cells were all short. **A measurement that shares a predicate with the thing it measures cannot
+detect that predicate's failures.**
+
+**Two further flaws my own new tests caught, before Codex saw them:**
+1. The replacement header rule ("header cells are shorter than their column's content") fails on
+   exactly the tables it exists for — a header naming a short column is *longer* than its data
+   ("Min" over "5", "Lesson" over "1"). Replaced with sentence punctuation: a header row names
+   its columns and ends nothing with a full stop; a data row states something and does. A table
+   of terse values throughout keeps its first row rather than losing it to a header that was
+   never there.
+2. "Longest table wins" let a three-row pacing grid beat a four-row procedure table. Selection
+   now prefers a run with a **duration-shaped column** ("5 min", "10") and falls back to size only
+   when nothing is timed — the structural difference between a procedure and a pacing grid, both
+   of which are wide tables of prose.
+
+**Final, against hand-read ground truth** (assessment from each document's own
+`Formative Assessment:` line; phases read by eye from the procedure tables, all ten lessons
+having six, first Warm-Up and last Exit Ticket): **assessment 10/10, phases 10/10, time bleed
+0/10.** The phase figure is no longer circular.
+
+**Deferred, with Codex's reasoning recorded:** `LessonSourceSpanDetector` still opens spans only
+on flat `Weekday:` headings and never looks at rows, so a packet with `Monday⇥Place value review`
+has structure the detector ignores. Not a regression — it behaves exactly as before — but it is
+the clear next structural consumer, and it matters as soon as an outside packet uses a table
+schedule. `DocumentPlacementClassifier`'s substring scans are lower priority: its positive
+lesson-shape gate already runs through the extractor and inferencer.
+
+**Verification:** 241 tests passing (8 new in Batch G total), `xcodebuild` succeeds.

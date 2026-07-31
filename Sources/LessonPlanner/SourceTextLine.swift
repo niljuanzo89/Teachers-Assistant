@@ -65,14 +65,102 @@ enum SourceTextLine: Equatable {
     /// lesson's assessment. That distinction is structural, so it needs no vocabulary.
     var isLabelValueRow: Bool { cellCount == 2 }
 
-    /// A data row in a multi-column table: at least three cells, and at least one of them long
-    /// enough to be prose rather than a column name. The header row of such a table has short
-    /// cells throughout ("Part", "Time", "Teacher and Student Actions"), so this excludes it
-    /// without needing to know that the first row is a header.
-    var isWideDataRow: Bool {
-        guard cellCount >= 3, case .tableRow(let cells) = self else { return false }
-        return cells.contains { $0.count >= Self.proseCellLength }
+    var cells: [String]? {
+        guard case .tableRow(let cells) = self else { return nil }
+        return cells
+    }
+}
+
+/// A contiguous block of table rows — one actual table in the document.
+///
+/// Rows alone were not enough. Judging a row on its own forced two guesses: a character-count
+/// threshold to tell a header from a data row, and a global "two or more wide rows anywhere in the
+/// document means these are the phases" rule. The first is a magic number; the second lets an
+/// unrelated table elsewhere in the document become the instructional sequence. Both disappear
+/// once the table itself is the unit.
+struct SourceTableRun {
+    /// Index of the first row in the `[SourceTextLine]` this run was found in.
+    var startIndex: Int
+    var headerCells: [String]?
+    var dataRows: [[String]]
+
+    var columnCount: Int { dataRows.first?.count ?? headerCells?.count ?? 0 }
+
+    /// A procedure table: three or more columns and at least two data rows. Two columns is a
+    /// label/value table, and a single row is not a sequence.
+    var looksLikeProcedure: Bool { columnCount >= 3 && dataRows.count >= 2 }
+
+    /// Whether some column is a duration ("5 min", "10", "45 minutes"). This is what separates a
+    /// lesson's procedure table from a pacing grid, whose middle column holds dates — both are
+    /// wide tables of prose, and row count alone picks whichever happens to be longer.
+    var hasDurationColumn: Bool {
+        guard columnCount >= 2 else { return false }
+        return (0..<columnCount).contains { column in
+            let values = dataRows.compactMap { $0.indices.contains(column) ? $0[column] : nil }
+            guard !values.isEmpty else { return false }
+            let durations = values.filter {
+                $0.range(of: #"^\d{1,3}\s*(min|mins|minute|minutes|hr|hour|hours)?\.?$"#,
+                         options: [.regularExpression, .caseInsensitive]) != nil
+            }
+            return durations.count * 2 >= values.count
+        }
     }
 
-    private static let proseCellLength = 40
+    /// Contiguous runs of table rows, each split into an optional header and its data rows.
+    static func runs(in lines: [SourceTextLine]) -> [SourceTableRun] {
+        var runs: [SourceTableRun] = []
+        var index = 0
+        while index < lines.count {
+            guard lines[index].cells != nil else {
+                index += 1
+                continue
+            }
+            let start = index
+            var rows: [[String]] = []
+            while index < lines.count, let cells = lines[index].cells {
+                rows.append(cells)
+                index += 1
+            }
+            runs.append(SourceTableRun(start: start, rows: rows))
+        }
+        return runs
+    }
+
+    private init(start: Int, rows: [[String]]) {
+        startIndex = start
+        // The first row is a header when its cells are consistently *shorter* than the same
+        // column below it — relative to this table, so a terse procedure table and a verbose
+        // header ("Teacher and Student Actions / Anticipated Responses") are both judged on the
+        // same footing rather than against a fixed character count. A table with no header keeps
+        // all its rows.
+        guard rows.count >= 3, let first = rows.first,
+              Self.readsAsHeader(first, above: Array(rows.dropFirst())) else {
+            headerCells = nil
+            dataRows = rows
+            return
+        }
+        headerCells = first
+        dataRows = Array(rows.dropFirst())
+    }
+
+    /// A header row names its columns; a data row states something. So the test is sentence
+    /// punctuation, not length.
+    ///
+    /// Length was the first attempt and it fails on exactly the tables this exists for: a header
+    /// naming a short column is *longer* than its own data ("Min" over "5", "Lesson" over "1"),
+    /// so a length rule refuses to see the header and keeps it as a phase.
+    private static func readsAsHeader(_ candidate: [String], above body: [[String]]) -> Bool {
+        let sameShape = body.allSatisfy { $0.count == candidate.count }
+        guard sameShape, !candidate.allSatisfy(\.isEmpty) else { return false }
+        guard !candidate.contains(where: endsASentence) else { return false }
+        // Require the body to actually read as sentences, so a table of terse values throughout
+        // keeps its first row rather than losing it to a header that was never there.
+        let sentenceRows = body.filter { $0.contains(where: endsASentence) }
+        return sentenceRows.count * 2 >= body.count
+    }
+
+    private static func endsASentence(_ cell: String) -> Bool {
+        guard let last = cell.last else { return false }
+        return last == "." || last == "!" || last == "?"
+    }
 }

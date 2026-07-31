@@ -104,6 +104,56 @@ final class StructuredExtractionTests: XCTestCase {
         XCTAssertTrue(lesson.instructionalSequence.first?.notes.hasPrefix("Show 3 plates") == true)
     }
 
+    /// Phases come from **one** table, not from wide rows collected across the document. Without
+    /// this, an unrelated grid — a pacing table, a materials matrix — becomes the lesson's
+    /// instructional sequence.
+    @MainActor
+    func testPhasesComeFromOneTableNotFromWideRowsAnywhere() {
+        let text = """
+        Unit pacing overview
+        Lesson\tDate\tFocus
+        1\tAugust 3\tMultiplication as equal groups, using counters and drawings to build meaning.
+        2\tAugust 4\tArrays as a model, connecting rows and columns to the multiplication equation.
+        3\tAugust 5\tNumber lines, using equal jumps to represent repeated addition as multiplying.
+
+        Lesson Procedure
+        Part\tTime\tTeacher and Student Actions
+        Warm-Up\t5 min\tShow 3 plates with 4 counters on each plate and ask how many altogether.
+        Teacher Modeling\t10 min\tModel two examples with drawings and equations for the whole class.
+        Guided Practice\t10 min\tStudents use counters to model each product and record an equation.
+        Exit Ticket\t5 min\tDraw equal groups for 4 x 3 and write the product in a sentence.
+        """
+        var lesson = LessonRecord.draft(title: "Equal groups")
+        AppStore.populateFields(from: text, into: &lesson, allowStructuralInference: true)
+
+        XCTAssertEqual(
+            lesson.instructionalSequence.map(\.title),
+            ["Warm-Up", "Teacher Modeling", "Guided Practice", "Exit Ticket"]
+        )
+        XCTAssertFalse(
+            lesson.instructionalSequence.contains { $0.title == "1" || $0.title == "2" },
+            "the pacing table was read as the instructional sequence"
+        )
+    }
+
+    /// A header row is recognised by being shorter than its own column's content, not by a fixed
+    /// character count — so a terse procedure table keeps every phase.
+    @MainActor
+    func testATerseProcedureTableKeepsAllItsPhases() {
+        let text = """
+        Step\tMin\tWhat happens
+        Warm-Up\t5\tNumber talk.
+        Launch\t5\tName the structure.
+        Practice\t10\tSolve six problems.
+        """
+        var lesson = LessonRecord.draft(title: "Terse")
+        AppStore.populateFields(from: text, into: &lesson, allowStructuralInference: true)
+
+        // Every cell here is far under the 40-character threshold the first implementation used;
+        // that version dropped these rows entirely.
+        XCTAssertEqual(lesson.instructionalSequence.map(\.title), ["Warm-Up", "Launch", "Practice"])
+    }
+
     /// The other family's shape: a two-column "Component | Plan" table. Its rows must still read as
     /// label/value pairs, and its phase rows must still read as phases.
     @MainActor
