@@ -3494,3 +3494,54 @@ flags merged/nested/borderless cells, which the current flattening has never met
 truth only.
 
 **Verification:** 243 tests passing, `xcodebuild` succeeds.
+
+### First outside-source measurement — a real publisher teacher edition
+
+**One document**, a Grade 5 HMH teacher-edition lesson PDF supplied by the owner. Genuinely
+outside both prior families: a different publisher, a different author, a real product rather
+than material generated for testing. Licensed content — extracted to a scratch directory outside
+the repo, measured, and deleted. No curriculum text in this log, in tests, or in any commit;
+nothing sent to any model.
+
+**Two caveats on what this does and does not test.** It is a **PDF**, so Batch 049's table work
+never engages — PDF extraction yields flat text with no cell boundaries. This measures the label
+grammar and the prose path, not the structural extraction. And it is **n=1**.
+
+**Shape.** No tables. ALL-CAPS section banners (`LESSON FOCUS AND COHERENCE`, `WARM-UP OPTIONS`,
+`SHARPEN SKILLS`, `PLAN FOR DIFFERENTIATED INSTRUCTION`, `UNPACKING MATH STANDARDS`). Three
+different objective labels in the first page alone — an "I Can" objective, a "Learning Objective",
+and a "Language Objective". Publisher-specific phase names. A `Materials:` line belonging to a
+*sub-activity* rather than to the lesson, with the lesson's own materials on a differently
+labelled line.
+
+**Result — 3 of 5 core fields confidently wrong:**
+
+| Field | Outcome |
+|---|---|
+| Classification | **Correct** — recognised as a lesson, on the grounds that it found a learning objective |
+| Objective | **Wrong.** Correct first sentence, then ran on for ~1,900 characters, absorbing the language objective, the lesson's materials line, a prior/current/future learning progression, a standards-unpacking section, and a page footer |
+| Materials | **Wrong.** Returned a sub-activity's materials; the lesson's own materials were sitting inside the objective run-on |
+| Assessment | **Wrong.** Returned a student word problem instead of the lesson's check-for-understanding guidance |
+| Differentiation | **Blank** — despite a differentiation section being present. Safe failure |
+| Instructional steps | **1 of ~4**, and the one found was mislabelled from an unrelated section |
+
+**Against the panel's decision rule** (continue at ≤2% critical-field false positives, narrow the
+contract above 5%): this document is at roughly **60%**. The rule says **narrow the input
+contract**, decisively, and it says so on the first outside document ever tested.
+
+**The objective run-on is the sixth instance of the run-on class** — and the first in the *prose*
+path since Batch 046. The terminator vocabulary added then does not contain "Language Objective",
+"Mathematical Progressions", or "UNPACKING MATH STANDARDS", and this publisher uses neither blank
+lines nor a recognised label between sections. **This is the clearest possible evidence for the
+panel's position that vocabulary cannot be extended into generality one observed failure at a
+time** — five fixes did not prevent a sixth on the first genuinely foreign document.
+
+**What it does not show.** It is not evidence against Batch 049: no table ever reached
+`SourceTableRun`. The two failure surfaces are separate and should not be conflated.
+
+**Bearing on the roadmap.** The panel's unanimous next step was an outside corpus before further
+parser work, then teacher-guided template mapping. This single document supports both, and moves
+template mapping from "recommended" to "the only proposal on the table that survives contact with
+a real publisher document." A corpus of 8-15 such documents would establish whether 60% is
+typical or this publisher is unusually hostile — but a second document is unlikely to reverse the
+direction.
