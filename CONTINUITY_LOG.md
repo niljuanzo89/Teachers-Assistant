@@ -3904,3 +3904,61 @@ also answer via the contract is a Step 3 question.
 in-family families exhibited: HMH gave a 1,900-character run-on and three wrong fields; this gives
 a form-instruction mistaken for content. Codex's estimate of 5 minimum looks conservative, not
 cautious.
+
+## Panel on the two foreign documents — Step 3 reframed
+
+**Unanimous:** Step 3 does **not** change order; **locus stays deferred**; **route the
+deterministic extractor through the contract**; get **3 more foreign documents** before drawing
+product conclusions; **confidently-wrong is the only metric that decides anything**.
+
+**All three told me off for the same thing, and they are right.** I was reasoning toward writing a
+locus rule because a foreign document finally hurt in a new way. Grok: "N=1 is how Batch 046 froze
+labels-only and then blanked a trivial SWBAT. Do not repeat it with fancier vocabulary… that itch
+is how in-family overfitting got replaced by single-foreign-doc overfitting." One example is a
+failure *class*, not a rule. Log it, add it to the eval set, and refuse to write structural rules
+until the same mismatch appears in several independent forms.
+
+**On gating the deterministic path — unanimous yes.** Grok: "'Path is being demoted' is not a
+reason to leave a known lie unguarded. If the contract is the product invariant, everything that
+emits a field goes through it. Anything else makes the model comparison theater." Gemini: an
+ungated deterministic baseline against gated model output is a dirty comparison.
+
+**Codex reframed Step 3, and this is the most useful thing in the round:**
+
+> Step 3 is not "try the hosted extractor." Step 3 is "turn extraction into a **scored, gated
+> producer competition**." Then the hosted extractor earns the write path instead of merely
+> looking better in anecdotes.
+
+**And it identified what I was under-weighting: strategy selection is the wrong abstraction.**
+The blank objective is not "labels-only failed" — it is that a *fixed per-field strategy* is the
+wrong shape. A producer should offer **multiple candidates per field** (labelled, inferred,
+model-selected) and let the contract admit the first defensible one. The candidate mechanism
+already exists — up to two ranked candidates — so this dissolves the Batch 046 freeze without a
+policy patch, and without the model.
+
+**On the model direction: for, but weaker than I argued.** Codex: "A model is not the safety
+layer. It is a better candidate generator." A model can return fluent form-instruction text just
+as confidently, and admissibility as built would not catch it — length passes, value-in-citation
+passes. So the case is for **model as candidate generator, contract as gate, blanks preferred over
+confident wrong** — not "the model will handle it".
+
+**Merged decision thresholds**, scored *after* admissibility, per field per document, labelled
+`correct` / `blank` / `confidently_wrong`, with a failure-class tag (`run_on`,
+`form_instruction`, `subactivity_not_lesson`, `missed_inference`, `wrong_field_span`):
+- **Proceed** with model-first if confidently-wrong is ≤5% of filled core fields, **zero repeated
+  confidently-wrong classes on foreign documents**, and correct improves by **≥20 percentage
+  points on foreign fields** over deterministic-through-contract.
+- **Block** if any core field exceeds 10% confidently-wrong, or the model only trades blanks for
+  fragile correctness.
+- **Keep deterministic** if routing it through the contract already reaches zero confidently-wrong
+  and the model merely trades blanks for fragile wins.
+
+**Also flagged as over-weighted by me:** treating "classification correct" as evidence extraction
+is close — it is not; and treating the Batch 046 freeze as an existential failure rather than a
+routing mistake.
+
+**Next batch, agreed: make the deterministic extractor a contract producer** emitting ranked
+candidates (labelled first, inferred second) and route it through `ExtractionAdmissibility`. That
+gates today's ungated wrong values, dissolves the per-field strategy freeze, and creates the
+like-for-like baseline every model comparison depends on. **Outstanding from the owner: 3 more
+foreign documents.**
