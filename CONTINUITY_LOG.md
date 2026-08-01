@@ -3545,3 +3545,67 @@ template mapping from "recommended" to "the only proposal on the table that surv
 a real publisher document." A corpus of 8-15 such documents would establish whether 60% is
 typical or this publisher is unusually hostile — but a second document is unlikely to reverse the
 direction.
+
+## Direction change — model-first extraction (four-model panel, premise removed)
+
+The owner questioned the standing "must be fully useful with generative AI switched off" rule.
+That rule was the premise under which all three external reviewers had previously rated a local
+model "optional accelerator only", so the panel was re-consulted with it removed.
+
+**Unanimous: change direction.** Replace the *extraction layer only* with an on-device model.
+Everything downstream — placement, pacing, span isolation, provenance, approval gating, the three
+renderers — is unchanged. Codex: "Stop treating prose grammar as the main generalization path.
+But do not let the model own truth."
+
+**Local-first survives and is not the same commitment as AI-free.** On-device, never hosted:
+these documents drift toward student-identifying material, and the HMH test file was licensed
+content that must not leave the machine.
+
+**The panel rejected my safety argument as insufficient, unanimously and independently.**
+I proposed "the model proposes, the document disposes" — the model returns source text, the app
+verifies it occurs in the document. All three said the same thing in different words: that stops
+**fabrication**, not **misattribution**. Grok: "It keeps never-fabricate. It does not keep
+never-misattribute." Substring proof shows a string exists; it cannot show it is the *objective*.
+The HMH failure was exactly that — real text, wrong field. Four additions close the gap:
+- **Block identity, not just text.** Force the model to return block IDs from a pre-built document
+  model, so verification is structural rather than textual (Gemini).
+- **Locus.** The span must sit in a region plausible for that field — heading path, section
+  ancestry — not merely somewhere in the document (Grok, Codex).
+- **Exclusivity.** Two fields may not claim the same span; a conflict drops both to blank (Grok).
+- **Candidate ranking.** Ask for top 2-3 candidates per field with evidence and let deterministic
+  code reject or mark ambiguous, rather than accepting a single answer (Codex).
+
+**PDF layout work is a prerequisite, not an alternative.** All three, emphatically — Gemini calls
+it "80% of the battle"; Grok warns that feeding raw PDF text to a model "re-creates run-ons
+inside the prompt window". A document block model (blocks, IDs, offsets, heading hierarchy,
+section ancestry) must exist *before* any model call. It also improves the deterministic path, so
+it is not a bet on the model working.
+
+**Disagreements, and where I came down:**
+- *Model size.* Gemini says a 3B is sufficient and larger models are unnecessary; Grok says do not
+  ship on 3B alone and wants 7-8B, 14B if RAM allows; Codex agrees 14B is realistic on 32GB.
+  **Going with Grok**: this task requires telling three differently-labelled objectives apart on
+  one page. 3B as a fast "is this hopeless" probe; 7-8B (Qwen2.5 / Llama-3.1, MLX or Ollama, with
+  JSON-schema-constrained decoding) as the real candidate.
+- *Grammar fallback.* Gemini says do not maintain two engines; Codex and Grok say keep it as the
+  no-model fallback and the regression baseline. **Keeping it** — it is already built and covered
+  by 243 tests, so the cost is sunk, and without it there is nothing to measure the model against.
+- *Template mapping.* Gemini would defer it as UX friction; Codex makes it a correction/learning
+  layer; Grok notes a mapped district template is exact and free forever, versus running an 8B
+  model on every import. **Demoted from essential to an escape hatch**, not dropped.
+
+**Codex's unique catch:** hardware is the quiet failure. On 8GB or Intel Macs a 7-14B model is
+painful or unusable, which is a product-support problem for school-issued machines even if
+extraction quality is good.
+
+**Pushback I accept:** I over-weighted a single HMH document as proof the direction should change
+(it proves the prose grammar is weak out of family; it proves nothing about the model). I
+under-weighted misattribution, because fabrication was the older fear. And I over-hoped that good
+extraction makes template mapping pointless.
+
+**Kill criteria, merged:** do not ship model-first automatic extraction if critical-field
+confident false positives stay above 10% after admissibility checks; if wrong-section errors
+remain common, build teacher-guided mapping before more model tuning; if runtime exceeds
+acceptable bounds on target Macs, demote the model to optional. Do not sink months into prompt
+polish — Grok's stop signal is two weeks of spike work that fails to beat the grammar baseline on
+foreign PDFs.
