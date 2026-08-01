@@ -3846,3 +3846,61 @@ implementation**, not inside `admit()`. `ExtractionAdmissibility` stays the inte
 checker and never sees external JSON.
 
 **Verification:** 268 tests passing, `xcodebuild` succeeds.
+
+### Second outside-source measurement — a university MAT lesson-plan template
+
+One document, the owner's own graduate-coursework lesson plan (ED550). Genuinely foreign: a
+different author, a different genre, and a **form** rather than a publisher artifact. DOCX, so
+unlike the HMH PDF the table-structure work does engage. Content not reproduced here; measured
+locally and nothing committed.
+
+**Shape.** Almost no tables (2 rows in 75 lines). Prose-heavy, first person. And a feature neither
+corpus had: **label lines whose remainder is the form's own instruction**, with the teacher's
+actual answer on the following line —
+
+    Differentiation: How are the various learning needs of your students (learners who have an
+    IEP/504, learners who need additional scaffolding, ...)
+    <the teacher's actual answer>
+
+**Result: 1 of 5 fields confidently wrong, 4 blank, 0 correct.**
+
+| | Outcome |
+|---|---|
+| Classification | **Correct** — placeable lesson |
+| Block model | **Healthy** — 150 blocks, 75 citable, **zero offset breaks** on a foreign document |
+| Objective | **Blank**, though the document states one plainly ("Students will be able to identify…") |
+| Materials | **Blank** — correct, the document has none |
+| Assessment | **Blank** — the document has one, under `Lesson Formative Assessment(s):` |
+| Differentiation | **WRONG** — returned the form's instruction text, 383 characters of "How are the various learning needs of your students…", not the teacher's answer |
+| Steps | **0** — the document uses "Instructional Procedures", "Anticipatory Set" |
+
+**The new failure class: a label's remainder is a question, not an answer.** The matcher takes the
+same-line remainder whenever it is non-empty, and on a form that remainder is boilerplate telling
+the teacher what to write. This is not the run-on class; it is new, and it will be common —
+teacher-education templates and district lesson-plan forms are built this way.
+
+**Why the objective came back blank is worth recording.** The document says "Students will be able
+to identify the operations needed to solve real world problems", and `LessonStructureInferencer`
+recognises exactly that opening. It was never consulted: Batch 046 decided, from measurement,
+label-only for objective/materials/assessment/differentiation and inference for steps alone. That
+decision was right for the corpora it was measured on and is wrong here. **A second data point
+against per-field strategies fixed from one corpus.**
+
+**Two things this strengthens.**
+- *The model-first direction.* Distinguishing a form's prompt from a teacher's answer is a
+  semantic judgment. No boundary rule reaches it; a model does it trivially.
+- *The admissibility layer.* Note that the wrong differentiation value is 383 characters and would
+  pass the coarse 600-character shape guard. Shape checks would not have caught this one — the
+  **value-in-citation** check is also no help, since the text is genuinely in the document. What
+  would catch it is *locus*: a form's instruction sits in a different structural position than an
+  answer. That is the first concrete evidence for a locus rule, and it comes from a foreign
+  document rather than from in-family guesswork, which is exactly the order Codex argued for.
+
+**Also worth noting: the deterministic path does not run through `ExtractionAdmissibility` at all.**
+Today's wrong differentiation is not gated by anything. Whether the deterministic extractor should
+also answer via the contract is a Step 3 question.
+
+**Corpus tally so far — 2 foreign documents, 2 different failure modes**, neither of which the two
+in-family families exhibited: HMH gave a 1,900-character run-on and three wrong fields; this gives
+a form-instruction mistaken for content. Codex's estimate of 5 minimum looks conservative, not
+cautious.
