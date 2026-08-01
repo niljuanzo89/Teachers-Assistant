@@ -108,6 +108,10 @@ enum ExtractionAdmissibility {
     private static let maximumListItems = 40
     private static let maximumListItemLength = 200
     private static let maximumSteps = 30
+    /// A step's body is legitimately a few sentences; it is not a section. Without this a step
+    /// note could be arbitrarily long as long as it appeared inside a large quote, which left the
+    /// absurd-shape guard doing nothing for `.steps` (Codex, Batch 051 debrief).
+    private static let maximumStepNotesLength = 600
 
     static func admit(
         _ proposal: ExtractionProposal, against document: SourceDocumentModel
@@ -263,15 +267,25 @@ enum ExtractionAdmissibility {
         var collapsed = ""
         var offsets: [Int] = []
         var index = 0
-        var pendingSpace = false
+        var pendingStart: Int?
+        var pendingHasNewline = false
         for character in text {
             if character.isWhitespace {
-                if !collapsed.isEmpty { pendingSpace = true }
+                if !collapsed.isEmpty {
+                    if pendingStart == nil { pendingStart = index }
+                    if character.isNewline { pendingHasNewline = true }
+                }
             } else {
-                if pendingSpace {
-                    collapsed.append(" ")
-                    offsets.append(index)
-                    pendingSpace = false
+                if let start = pendingStart {
+                    // A run of whitespace containing a line break stays a line break. Collapsing it
+                    // to a space would let a quote match *across* a real boundary — an extractor
+                    // could quote an objective and the assessment beneath it as one contiguous
+                    // string and be admitted. Horizontal whitespace still collapses, which is what
+                    // the table-row case actually needs.
+                    collapsed.append(pendingHasNewline ? "\n" : " ")
+                    offsets.append(start)
+                    pendingStart = nil
+                    pendingHasNewline = false
                 }
                 collapsed.append(character)
                 offsets.append(index)
@@ -289,7 +303,9 @@ enum ExtractionAdmissibility {
         case .list(let items):
             return items.count <= maximumListItems && items.allSatisfy { $0.count <= maximumListItemLength }
         case .steps(let steps):
-            return steps.count <= maximumSteps && steps.allSatisfy { $0.title.count <= maximumListItemLength }
+            return steps.count <= maximumSteps && steps.allSatisfy {
+                $0.title.count <= maximumListItemLength && $0.notes.count <= maximumStepNotesLength
+            }
         }
     }
 }

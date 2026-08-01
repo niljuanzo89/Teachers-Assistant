@@ -167,6 +167,43 @@ final class ExtractionAdmissibilityTests: XCTestCase {
         XCTAssertEqual(result.rejections[.objective], [.tooManyCandidates])
     }
 
+    /// Whitespace collapsing exists for table rows, where cells are tab-separated in canonical
+    /// text and quoted with spaces by any realistic extractor. It must not extend to line breaks:
+    /// otherwise an extractor could quote an objective *and* the assessment beneath it as one
+    /// contiguous string and have it admitted.
+    func testAQuoteMatchedOnlyByCollapsingALineBreakIsRejected() {
+        let objectiveBlock = blockID(containing: "Objective:")
+        let materialsBlock = blockID(containing: "Materials:")
+        let acrossTheBoundary = "equal groups. Materials: counters"
+        let result = ExtractionAdmissibility.admit(
+            proposal(.objective, [candidate(acrossTheBoundary, quoting: acrossTheBoundary,
+                                            blocks: [objectiveBlock, materialsBlock])]),
+            against: document
+        )
+        XCTAssertNil(result.fields[.objective])
+        XCTAssertEqual(result.rejections[.objective], [.quoteNotFound])
+    }
+
+    /// The absurd-shape guard did nothing for `.steps`: only the count and the title were checked,
+    /// so a note could be arbitrarily long provided it sat inside a large quote.
+    func testAnAbsurdlyLongStepNoteIsRejected() {
+        let long = String(repeating: "and then the class continues working through the task. ", count: 20)
+        let document = SourceDocumentModel.build(from: "Warm-Up\t\(long)")
+        let result = ExtractionAdmissibility.admit(
+            ExtractionProposal(
+                proposalID: "t", schemaVersion: "1", producer: "test",
+                candidates: [.steps: [ExtractedFieldCandidate(
+                    value: .steps([LessonFieldExtractor.ExtractedStep(
+                        title: "Warm-Up", notes: long.trimmingCharacters(in: .whitespaces)
+                    )]),
+                    citation: SourceCitation(blockIDs: ["b0"], quote: "Warm-Up \(long)")
+                )]]
+            ),
+            against: document
+        )
+        XCTAssertEqual(result.rejections[.steps], [.implausibleShape])
+    }
+
     // MARK: - Ranking and exclusivity
 
     func testARejectedFirstCandidateFallsThroughToTheSecond() {

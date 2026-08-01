@@ -3816,3 +3816,33 @@ registration.
 in hand, against Codex's advice to obtain five first. Contract details — quote length, multi-block
 citations, table-row granularity, boilerplate — are exactly what foreign documents expose early,
 and the CRLF bug in Batch 050 was an example of that class.
+
+**Batch 051 follow-up (after Codex debrief).** Two holes closed, both real:
+
+1. **Whitespace collapsing was too permissive across line breaks.** It exists so a table row
+   quoted with spaces matches canonical text separated by tabs — but collapsing *newlines* too
+   meant an extractor could quote an objective and the assessment beneath it as one contiguous
+   string and be admitted. Now a run of whitespace containing a line break collapses to a line
+   break, not a space: horizontal whitespace still collapses, so the table-row case that motivated
+   this is unaffected, while a quote crossing a real block boundary no longer matches. Applied to
+   the value-in-citation check as well as quote lookup.
+2. **The absurd-shape guard did nothing for `.steps`.** Only step count and title length were
+   checked, so a note could be arbitrarily long provided it appeared inside a large quote. Notes
+   are now capped too.
+
+**Codex confirmed the exclusivity retry loop terminates** under `maximumCandidates = 2`:
+candidates are spent when evaluated, including successful ones, so each pass can only advance to
+unspent candidates. I had convinced myself of this but wanted it checked rather than assumed.
+
+**Confirmed by Codex, recorded as decisions:** `emptyValue` and `emptyCitation` stay *rejections*
+rather than silent blanks — a proposed blank is an assertion without evidence, and admitting one
+would make it trivial for a model to erase fields. Absence is expressed by omission. If Step 3
+needs explicit "I found nothing" semantics, that is a decoded producer signal, not an admitted
+candidate.
+
+**Step 3 boundary decided:** the JSON adapter — decode, reject malformed payloads, reject unknown
+field names, validate shape and candidate count — belongs **in the hosted extractor
+implementation**, not inside `admit()`. `ExtractionAdmissibility` stays the internal invariant
+checker and never sees external JSON.
+
+**Verification:** 268 tests passing, `xcodebuild` succeeds.
