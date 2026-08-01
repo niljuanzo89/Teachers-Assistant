@@ -3609,3 +3609,63 @@ remain common, build teacher-guided mapping before more model tuning; if runtime
 acceptable bounds on target Macs, demote the model to optional. Do not sink months into prompt
 polish — Grok's stop signal is two weeks of spike work that fails to beat the grammar baseline on
 foreign PDFs.
+
+## Model-first extraction — action steps, panel-adjudicated
+
+Premises now fixed by the owner: AI-free dropped, **no student data**, **personal use**, so a
+hosted API is acceptable. That moots the hardware dispute, the model-size dispute, and
+procurement.
+
+**The one real disagreement: build the admissibility layer before or after wiring a model.**
+- *Gemini:* flip it. Writing verification against hand-written fake responses tests assumptions
+  about how models fail, not how they actually fail. Frontier models rarely break schemas; they
+  fail semantically, and tight locus rules cannot be written blind.
+- *Grok:* guard first, "Gemini is wrong here." The failure modes were already observed on the HMH
+  PDF; frontier quality reduces their frequency, not their class. Spike-first is how you get a
+  demo that looks 80% right and a product that quietly misattributes.
+- *Codex:* admissibility first, **but narrow its first version** — and this is the synthesis that
+  was adopted. Build the *invariant core* now (claimed block IDs exist; the quote is present in
+  those blocks; the value is derivable from the quote; field shape is plausible; two fields cannot
+  claim the same span; failure means blank or candidate, never an accepted value). Then wire a
+  model quickly and let **observed** failures drive the richer *locus* rules — because section
+  ancestry plausibility is exactly where the rules would overfit to the 20 in-family documents.
+
+Codex's architectural reason for not deferring the guard: if the model arrives before the
+contract, it becomes the source of truth by default, which is the wrong boundary.
+
+**Now unanimous, and a change from the previous round:** the deterministic grammar is **frozen**,
+not maintained as a co-equal engine. Offline fallback is a weak argument under hosted + personal
+use. Its remaining value is as a regression baseline and a scorer for the spike. Stop growing it;
+243 tests are an asset only if they stop multiplying.
+
+**Also unanimous: "no student data" needs a mechanism, not a policy statement.** Real
+differentiation and accommodation notes carry names. Local preflight before any API call —
+detect names/emails/IDs/roster-shaped lists, warn, redact before sending, show the redacted
+preview, keep the unredacted original local or unpersisted.
+
+**Unique catches worth keeping:**
+- *Codex:* **prompt injection.** Curriculum documents are untrusted input; source text must not be
+  able to instruct the model. Nobody else raised it.
+- *Codex:* store schema, model, and prompt version with every extraction result.
+- *Codex:* an **error taxonomy** for scoring — blank / hallucinated / wrong section / wrong
+  lesson-day / wrong field / partial / overlong / stale provenance. Document-level scoring hides
+  all of this.
+- *Codex:* get **5 foreign documents early**, so the block model and admissibility rules do not
+  become in-family architecture with a hosted model bolted on. This moves corpus work earlier.
+- *Codex:* **per-field thresholds** instead of a blanket 10%. Objective, assessment,
+  differentiation and placement should be near zero confident-wrong; materials and steps can
+  tolerate more given approval gating.
+- *Gemini:* tag blocks explicitly in the prompt (`<block id="b42" page="3" section="...">`) and
+  use the provider's native structured outputs rather than hand-parsed JSON.
+- *Grok:* set a cost/latency budget per document; log every prompt/response pair for replay;
+  distinguish "a blank the teacher fixes in two seconds" from "a blank that blocks the workflow".
+
+**Pushback accepted:** I am over-weighting span verification — Codex: "the real enemy is
+cross-context contamination", not fabrication. I am under-weighting corpus design and redaction:
+the outside corpus should *shape* the verifier, not merely gate it afterwards. And Grok's blunt
+note that I am over-weighting reviewer consensus — the argument is settled; pick the order and
+build.
+
+**Cut:** on-device exploration before the deployment decision; dual-engine product maintenance;
+a third ranked candidate (two is enough if admissibility drops losers); publisher-specific special
+cases until a corpus shows a pattern.
