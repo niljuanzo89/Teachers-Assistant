@@ -808,7 +808,12 @@ final class AppStore: ObservableObject {
             lastError = PDFTextExtractionError.unreadable.localizedDescription
             return
         }
-        let text = document.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // Normalized to LF at the source: PDF text can carry CR or CRLF, and character-offset
+        // arithmetic over mixed line endings silently mis-points (see `SourceDocumentModel`).
+        let text = (document.string ?? "")
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         let extraction: (method: SourceExtractionMethod, text: String, confidence: Double?)
         if text.isEmpty {
             do {

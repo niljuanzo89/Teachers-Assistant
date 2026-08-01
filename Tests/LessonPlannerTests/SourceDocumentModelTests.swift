@@ -86,6 +86,42 @@ final class SourceDocumentModelTests: XCTestCase {
         XCTAssertNil(model.text(at: (sample.count + 10)..<(sample.count + 20)))
     }
 
+    /// Codex caught this in review. Swift counts `\r\n` as one `Character`, but
+    /// `components(separatedBy: .newlines)` splits on unicode scalars and treats it as two — so
+    /// Windows-authored text produced a phantom empty line and pushed every later block's range
+    /// past the end of the document. It looks fine until a citation is checked.
+    func testCRLFTextProducesCorrectBlocksAndOffsets() {
+        let model = SourceDocumentModel.build(from: "Objective: Compare numbers.\r\nMaterials: cubes\r\n")
+
+        XCTAssertEqual(model.blocks.first?.rawText, "Objective: Compare numbers.")
+        XCTAssertEqual(model.citableBlocks.count, 2, "a phantom line appeared: \(model.blocks.map(\.rawText))")
+        for block in model.blocks {
+            XCTAssertEqual(model.text(at: block.range), block.rawText, "block \(block.id)")
+        }
+        XCTAssertFalse(model.canonicalText.contains("\r"))
+    }
+
+    /// The pressure case for the admissibility layer: a citation quotes part of a wide table row,
+    /// so the verifier has to locate a value *inside* a block rather than accept the whole block.
+    func testAQuoteCanBeLocatedInsideAWideTableRow() {
+        let model = SourceDocumentModel.build(
+            from: "Part\tTime\tActions\nWarm-Up\t5 min\tShow 3 plates with 4 counters.\n"
+        )
+        guard let row = model.citableBlocks.last else { return XCTFail("no row") }
+        let quote = "Show 3 plates with 4 counters."
+
+        // Present in the raw text, and locatable at a real offset within the document.
+        XCTAssertTrue(row.rawText.contains(quote))
+        guard let local = row.rawText.range(of: quote) else { return XCTFail("quote not found") }
+        let start = row.range.lowerBound + row.rawText.distance(from: row.rawText.startIndex, to: local.lowerBound)
+        XCTAssertEqual(model.text(at: start..<(start + quote.count)), quote)
+
+        // And the row's other cells are *not* the value — the reason a block ID alone is not a
+        // sufficient citation.
+        XCTAssertEqual(row.line.valueCell, quote)
+        XCTAssertNotEqual(row.line.headingCell, quote)
+    }
+
     /// Offsets have to survive multi-byte characters, since real curriculum text carries curly
     /// quotes, dashes and fractions.
     func testOffsetsSurviveNonASCIIText() {

@@ -3715,3 +3715,41 @@ registration for `SourceDocumentModel.swift`. Offsets are asserted to survive no
 
 **Still outstanding before Step 2:** Codex's note to get 5 foreign documents early, so the block
 model and the admissibility rules are not shaped entirely by in-family material.
+
+**Batch 050 follow-up (after Codex debrief).** Codex found a real offset bug and it took two
+attempts to fix, the second being a Swift trap worth recording.
+
+**The bug: CRLF.** Offset arithmetic assumed every separator `components(separatedBy: .newlines)`
+consumed was one `Character`. It is not. Swift counts `\r\n` as **one** `Character`, but
+`components` splits on unicode scalars and treats it as **two** — so Windows-authored text
+produced a phantom empty line and pushed every subsequent block's range past the end of the
+document. Invisible until a citation is checked, which is exactly when it would have been blamed
+on the model.
+
+Fixed in two places: `SourceDocumentModel` normalizes line endings before measuring anything, and
+the PDF import path normalizes at the source so `extractedText` and `canonicalText` agree in
+practice (DOCX flattening already emits LF only).
+
+**The second attempt failed silently, for an instructive reason.** The first fix guarded with
+`text.contains("\r")` — which returns **false** on `"A\r\nB"`, because `\r\n` is a single grapheme
+cluster and does not equal `\r`. The guard skipped the exact input it existed for, and the test
+still failed with normalization apparently in place. `text.unicodeScalars.contains("\r")` is the
+reliable test. **A `String.contains` check for a bare CR cannot see one inside a CRLF.**
+
+**Codex's answers to the Step 2 design questions, recorded for the next batch:**
+- **Citation shape: block IDs plus a quote**, not model-supplied character offsets. The verifier
+  resolves the quote against the cited blocks' `rawText`, computes the span itself, and rejects or
+  flags when the quote is absent or ambiguous. Offsets become derived data *after* verification,
+  never model-supplied identity. A test now demonstrates locating a quote inside a wide table row
+  — the pressure case, since a block ID alone cannot identify which cell is the value.
+- **`citableBlocks` stays "not blank" for now.** Do not encode "headers and footers are not
+  evidence" into the invariant layer; that is prompt packaging or a later locus rule, and the
+  invariant verifier should stay semantic-free.
+- **Blanks-as-blocks was the right departure** from its own earlier advice, given they are
+  semantic terminators for the extractor.
+- **Get the 5 foreign documents before or during Step 2**, not after: contract details like quote
+  length, multi-block citations, table-row granularity, repeated boilerplate and line-ending
+  normalization are exactly what foreign documents expose early. The CRLF bug is itself an example
+  of that class.
+
+**Verification:** 253 tests passing, `xcodebuild` succeeds.

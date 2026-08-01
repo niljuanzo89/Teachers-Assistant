@@ -52,6 +52,8 @@ struct SourceBlock: Equatable, Identifiable {
 /// Transient and derived — `ImportedSource.extractedText` remains the persisted `String`, so no
 /// stored data, span offset, or existing consumer changes shape.
 struct SourceDocumentModel {
+    /// The text every offset in `blocks` points into. Identical to the source's `extractedText`
+    /// except that line endings are normalized to LF — see `normalizingLineEndings`.
     var canonicalText: String
     var blocks: [SourceBlock]
 
@@ -63,8 +65,9 @@ struct SourceDocumentModel {
     /// the line list are the same sequence, and this layer adds addressing without altering
     /// behaviour. Blank blocks simply are not offered to an extractor as evidence.
     static func build(from extractedText: String) -> SourceDocumentModel {
-        let lines = extractedText.components(separatedBy: .newlines)
-        let parsed = SourceTextLine.parse(extractedText)
+        let canonical = Self.normalizingLineEndings(extractedText)
+        let lines = canonical.components(separatedBy: .newlines)
+        let parsed = SourceTextLine.parse(canonical)
         var blocks: [SourceBlock] = []
         blocks.reserveCapacity(lines.count)
 
@@ -83,7 +86,24 @@ struct SourceDocumentModel {
             ))
             offset += length + 1   // + the newline that `components` consumed
         }
-        return SourceDocumentModel(canonicalText: extractedText, blocks: blocks)
+        return SourceDocumentModel(canonicalText: canonical, blocks: blocks)
+    }
+
+    /// Collapses CRLF and lone CR to LF before anything measures an offset.
+    ///
+    /// Without this the arithmetic above is wrong on Windows-authored text, and wrong in a way
+    /// that looks fine until a citation is checked. Swift counts `\r\n` as **one** `Character`,
+    /// but `components(separatedBy: .newlines)` splits on unicode scalars and so treats it as
+    /// **two** separators — yielding a phantom empty line and shifting every subsequent block's
+    /// range off the end of the document. Caught by Codex in the Batch 050 debrief.
+    private static func normalizingLineEndings(_ text: String) -> String {
+        // No `contains("\r")` fast path: Swift treats `\r\n` as a single grapheme cluster, so
+        // `"A\r\nB".contains("\r")` is **false** and such a guard skips the very input it exists
+        // for. Comparing unicode scalars is the reliable test.
+        guard text.unicodeScalars.contains("\r") else { return text }
+        return text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
     }
 
     private static func kind(of line: SourceTextLine, raw: String) -> SourceBlock.Kind {
