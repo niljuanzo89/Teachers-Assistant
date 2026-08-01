@@ -3441,3 +3441,56 @@ schedule. `DocumentPlacementClassifier`'s substring scans are lower priority: it
 lesson-shape gate already runs through the extractor and inferencer.
 
 **Verification:** 241 tests passing (8 new in Batch G total), `xcodebuild` succeeds.
+
+**Batch 049 second follow-up — four-model panel on the Batch G outcome.**
+
+All four agreed the structured-extraction result validates continuing, and all four said the
+in-family 10/10 is being over-weighted: it is evidence the representation bug is gone, not
+evidence of generalization. The **"narrow the input contract" recommendation stands unchanged**
+until outside documents are measured. Grok's framing: the two structural rules are still
+heuristics, but they are heuristics over *shape* rather than over lesson vocabulary — "they will
+fail on unfamiliar shapes; they will not hallucinate 'Exit Ticket' from a keyword."
+
+**They disagreed about which rule breaks first — and two of the three predictions were
+confirmed as live defects by testing them before fixing anything:**
+
+1. **Grok: the duration-column preference.** Confirmed. `hasDurationColumn` made the unit
+   optional, so a pacing grid's "Lesson" column of 1, 2, 3 matched as timing. The preference was
+   doing nothing to discriminate — row count was — and a longer pacing grid would have won and
+   named the phases "1", "2", "3". Fixed: an explicit unit ("5 min") always counts; bare numbers
+   count only when that column's own header names time.
+2. **Gemini: the sentence-punctuation header rule.** Confirmed. Testing *every* cell fails on an
+   abbreviated column name — `Est. Time.` ends in a period, so a real header was rejected and
+   "Part" was promoted to a phase. Fixed: judge the **prose column** only, since that is the one
+   place the sentence/label distinction means anything.
+3. **Codex: the two-cell/wider-row split** as highest confidently-wrong risk. Not reproduced yet.
+   Grok argues its likely failure (a two-column `Phase | Activity` procedure read as label/value)
+   fails **blank**, which is the safe direction. Left as-is, recorded as the open disagreement.
+
+Both fixes are pinned by tests naming the panel prediction that found them.
+
+**Agreed order for what comes next**, unanimous across all four:
+1. **Outside-source corpus** — 8-15 documents minimum (Grok), 30-50 preferred (Codex, Gemini),
+   from teachers/districts/publishers outside both families. Vocabulary frozen, nothing fixed
+   during the run, blanks scored separately from confidently-wrong. **No further parser work
+   first.**
+2. **Teacher-guided template mapping** — recommended by all three external models in every
+   consultation so far and still not built. Confirm which table is the procedure, which column is
+   duration, which row is the assessment; persist per source family.
+3. **Span detection over table rows** — it still only opens on flat `Weekday:` headings, so
+   extraction now understands tables while span detection does not. An architectural
+   inconsistency, but secondary to the two above.
+4. **Manual material linking** — last; it improves workflow, not extraction trust.
+
+**Under-weighted, per the panel:** *table selection* rather than table parsing — parsing is now
+sound, and picking the wrong table is the remaining confidently-wrong path. Codex suggests the
+parser expose *why* it chose a table (duration column, header shape, row count) so a low-confidence
+selection can route to "needs review" instead of silent extraction. Also under-weighted: negative
+examples — documents with multiple timed tables, rubrics, standards grids, merged cells, and
+malformed teacher-edited tables will teach more than another ten clean wins. Gemini specifically
+flags merged/nested/borderless cells, which the current flattening has never met.
+
+**Permanent rule adopted:** never score against a predicate the parser uses. Hand-labelled ground
+truth only.
+
+**Verification:** 243 tests passing, `xcodebuild` succeeds.

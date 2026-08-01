@@ -154,6 +154,44 @@ final class StructuredExtractionTests: XCTestCase {
         XCTAssertEqual(lesson.instructionalSequence.map(\.title), ["Warm-Up", "Launch", "Practice"])
     }
 
+    /// Predicted by the review panel and confirmed as a live defect before fixing: a column of
+    /// bare numbers matched the duration test, so a pacing grid's "Lesson" column of 1, 2, 3 read
+    /// as timing. Row count alone was doing the discriminating, and a longer grid would have won —
+    /// naming the phases "1", "2", "3".
+    func testAPacingGridIsNotMistakenForATimedProcedure() {
+        let pacing = SourceTableRun.runs(in: SourceTextLine.parse("""
+        Lesson\tDate\tFocus
+        1\tAugust 3\tMultiplication as equal groups, using counters to build meaning.
+        2\tAugust 4\tArrays as a model, connecting rows and columns to the equation.
+        3\tAugust 5\tNumber lines, using equal jumps to represent repeated addition.
+        """)).first
+        XCTAssertEqual(pacing?.hasDurationColumn, false)
+
+        // Bare numbers still count when the column's own header names time.
+        let timed = SourceTableRun.runs(in: SourceTextLine.parse("""
+        Step\tMin\tWhat happens
+        Warm-Up\t5\tNumber talk about equal groups.
+        Launch\t5\tName the structure for the class.
+        Practice\t10\tSolve six problems together.
+        """)).first
+        XCTAssertEqual(timed?.hasDurationColumn, true)
+    }
+
+    /// Also predicted by the panel: an abbreviated column name ends in a period, so testing every
+    /// cell for sentence punctuation rejected a real header and promoted "Part" to a phase.
+    func testAnAbbreviatedColumnNameIsStillAHeader() {
+        let run = SourceTableRun.runs(in: SourceTextLine.parse("""
+        Part\tEst. Time.\tTeacher and Student Actions
+        Warm-Up\t5 min\tShow 3 plates with 4 counters and ask how many altogether.
+        Launch\t5 min\tName the structure and record the equation for the class.
+        Practice\t10 min\tStudents model each product and record an equation for it.
+        """)).first
+
+        XCTAssertEqual(run?.headerCells?.first, "Part")
+        XCTAssertEqual(run?.dataRows.first?.first, "Warm-Up", "the header row was read as a phase")
+        XCTAssertEqual(run?.dataRows.count, 3)
+    }
+
     /// The other family's shape: a two-column "Component | Plan" table. Its rows must still read as
     /// label/value pairs, and its phase rows must still read as phases.
     @MainActor

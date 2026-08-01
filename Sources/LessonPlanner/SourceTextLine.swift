@@ -98,13 +98,25 @@ struct SourceTableRun {
         return (0..<columnCount).contains { column in
             let values = dataRows.compactMap { $0.indices.contains(column) ? $0[column] : nil }
             guard !values.isEmpty else { return false }
-            let durations = values.filter {
-                $0.range(of: #"^\d{1,3}\s*(min|mins|minute|minutes|hr|hour|hours)?\.?$"#,
+
+            let explicit = values.filter {
+                $0.range(of: #"^\d{1,3}\s*(min|mins|minute|minutes|hr|hour|hours)\.?$"#,
                          options: [.regularExpression, .caseInsensitive]) != nil
             }
-            return durations.count * 2 >= values.count
+            if explicit.count * 2 >= values.count { return true }
+
+            // A column of bare numbers is a duration only when its header says so. Without that,
+            // a pacing grid's "Lesson" column of 1, 2, 3 reads as timing and the grid impersonates
+            // a procedure table — which would name the phases "1", "2", "3".
+            guard let header = headerCells, header.indices.contains(column) else { return false }
+            let named = header[column].lowercased()
+            guard Self.timeHeaderWords.contains(where: named.contains) else { return false }
+            let bare = values.filter { $0.range(of: #"^\d{1,3}$"#, options: .regularExpression) != nil }
+            return bare.count * 2 >= values.count
         }
     }
+
+    private static let timeHeaderWords = ["time", "min", "duration", "length"]
 
     /// Contiguous runs of table rows, each split into an optional header and its data rows.
     static func runs(in lines: [SourceTextLine]) -> [SourceTableRun] {
@@ -152,11 +164,29 @@ struct SourceTableRun {
     private static func readsAsHeader(_ candidate: [String], above body: [[String]]) -> Bool {
         let sameShape = body.allSatisfy { $0.count == candidate.count }
         guard sameShape, !candidate.allSatisfy(\.isEmpty) else { return false }
-        guard !candidate.contains(where: endsASentence) else { return false }
+
+        // Judge the *prose* column only. Testing every cell fails on an abbreviated column name —
+        // "Est. Time." ends in a period, so an any-cell rule rejects a real header and promotes it
+        // to a phase. The sentence/label distinction is only meaningful where sentences live.
+        guard let prose = proseColumn(of: body), candidate.indices.contains(prose) else { return false }
+        guard !endsASentence(candidate[prose]) else { return false }
         // Require the body to actually read as sentences, so a table of terse values throughout
         // keeps its first row rather than losing it to a header that was never there.
-        let sentenceRows = body.filter { $0.contains(where: endsASentence) }
+        let sentenceRows = body.filter { $0.indices.contains(prose) && endsASentence($0[prose]) }
         return sentenceRows.count * 2 >= body.count
+    }
+
+    /// The column carrying the longest typical content — a table's prose column.
+    private static func proseColumn(of body: [[String]]) -> Int? {
+        guard let width = body.first?.count, width > 0 else { return nil }
+        return (0..<width).max { left, right in
+            medianLength(of: body, column: left) < medianLength(of: body, column: right)
+        }
+    }
+
+    private static func medianLength(of body: [[String]], column: Int) -> Int {
+        let lengths = body.compactMap { $0.indices.contains(column) ? $0[column].count : nil }.sorted()
+        return lengths.isEmpty ? 0 : lengths[lengths.count / 2]
     }
 
     private static func endsASentence(_ cell: String) -> Bool {
