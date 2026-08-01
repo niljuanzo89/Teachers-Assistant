@@ -3753,3 +3753,66 @@ reliable test. **A `String.contains` check for a bare CR cannot see one inside a
   of that class.
 
 **Verification:** 253 tests passing, `xcodebuild` succeeds.
+
+### Batch 051 — Step 2: the extraction contract and invariant admissibility core
+
+**Compute: medium-high. Model shape: dual (Codex pre-review + debrief).** Still no model involved.
+
+`ExtractionContract.swift` defines what any extractor returns and what survives contact with the
+document. Built **before** the model deliberately: if the model arrives first it becomes the
+source of truth by default, and a guard written afterwards is one that gets skipped under
+pressure.
+
+**The contract.** `ExtractionProposal` carries `proposalID`, `schemaVersion`, `producer`, and up to
+two ranked `ExtractedFieldCandidate`s per field. A candidate is a typed `ExtractedValue`
+(`.text` / `.list` / `.steps`) plus a `SourceCitation` of **block IDs and a quote — never
+model-supplied offsets**. The verifier resolves the quote itself and derives the span, so position
+is something the app computes rather than something the extractor asserts.
+
+**Codex's two pre-review tightenings, both adopted:**
+1. **Typed payload, not `value: String`.** Materials and steps are already structured; a string
+   payload would have forced the hosted extractor to flatten them and then forced a breaking
+   contract change to get the structure back.
+2. **Quote resolution narrower than "concatenated `rawText`".** Cited blocks must be unique,
+   document-ordered and *contiguous*, resolved through `canonicalText` so real line breaks are
+   included. Naive concatenation would invent adjacency across blocks, letting a quote span text
+   the author never wrote next to each other.
+
+**The five checks**, in order: cited blocks exist → blocks contiguous and ordered → the quote
+occurs **exactly once** in that region (more than once is a rejection, not a coin flip) → **the
+value is contained in its own citation** → shape is plausible. Then exclusivity across fields.
+
+**Check 4 is the one that matters.** The quote check authenticates the *quote*; this binds the
+*value* to it. Without it a model can cite a real sentence and return a polished paraphrase, and
+the citation would prove nothing about the value. Kept strict: exact text after whitespace
+collapsing, with any cleanup left to deterministic app code after admission.
+
+**Exclusivity drops both fields, not the lower-ranked one.** Keeping the higher-ranked one would
+import the extractor's confidence into a layer whose entire job is not to trust it. Both then get
+another turn with their remaining candidates, so one model mistake does not automatically cost
+two fields (Codex's refinement).
+
+**Shape checks are coarse on purpose** — 600 characters, not a tight 300 — per Codex: catch the
+indefensible, not the unusual. A measured 1,900-character objective is absurd under any corpus; a
+tight threshold would silently blank correct values, and a safe failure is still a failure.
+
+**The whitespace trap, hit exactly where Codex predicted it.** The first implementation matched
+the quote against raw region text while comparing the *value* in collapsed space. Every table-row
+citation was rejected as `quoteNotFound`, because canonical text separates cells with tabs and any
+sane extractor quotes them with spaces. Fixed by matching in collapsed space on both sides and
+mapping the match back through a recorded offset table, so the resolved span still points into raw
+text. **This is the second time the `rawText` vs display-text distinction has cost a debugging
+cycle; it is now the single most load-bearing detail in this layer.**
+
+**Tests** are hand-written proposals modelled on measured failures, not imagined ones: a real
+quote belonging to a sub-activity, a paraphrased value with a genuine citation, an objective
+running through five sections, two fields claiming one row, an ambiguous quote in a document that
+repeats itself.
+
+**Verification:** 266 tests passing (13 new), `xcodebuild` succeeds after a 4-entry pbxproj
+registration.
+
+**Known risk, logged rather than mitigated:** the owner chose to proceed without foreign documents
+in hand, against Codex's advice to obtain five first. Contract details — quote length, multi-block
+citations, table-row granularity, boilerplate — are exactly what foreign documents expose early,
+and the CRLF bug in Batch 050 was an example of that class.
