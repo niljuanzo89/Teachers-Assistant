@@ -3669,3 +3669,49 @@ build.
 **Cut:** on-device exploration before the deployment decision; dual-engine product maintenance;
 a third ranked candidate (two is enough if admissibility drops losers); publisher-specific special
 cases until a corpus shows a pattern.
+
+### Batch 050 — Step 1 of model-first: the document block model
+
+**Compute: medium. Model shape: dual (Codex pre-review + debrief).**
+
+The addressable layer a model contract answers *against*. No model involved, and by design it
+changes nothing: `SourceDocumentModel.lines` is asserted identical to `SourceTextLine.parse` over
+the same text, so any later difference in extraction is attributable to the extractor rather than
+to this.
+
+`SourceBlock` carries `id`, `kind`, `rawText`, `range` (character offsets into the canonical
+text), `page`, `headingPath`, and the parsed `SourceTextLine`.
+
+**Codex's review shaped four decisions:**
+1. **A layer above `SourceTextLine`, not a replacement.** It landed two commits ago and both
+   parsers consume it; blocks add identity, offsets and ancestry — things a line parser should not
+   own — without churning working code.
+2. **`headingPath` stays empty.** Text-shape heading inference would manufacture confidence the
+   app has not earned: DOCX style names are discarded at extraction and PDF layout is flattened,
+   so any heading would be a guess dressed as structure. Empty means "unknown", which is true.
+   Codex also warned this is exactly where locus rules would overfit to the 20 in-family
+   documents. It gets filled when the spike shows a measured need.
+3. **Ordinal IDs (`b0`, `b1`), not content-derived.** Real documents repeat themselves — "5 min",
+   "Exit Ticket", "Practice" — so a content hash collides precisely where precision matters.
+   Offsets are the validated pointer, not the identity.
+4. **`rawText` separate from `line`.** Codex's catch: `SourceTextLine.text` joins a row's cells
+   with spaces while the canonical text separates them with tabs, so a validator comparing a
+   citation against the wrong representation would fail on **every table row**. Rule recorded on
+   the type: validate against `rawText`, prompt and display with `line`.
+
+**Departed from Codex's advice in one place, deliberately.** It suggested one block per *non-blank*
+line. Blanks have to stay: the field extractor uses a blank line as a value terminator, so
+dropping them would silently change extraction the moment a caller switched to
+`blocks.map(\.line)`. They are kept as `.blank` blocks and excluded from `citableBlocks`, so the
+sequence is identical and no blank is ever offered to an extractor as evidence.
+
+**A test of mine crashed the suite** — `model.text(at: 5..<2)` traps at *construction*, since
+`Range` cannot hold an inverted bound. The guard against it was dead code. Both removed; the real
+out-of-bounds cases are still covered.
+
+**Verification:** 251 tests passing (8 new), `xcodebuild` succeeds after a 4-entry pbxproj
+registration for `SourceDocumentModel.swift`. Offsets are asserted to survive non-ASCII text
+(curly quotes, em dashes, fractions) since real curriculum carries all three.
+
+**Still outstanding before Step 2:** Codex's note to get 5 foreign documents early, so the block
+model and the admissibility rules are not shaped entirely by in-family material.
